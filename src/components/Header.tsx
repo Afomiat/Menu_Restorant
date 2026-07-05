@@ -53,31 +53,38 @@ export default function Header({
         }}
       >
         {/* Logo — smaller on phone */}
-        <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-          <h1
-            style={{
-              fontFamily: 'var(--font-serif)',
-              fontSize: 'clamp(20px, 5vw, 28px)',
-              fontWeight: 500,
-              letterSpacing: '1px',
-              color: 'var(--text-primary)',
-              lineHeight: 1.1
-            }}
-          >
-            AURA
-          </h1>
-          <span
-            style={{
-              fontFamily: 'var(--font-sans)',
-              fontSize: '8px',
-              textTransform: 'uppercase',
-              letterSpacing: '3px',
-              color: 'var(--accent-gold)',
-              marginTop: '1px'
-            }}
-          >
-            ristorante
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+          <img 
+            src="/images/aura_logo.png" 
+            alt="Aura Logo" 
+            style={{ width: 'clamp(36px, 10vw, 48px)', height: 'clamp(36px, 10vw, 48px)', borderRadius: '6px', objectFit: 'cover', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }} 
+          />
+          <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+            <h1
+              style={{
+                fontFamily: 'var(--font-serif)',
+                fontSize: 'clamp(20px, 5vw, 28px)',
+                fontWeight: 500,
+                letterSpacing: '1px',
+                color: 'var(--text-primary)',
+                lineHeight: 1.1
+              }}
+            >
+              AURA
+            </h1>
+            <span
+              style={{
+                fontFamily: 'var(--font-sans)',
+                fontSize: '8px',
+                textTransform: 'uppercase',
+                letterSpacing: '3px',
+                color: 'var(--accent-gold)',
+                marginTop: '1px'
+              }}
+            >
+              ristorante
+            </span>
+          </div>
         </div>
 
         {/* Right side controls: Search + Table + Cart */}
