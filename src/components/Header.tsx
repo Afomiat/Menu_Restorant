@@ -48,12 +48,12 @@ export default function Header({
           justifyContent: 'space-between',
           alignItems: 'center',
           width: '100%',
-          gap: '8px',
+          gap: '4px',
           minWidth: 0,
         }}
       >
         {/* Logo — smaller on phone */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
           <img 
             src="/images/aura_logo.svg" 
             alt="Aura Logo" 
@@ -88,7 +88,7 @@ export default function Header({
         </div>
 
         {/* Right side controls: Search + Table + Cart */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', minWidth: 0, flex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px', minWidth: 0, flex: 1 }}>
 
           {/* Pill Search — full width remaining on mobile */}
           <div
@@ -96,7 +96,7 @@ export default function Header({
               position: 'relative',
               flex: 1,
               maxWidth: '320px',
-              minWidth: '140px',
+              minWidth: '150px',
             }}
           >
             <Search
