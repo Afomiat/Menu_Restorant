@@ -1,4 +1,5 @@
-import { ShoppingBag, X, Plus, Minus, Trash2, CheckCircle2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ShoppingBag, X, Plus, Minus, Trash2, CheckCircle2, Receipt, ChefHat, Clock, Flame, Undo2 } from 'lucide-react';
 import type { MenuItem } from '../data/menuData';
 
 export interface CartItem {
@@ -6,6 +7,9 @@ export interface CartItem {
   quantity: number;
   variant: string;
   notes?: string;
+  orderId?: string;
+  placedAt?: number;
+  status?: 'not_started' | 'pending' | 'complete';
 }
 
 interface CartDrawerProps {
@@ -15,7 +19,9 @@ interface CartDrawerProps {
   setIsOpen: (open: boolean) => void;
   onUpdateQuantity: (idx: number, change: number) => void;
   onRemoveItem: (idx: number) => void;
-  onClearCart: () => void;
+  onPlaceOrder: () => void;
+  placedOrders: CartItem[];
+  onUndoOrder: (orderId: string) => void;
 }
 
 export default function CartDrawer({
@@ -25,11 +31,15 @@ export default function CartDrawer({
   setIsOpen,
   onUpdateQuantity,
   onRemoveItem,
-  onClearCart
+  onPlaceOrder,
+  placedOrders,
+  onUndoOrder
 }: CartDrawerProps) {
+  const [activeTab, setActiveTab] = useState<'tray' | 'kitchen'>('tray');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
   const [orderId, setOrderId] = useState('');
+
+
 
   const totalPrice = cart.reduce((sum, current) => {
     const variantAdjustment = current.item.variants?.find(v => v.name === current.variant)?.priceAdjustment || 0;
@@ -41,23 +51,23 @@ export default function CartDrawer({
     // Simulate API delay
     setTimeout(() => {
       setIsSubmitting(false);
-      setIsSuccess(true);
       setOrderId(`ORD-${Math.floor(1000 + Math.random() * 9000)}`);
-      onClearCart();
+      onPlaceOrder();
+      setActiveTab('kitchen');
     }, 1500);
   };
 
   const handleClose = () => {
     if (!isSubmitting) {
       setIsOpen(false);
-      setIsSuccess(false);
+      setTimeout(() => setActiveTab('tray'), 300);
     }
   };
 
   return (
     <>
       {/* Dark Backdrop Overlay */}
-      {(isOpen || isSuccess) && (
+      {isOpen && (
         <div
           style={{
             position: 'fixed',
@@ -75,29 +85,18 @@ export default function CartDrawer({
 
       {/* Side Drawer Box */}
       <div
-        className={`cart-side-drawer ${(isOpen || isSuccess) ? 'open' : ''}`}
+        className={`cart-side-drawer ${isOpen ? 'open' : ''}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div
           style={{
-            padding: '24px',
-            borderBottom: '1px solid rgba(255,255,255,0.03)',
+            padding: '24px 24px 16px 24px',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center'
           }}
         >
-          <h3
-            style={{
-              fontFamily: 'var(--font-serif)',
-              fontSize: '20px',
-              fontWeight: 500,
-              color: 'var(--text-primary)'
-            }}
-          >
-            {isSuccess ? 'Order Confirmed' : 'Your Order Tray'}
-          </h3>
           <button
             onClick={handleClose}
             disabled={isSubmitting}
@@ -115,93 +114,55 @@ export default function CartDrawer({
           </button>
         </div>
 
-        {/* Success State */}
-        {isSuccess ? (
-          <div
-            style={{
-              padding: '40px 24px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              textAlign: 'center',
-              gap: '16px',
-              overflowY: 'auto'
-            }}
-          >
-            <CheckCircle2 size={64} style={{ color: '#5c6b4e' }} />
-            <div>
-              <span
-                style={{
-                  fontFamily: 'var(--font-sans)',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  textTransform: 'uppercase',
-                  letterSpacing: '2px',
-                  color: 'var(--accent-gold)',
-                  display: 'block',
-                  marginBottom: '4px'
-                }}
-              >
-                Kitchen Received Order
-              </span>
-              <h4
-                style={{
-                  fontFamily: 'var(--font-serif)',
-                  fontSize: '24px',
-                  fontWeight: 500,
-                  color: 'var(--text-primary)'
-                }}
-              >
-                Enjoy Your Meal
-              </h4>
-              <span
-                style={{
-                  fontFamily: 'var(--font-sans)',
-                  fontSize: '12px',
-                  color: 'var(--text-secondary)',
-                  opacity: 0.8,
-                  display: 'block',
-                  marginTop: '8px'
-                }}
-              >
-                Order Reference: {orderId}
-              </span>
-            </div>
-            <p
-              style={{
-                fontFamily: 'var(--font-sans)',
-                fontSize: '14px',
-                color: 'var(--text-secondary)',
-                lineHeight: '1.6',
-                maxWidth: '300px'
-              }}
-            >
-              Your dishes are being prepared with care. {tableNumber ? `They will be served straight to Table ${tableNumber}.` : 'They will be served to you shortly.'}
-            </p>
+        {/* Tab Bar */}
+        {placedOrders.length > 0 && (
+          <div style={{ display: 'flex', padding: '0 24px 16px 24px', borderBottom: '1px solid rgba(255,255,255,0.03)', gap: '16px' }}>
             <button
-              onClick={handleClose}
+              onClick={() => setActiveTab('tray')}
               style={{
-                marginTop: '12px',
-                backgroundColor: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                color: 'var(--text-primary)',
-                padding: '10px 24px',
-                fontSize: '12px',
-                fontWeight: 600,
-                textTransform: 'uppercase',
-                letterSpacing: '1px',
+                flex: 1,
+                background: activeTab === 'tray' ? 'rgba(201, 168, 118, 0.15)' : 'rgba(255,255,255,0.02)',
+                border: `1px solid ${activeTab === 'tray' ? 'var(--accent-gold)' : 'rgba(255,255,255,0.05)'}`,
+                color: activeTab === 'tray' ? 'var(--accent-gold)' : 'var(--text-secondary)',
                 cursor: 'pointer',
-                borderRadius: '2px',
-                transition: 'var(--transition-smooth)'
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                padding: '10px',
+                borderRadius: '8px',
+                transition: 'all 0.3s ease'
               }}
             >
-              Back to Menu
+              <ShoppingBag size={16} />
+              <span style={{ fontFamily: 'var(--font-sans)', fontSize: '13px', fontWeight: 500 }}>Current Tray</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('kitchen')}
+              style={{
+                flex: 1,
+                background: activeTab === 'kitchen' ? 'rgba(201, 168, 118, 0.15)' : 'rgba(255,255,255,0.02)',
+                border: `1px solid ${activeTab === 'kitchen' ? 'var(--accent-gold)' : 'rgba(255,255,255,0.05)'}`,
+                color: activeTab === 'kitchen' ? 'var(--accent-gold)' : 'var(--text-secondary)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                padding: '10px',
+                borderRadius: '8px',
+                transition: 'all 0.3s ease'
+              }}
+            >
+              <ChefHat size={16} />
+              <span style={{ fontFamily: 'var(--font-sans)', fontSize: '13px', fontWeight: 500 }}>Kitchen Orders</span>
             </button>
           </div>
-        ) : (
-          /* Main Cart Content */
-          <>
-            {cart.length === 0 ? (
+        )}
+
+        {/* Main Cart Content */}
+        <>
+            {(activeTab === 'tray' ? cart : placedOrders).length === 0 ? (
               /* Empty State */
               <div
                 style={{
@@ -215,47 +176,79 @@ export default function CartDrawer({
                   gap: '16px'
                 }}
               >
-                <ShoppingBag size={48} style={{ color: 'var(--accent-gold)', opacity: 0.2 }} />
-                <h4 style={{ fontFamily: 'var(--font-serif)', fontSize: '18px', color: 'var(--text-primary)', fontWeight: 500 }}>
-                  Your Tray is Empty
-                </h4>
-                <p style={{ fontFamily: 'var(--font-sans)', fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.6', maxWidth: '280px' }}>
-                  Browse our gourmet menu and add your favorite dishes to start building your dining experience.
-                </p>
-                <button
-                  onClick={handleClose}
-                  style={{
-                    marginTop: '8px',
-                    backgroundColor: 'var(--accent-gold)',
-                    color: 'var(--bg-dark)',
-                    border: 'none',
-                    padding: '10px 20px',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    letterSpacing: '1.5px',
-                    cursor: 'pointer',
-                    borderRadius: '2px',
-                    transition: 'var(--transition-smooth)'
-                  }}
-                >
-                  Browse Menu
-                </button>
+                {activeTab === 'tray' ? (
+                  <>
+                    <ShoppingBag size={48} style={{ color: 'var(--accent-gold)', opacity: 0.2 }} />
+                    <h4 style={{ fontFamily: 'var(--font-serif)', fontSize: '18px', color: 'var(--text-primary)', fontWeight: 500 }}>
+                      Your Tray is Empty
+                    </h4>
+                    <p style={{ fontFamily: 'var(--font-sans)', fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.6', maxWidth: '280px' }}>
+                      Browse our gourmet menu and add your favorite dishes to start building your dining experience.
+                    </p>
+                    <button
+                      onClick={handleClose}
+                      style={{
+                        marginTop: '8px',
+                        backgroundColor: 'var(--accent-gold)',
+                        color: 'var(--bg-dark)',
+                        border: 'none',
+                        padding: '10px 20px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        letterSpacing: '1.5px',
+                        cursor: 'pointer',
+                        borderRadius: '2px',
+                        transition: 'var(--transition-smooth)'
+                      }}
+                    >
+                      Browse Menu
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <ChefHat size={48} style={{ color: 'var(--accent-gold)', opacity: 0.2 }} />
+                    <h4 style={{ fontFamily: 'var(--font-serif)', fontSize: '18px', color: 'var(--text-primary)', fontWeight: 500 }}>
+                      No Orders Sent Yet
+                    </h4>
+                    <p style={{ fontFamily: 'var(--font-sans)', fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.6', maxWidth: '280px' }}>
+                      Items you send to the kitchen will appear here.
+                    </p>
+                    <button
+                      onClick={() => setActiveTab('tray')}
+                      style={{
+                        marginTop: '8px',
+                        backgroundColor: 'rgba(255,255,255,0.03)',
+                        color: 'var(--text-primary)',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        padding: '10px 20px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        letterSpacing: '1.5px',
+                        cursor: 'pointer',
+                        borderRadius: '2px',
+                        transition: 'var(--transition-smooth)'
+                      }}
+                    >
+                      View Tray
+                    </button>
+                  </>
+                )}
               </div>
             ) : (
-              /* Cart List State */
               <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, overflow: 'hidden', position: 'relative' }}>
                 <div
                   style={{
                     flexGrow: 1,
                     overflowY: 'auto',
-                    padding: '0 24px 140px 24px',
+                    padding: activeTab === 'tray' ? '0 24px 140px 24px' : '0 24px 40px 24px',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '16px'
                   }}
                 >
-                  {cart.map((cartItem, idx) => {
+                  {(activeTab === 'tray' ? cart : placedOrders).map((cartItem, idx) => {
                     const variantAdjustment = cartItem.item.variants?.find(v => v.name === cartItem.variant)?.priceAdjustment || 0;
                     const itemPrice = cartItem.item.price + variantAdjustment;
                     
@@ -327,164 +320,252 @@ export default function CartDrawer({
                           </span>
                         </div>
 
-                        {/* Quantity edits */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <button
-                            onClick={() => onUpdateQuantity(idx, -1)}
-                            style={{
-                              backgroundColor: 'rgba(255,255,255,0.03)',
-                              border: '1px solid rgba(255,255,255,0.05)',
-                              color: 'var(--text-secondary)',
-                              width: '24px',
-                              height: '24px',
-                              borderRadius: '2px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            <Minus size={10} />
-                          </button>
-                          <span
-                            style={{
-                              fontFamily: 'var(--font-sans)',
-                              fontSize: '13px',
-                              fontWeight: 600,
-                              width: '18px',
-                              textAlign: 'center',
-                              color: 'var(--text-primary)'
-                            }}
-                          >
-                            {cartItem.quantity}
-                          </span>
-                          <button
-                            onClick={() => onUpdateQuantity(idx, 1)}
-                            style={{
-                              backgroundColor: 'rgba(255,255,255,0.03)',
-                              border: '1px solid rgba(255,255,255,0.05)',
-                              color: 'var(--text-secondary)',
-                              width: '24px',
-                              height: '24px',
-                              borderRadius: '2px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            <Plus size={10} />
-                          </button>
-                          <button
-                            onClick={() => onRemoveItem(idx)}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              color: '#a94a42',
-                              cursor: 'pointer',
-                              padding: '4px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              marginLeft: '4px'
-                            }}
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                        {/* Quantity edits or read-only */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          {activeTab === 'tray' ? (
+                            <>
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  backgroundColor: 'rgba(255,255,255,0.03)',
+                                  border: '1px solid rgba(255,255,255,0.08)',
+                                  borderRadius: '20px',
+                                  padding: '2px 4px',
+                                  gap: '2px'
+                                }}
+                              >
+                                <button
+                                  onClick={() => onUpdateQuantity(idx, -1)}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: 'var(--text-secondary)',
+                                    width: '24px',
+                                    height: '24px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    borderRadius: '50%',
+                                    transition: 'background-color 0.2s'
+                                  }}
+                                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
+                                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                >
+                                  <Minus size={12} />
+                                </button>
+                                <span
+                                  style={{
+                                    fontFamily: 'var(--font-sans)',
+                                    fontSize: '13px',
+                                    fontWeight: 600,
+                                    width: '20px',
+                                    textAlign: 'center',
+                                    color: 'var(--text-primary)'
+                                  }}
+                                >
+                                  {cartItem.quantity}
+                                </span>
+                                <button
+                                  onClick={() => onUpdateQuantity(idx, 1)}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: 'var(--text-secondary)',
+                                    width: '24px',
+                                    height: '24px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    borderRadius: '50%',
+                                    transition: 'background-color 0.2s'
+                                  }}
+                                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
+                                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                >
+                                  <Plus size={12} />
+                                </button>
+                              </div>
+                              <button
+                                onClick={() => onRemoveItem(idx)}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#a94a42',
+                                  cursor: 'pointer',
+                                  padding: '4px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  marginLeft: '4px'
+                                }}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              {/* Status Tag */}
+                              {cartItem.status === 'complete' ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'rgba(100, 200, 100, 0.1)', border: '1px solid rgba(100, 200, 100, 0.3)', padding: '4px 8px', borderRadius: '4px', color: '#8cd98c' }}>
+                                  <CheckCircle2 size={12} />
+                                  <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>Complete</span>
+                                </div>
+                              ) : cartItem.status === 'pending' ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'rgba(201, 168, 118, 0.1)', border: '1px solid rgba(201, 168, 118, 0.3)', padding: '4px 8px', borderRadius: '4px', color: 'var(--accent-gold)' }}>
+                                  <Flame size={12} />
+                                  <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>Pending</span>
+                                </div>
+                              ) : (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'rgba(255, 100, 100, 0.1)', border: '1px solid #ff6666', padding: '4px 10px', borderRadius: '20px', color: '#ff6666' }}>
+                                  <Clock size={12} />
+                                  <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>Not Started</span>
+                                </div>
+                              )}
+
+                              <div
+                                style={{
+                                  backgroundColor: 'rgba(255,255,255,0.03)',
+                                  border: '1px solid rgba(255,255,255,0.05)',
+                                  color: 'var(--text-primary)',
+                                  height: '28px',
+                                  width: '28px',
+                                  minWidth: '28px',
+                                  minHeight: '28px',
+                                  borderRadius: '50%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontFamily: 'var(--font-sans)',
+                                  flexShrink: 0
+                                }}
+                              >
+                                <span style={{ fontSize: '12px', fontWeight: 600, transform: 'translateY(-1px)' }}>{cartItem.quantity}</span>
+                                <span style={{ fontSize: '9px', marginLeft: '1px', opacity: 0.7, fontWeight: 500, transform: 'translateY(1px)' }}>x</span>
+                              </div>
+
+                              {/* Undo Button if not_started */}
+                              {cartItem.status === 'not_started' && cartItem.orderId && (
+                                <button
+                                  onClick={() => onUndoOrder(cartItem.orderId!)}
+                                  title="Delete Order"
+                                  style={{
+                                    background: 'none',
+                                    border: '1px solid rgba(255, 100, 100, 0.3)',
+                                    backgroundColor: 'rgba(255, 100, 100, 0.05)',
+                                    color: '#ff6666',
+                                    cursor: 'pointer',
+                                    padding: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    marginLeft: '4px',
+                                    borderRadius: '50%',
+                                    height: '24px',
+                                    width: '24px',
+                                    transition: 'all 0.3s ease',
+                                    flexShrink: 0
+                                  }}
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              )}
+                            </>
+                          )}
                         </div>
                       </div>
                     );
                   })}
                 </div>
 
-                {/* Bottom checkout action */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    padding: '20px 24px',
-                    paddingBottom: 'calc(24px + env(safe-area-inset-bottom, 0px))',
-                    borderTop: '1px solid rgba(255,255,255,0.06)',
-                    backgroundColor: 'rgba(21, 22, 28, 0.55)',
-                    backdropFilter: 'blur(16px)',
-                    WebkitBackdropFilter: 'blur(16px)',
-                    zIndex: 10,
-                  }}
-                >
+                {/* Bottom checkout action - ONLY visible on Tray tab */}
+                {activeTab === 'tray' && (
                   <div
                     style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: '16px'
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      padding: '20px 24px',
+                      paddingBottom: 'calc(24px + env(safe-area-inset-bottom, 0px))',
+                      borderTop: '1px solid rgba(255,255,255,0.06)',
+                      backgroundColor: 'rgba(21, 22, 28, 0.55)',
+                      backdropFilter: 'blur(16px)',
+                      WebkitBackdropFilter: 'blur(16px)',
+                      zIndex: 10,
                     }}
                   >
-                    <span
+                    <div
                       style={{
-                        fontFamily: 'var(--font-sans)',
-                        fontSize: '13px',
-                        textTransform: 'uppercase',
-                        letterSpacing: '1px',
-                        color: 'var(--text-secondary)'
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '16px'
                       }}
                     >
-                      Total Value
-                    </span>
-                    <span
-                      style={{
-                        fontFamily: 'var(--font-sans)',
-                        fontSize: '22px',
-                        fontWeight: 600,
-                        color: 'var(--accent-gold)'
-                      }}
-                    >
-                      {totalPrice} Birr
-                    </span>
-                  </div>
-
-                  {/* Submission triggers */}
-                  <button
-                    onClick={handlePlaceOrder}
-                    disabled={isSubmitting}
-                    style={{
-                      width: '100%',
-                      height: '48px',
-                      borderRadius: '30px',
-                      border: 'none',
-                      backgroundColor: isSubmitting ? '#46553e' : 'var(--accent-gold)',
-                      color: isSubmitting ? '#f2efe9' : 'var(--bg-dark)',
-                      fontFamily: 'var(--font-serif)',
-                      fontStyle: 'italic',
-                      fontSize: '16px',
-                      fontWeight: 600,
-                      textTransform: 'none',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-                      boxShadow: isSubmitting ? 'none' : '0 8px 20px rgba(201, 168, 118, 0.4)'
-                    }}
-                  >
-                    {isSubmitting ? (
-                      <span>Sending to Kitchen...</span>
-                    ) : (
-                      <span>
-                        Place order
+                      <span
+                        style={{
+                          fontFamily: 'var(--font-sans)',
+                          fontSize: '13px',
+                          textTransform: 'uppercase',
+                          letterSpacing: '1px',
+                          color: 'var(--text-secondary)'
+                        }}
+                      >
+                        Total Value
                       </span>
-                    )}
-                  </button>
-                </div>
+                      <span
+                        style={{
+                          fontFamily: 'var(--font-sans)',
+                          fontSize: '22px',
+                          fontWeight: 600,
+                          color: 'var(--accent-gold)'
+                        }}
+                      >
+                        {totalPrice} Birr
+                      </span>
+                    </div>
+
+                    {/* Submission triggers */}
+                    <button
+                      onClick={handlePlaceOrder}
+                      disabled={isSubmitting}
+                      style={{
+                        width: '100%',
+                        height: '48px',
+                        borderRadius: '30px',
+                        border: 'none',
+                        backgroundColor: isSubmitting ? '#46553e' : 'var(--accent-gold)',
+                        color: isSubmitting ? '#f2efe9' : 'var(--bg-dark)',
+                        fontFamily: 'var(--font-serif)',
+                        fontStyle: 'italic',
+                        fontSize: '16px',
+                        fontWeight: 600,
+                        textTransform: 'none',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                        boxShadow: isSubmitting ? 'none' : '0 8px 20px rgba(201, 168, 118, 0.4)'
+                      }}
+                    >
+                      {isSubmitting ? (
+                        <span>Sending to Kitchen...</span>
+                      ) : (
+                        <span>
+                          Place order
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </>
-        )}
       </div>
     </>
   );
 }
-
-// Inline useState hook shim if missing, but it is imported at the top
-import { useState } from 'react';

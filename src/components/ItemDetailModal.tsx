@@ -374,11 +374,12 @@ export default function ItemDetailModal({
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                backgroundColor: '#16171d',
-                border: '1px solid rgba(255, 255, 255, 0.05)',
-                borderRadius: '4px',
+                backgroundColor: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '24px',
                 height: '48px',
-                padding: '0 8px'
+                padding: '4px',
+                gap: '4px'
               }}
             >
               <button
@@ -388,21 +389,31 @@ export default function ItemDetailModal({
                   border: 'none',
                   color: 'var(--text-secondary)',
                   cursor: 'pointer',
-                  width: '32px',
-                  height: '32px',
+                  width: '40px',
+                  height: '40px',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  borderRadius: '50%',
+                  transition: 'background-color 0.2s ease, color 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)';
+                  e.currentTarget.style.color = 'var(--text-primary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = 'var(--text-secondary)';
                 }}
               >
-                <Minus size={14} />
+                <Minus size={16} />
               </button>
               <span
                 style={{
                   fontFamily: 'var(--font-sans)',
-                  fontSize: '14px',
+                  fontSize: '16px',
                   fontWeight: 600,
-                  width: '30px',
+                  width: '24px',
                   textAlign: 'center',
                   color: 'var(--text-primary)'
                 }}
@@ -416,14 +427,24 @@ export default function ItemDetailModal({
                   border: 'none',
                   color: 'var(--text-secondary)',
                   cursor: 'pointer',
-                  width: '32px',
-                  height: '32px',
+                  width: '40px',
+                  height: '40px',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  borderRadius: '50%',
+                  transition: 'background-color 0.2s ease, color 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)';
+                  e.currentTarget.style.color = 'var(--text-primary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = 'var(--text-secondary)';
                 }}
               >
-                <Plus size={14} />
+                <Plus size={16} />
               </button>
             </div>
 

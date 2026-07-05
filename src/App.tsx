@@ -20,7 +20,35 @@ export default function App() {
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
       const stored = localStorage.getItem('aura_menu_cart');
-      return stored ? JSON.parse(stored) : [];
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return parsed.map((cartItem: any) => ({
+          ...cartItem,
+          item: MENU_ITEMS.find(m => m.id === cartItem.item?.id) || cartItem.item
+        }));
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [placedOrders, setPlacedOrders] = useState<CartItem[]>(() => {
+    try {
+      const stored = localStorage.getItem('aura_menu_placed_orders');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return parsed.map((item: any, index: number) => {
+          return {
+            ...item,
+            item: MENU_ITEMS.find(m => m.id === item.item?.id) || item.item,
+            orderId: item.orderId || `ORD-MIG-${Date.now()}-${index}`,
+            placedAt: item.placedAt || Date.now(),
+            status: 'not_started' // Everything remains not_started
+          };
+        });
+      }
+      return [];
     } catch {
       return [];
     }
@@ -52,6 +80,11 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('aura_menu_cart', JSON.stringify(cart));
   }, [cart]);
+
+  // Sync Placed Orders to localStorage
+  useEffect(() => {
+    localStorage.setItem('aura_menu_placed_orders', JSON.stringify(placedOrders));
+  }, [placedOrders]);
 
   // Simulate loading state for skeletons
   useEffect(() => {
@@ -142,10 +175,34 @@ export default function App() {
     setCart((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  // Clear Tray after order submission
-  const handleClearCart = () => {
+  // Submit Tray to Kitchen
+  const handlePlaceOrder = () => {
+    if (cart.length === 0) return;
+    
+    // Stamp each item with order details for kitchen tracking
+    const newPlacedItems = cart.map((item) => ({
+      ...item,
+      orderId: `ORD-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+      placedAt: Date.now(),
+      status: 'not_started' as const
+    }));
+
+    setPlacedOrders((prev) => [...prev, ...newPlacedItems]);
     setCart([]);
   };
+
+  // Undo an order if it's still not_started
+  const handleUndoOrder = (orderId: string) => {
+    const orderToUndo = placedOrders.find(o => o.orderId === orderId);
+    if (orderToUndo) {
+      // Strip kitchen tracking fields to put it back in the tray cleanly
+      const { orderId: _oid, placedAt: _pa, status: _st, ...rest } = orderToUndo;
+      setCart(currentCart => [...currentCart, rest as CartItem]);
+      setPlacedOrders(prev => prev.filter(o => o.orderId !== orderId));
+    }
+  };
+
+
 
   // Filter Items
   const filteredItems = MENU_ITEMS.filter((item) => {
@@ -257,7 +314,9 @@ export default function App() {
         setIsOpen={setIsCartOpen}
         onUpdateQuantity={handleUpdateQuantity}
         onRemoveItem={handleRemoveItem}
-        onClearCart={handleClearCart}
+        onPlaceOrder={handlePlaceOrder}
+        placedOrders={placedOrders}
+        onUndoOrder={handleUndoOrder}
       />
 
       {/* Footer Branding */}
