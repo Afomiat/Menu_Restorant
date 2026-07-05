@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { ShoppingBag, X, Plus, Minus, Trash2, CheckCircle2, Receipt, ChefHat, Clock, Flame, Undo2 } from 'lucide-react';
+import { useState } from 'react';
+import { ShoppingBag, X, Plus, Minus, Trash2, CheckCircle2, ChefHat, Clock, Flame } from 'lucide-react';
 import type { MenuItem } from '../data/menuData';
 
 export interface CartItem {
@@ -26,7 +26,6 @@ interface CartDrawerProps {
 
 export default function CartDrawer({
   cart,
-  tableNumber,
   isOpen,
   setIsOpen,
   onUpdateQuantity,
@@ -36,12 +35,7 @@ export default function CartDrawer({
   onUndoOrder
 }: CartDrawerProps) {
   const [activeTab, setActiveTab] = useState<'tray' | 'kitchen'>('tray');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [orderId, setOrderId] = useState('');
-
-
-
-  const totalPrice = cart.reduce((sum, current) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);  const totalPrice = cart.reduce((sum, current) => {
     const variantAdjustment = current.item.variants?.find(v => v.name === current.variant)?.priceAdjustment || 0;
     return sum + (current.item.price + variantAdjustment) * current.quantity;
   }, 0);
@@ -51,7 +45,6 @@ export default function CartDrawer({
     // Simulate API delay
     setTimeout(() => {
       setIsSubmitting(false);
-      setOrderId(`ORD-${Math.floor(1000 + Math.random() * 9000)}`);
       onPlaceOrder();
       setActiveTab('kitchen');
     }, 1500);
