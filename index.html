@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="Discover our premium culinary creations, hand-crafted pasta dishes, wood-fired grills, and signature drinks at AURA. Scan the QR code at your table to browse and order." />
+    <link rel="manifest" href="/manifest.json" />
+    <title>AURA — Elegant Digital Menu</title>
+  </head>
+  <body>
+    <div id="root">
+      <style>
+        .initial-loader-container {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          height: 100vh;
+          height: 100dvh;
+          background-color: #121316;
+          color: #c9a876;
+        }
+        .initial-loader-spinner {
+          width: 48px;
+          height: 48px;
+          border: 3px solid rgba(201, 168, 118, 0.2);
+          border-top-color: #c9a876;
+          border-radius: 50%;
+          animation: spin 1s cubic-bezier(0.55, 0.15, 0.45, 0.85) infinite;
+          margin-bottom: 24px;
+        }
+        .initial-loader-text {
+          font-family: Georgia, serif;
+          font-style: italic;
+          font-size: 24px;
+          letter-spacing: 3px;
+          animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 0.5; transform: scale(0.98); }
+          50% { opacity: 1; transform: scale(1.02); }
+        }
+      </style>
+      <div class="initial-loader-container">
+        <div class="initial-loader-spinner"></div>
+        <div class="initial-loader-text">Aura Menu</div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

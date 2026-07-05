@@ -1,0 +1,16 @@
+{
+  "short_name": "AURA",
+  "name": "AURA Ristorante Digital Menu",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#111216",
+  "theme_color": "#c9a876",
+  "display": "standalone",
+  "orientation": "portrait"
+}

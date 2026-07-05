@@ -1,0 +1,293 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&display=swap');
+
+:root {
+  --bg-dark: #15161c;
+  --bg-body: #15161c;
+  --bg-card: rgba(27, 29, 38, 0.75);
+  --bg-card-border: rgba(201, 168, 118, 0.15);
+  --accent-gold: #c9a876;
+  --accent-gold-rgb: 201, 168, 118;
+  --accent-gold-hover: #dec093;
+  --text-primary: #f2efe9;
+  --text-secondary: #9c9ca6;
+  
+  --tag-veg: #46553e;
+  --tag-spicy: #722c2a;
+  --tag-gf: #2c4a63;
+  --tag-chef: #5c4323;
+
+  --font-serif: 'Playfair Display', Georgia, serif;
+  --font-display: 'Fraunces', serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
+
+  --transition-smooth: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  --shadow-luxury: 0 20px 40px rgba(0, 0, 0, 0.6);
+  --shadow-glow: 0 0 15px rgba(201, 168, 118, 0.2);
+
+  /* --- MOBILE FIRST (xs: < 400px phones) --- */
+  /* Stacked layout on mobile: plate sits centered above card */
+  --plate-size: 90px;
+  --card-overlap-margin: -22px;   /* 25% of 90px */
+  --card-padding-overlap: 32px;
+  --timeline-row-padding: 24px 16px;
+  --font-size-title: 15px;
+  --font-size-desc: 12px;
+  --font-size-subtitle: 9px;
+
+  /* Sticky header height for scroll-padding */
+  --header-height: 110px;
+}
+
+/* sm: 400px+ phones (iPhone 14, Pixel 7) */
+@media (min-width: 400px) {
+  :root {
+    --plate-size: 110px;
+    --card-overlap-margin: -27px;
+    --card-padding-overlap: 38px;
+    --timeline-row-padding: 26px 18px;
+    --font-size-title: 17px;
+    --font-size-desc: 12.5px;
+    --font-size-subtitle: 9.5px;
+    --header-height: 120px;
+  }
+}
+
+/* md: 640px+ (tablets, landscape phones) */
+@media (min-width: 640px) {
+  :root {
+    --plate-size: 155px;
+    --card-overlap-margin: -38px;
+    --card-padding-overlap: 54px;
+    --timeline-row-padding: 32px 24px;
+    --font-size-title: 20px;
+    --font-size-desc: 13.5px;
+    --font-size-subtitle: 10px;
+    --header-height: 130px;
+  }
+}
+
+/* lg: 1024px+ (desktop) */
+@media (min-width: 1024px) {
+  :root {
+    --plate-size: 210px;
+    --card-overlap-margin: -48px;
+    --card-padding-overlap: 72px;
+    --timeline-row-padding: 48px 40px;
+    --font-size-title: 25px;
+    --font-size-desc: 14.5px;
+    --font-size-subtitle: 11px;
+    --header-height: 140px;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  /* Snappy touch response on mobile — no 300ms delay */
+  touch-action: manipulation;
+}
+
+html {
+  /* Smooth anchor scrolling, offset for sticky header */
+  scroll-behavior: smooth;
+  scroll-padding-top: var(--header-height);
+}
+
+body {
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  width: 100%;
+  max-width: 100vw;
+  display: flex;
+  justify-content: center;
+}
+
+/* Scrollbar customization (desktop only) */
+@media (min-width: 768px) {
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg-dark); }
+  ::-webkit-scrollbar-thumb { background: rgba(201, 168, 118, 0.3); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--accent-gold); }
+}
+
+/* Hide scrollbar for horizontal categories */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Skeleton Loading Pulses */
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 0.25; }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes beat {
+  0%, 100% { transform: scale(1); opacity: 0; }
+  50% { transform: scale(1.4); opacity: 0.5; }
+}
+
+.beating-halo {
+  animation: beat 0.5s ease-in-out infinite;
+}
+
+/* Safe areas on notched phones */
+.safe-padding-bottom {
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  position: relative;
+  align-items: center;
+  width: 100%;
+  max-width: 100%;
+}
+
+.app-container {
+  width: 100%;
+  max-width: 1240px;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: transparent;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* Category transition animations */
+.fade-in {
+  animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ──────────────────────────────────────────────
+   Category Nav
+────────────────────────────────────────────── */
+.category-nav-wrapper {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  justify-content: flex-start;
+  padding: 8px 16px;
+}
+
+@media (min-width: 768px) {
+  .category-nav-wrapper {
+    justify-content: center;
+    gap: 36px;
+    padding: 12px 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .category-nav-wrapper {
+    gap: 56px;
+    padding: 16px 32px;
+  }
+}
+
+/* ──────────────────────────────────────────────
+   Side Cart Drawer  (right → left slide-out)
+────────────────────────────────────────────── */
+.cart-side-drawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  background-color: rgba(18, 19, 22, 0.4);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-left: 1px solid rgba(201, 168, 118, 0.15);
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+  box-shadow: -10px 0 40px rgba(0, 0, 0, 0.7);
+  transform: translateX(100%);
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  /* Safe inset for notch / home-indicator */
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.cart-side-drawer.open {
+  transform: translateX(0);
+}
+
+@media (min-width: 768px) {
+  .cart-side-drawer {
+    width: 40vw;
+    min-width: 400px;
+    max-width: 600px;
+    padding-top: 0;
+  }
+}
+
+/* ──────────────────────────────────────────────
+   Timeline — Mobile Stacked card hover effects
+────────────────────────────────────────────── */
+.dish-plate-container:hover {
+  transform: scale(1.06) rotate(3deg);
+}
+.dish-card:hover {
+  border-color: rgba(201, 168, 118, 0.45);
+  transform: translateY(-3px);
+}
+.dish-card:hover .dish-image {
+  transform: scale(1.06);
+}
+
+/* Disable hover transform on touch devices to avoid sticky states */
+@media (hover: none) {
+  .dish-plate-container:hover { transform: none; }
+  .dish-card:hover { transform: none; border-color: var(--bg-card-border); }
+  .dish-card:hover .dish-image { transform: none; }
+}
+
+/* Active press feedback for touch */
+.dish-plate-container:active {
+  transform: scale(0.97);
+  transition: transform 0.15s ease;
+}
+.dish-card:active {
+  transform: scale(0.99);
+  transition: transform 0.15s ease;
+  border-color: rgba(201, 168, 118, 0.35);
+}
