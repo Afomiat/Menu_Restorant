@@ -94,9 +94,9 @@ export default function Header({
           <div
             style={{
               position: 'relative',
-              width: 'clamp(105px, 30vw, 320px)',
-              flexShrink: 1,
-              minWidth: 0,
+              flex: 1,
+              maxWidth: '320px',
+              minWidth: '148px',
             }}
           >
             <Search

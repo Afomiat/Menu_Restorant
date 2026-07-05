@@ -184,6 +184,17 @@ export default function App() {
         <SkeletonLoader />
       ) : (
         <div style={{ flexGrow: 1 }}>
+          {filteredItems.length === 0 && searchQuery && (
+            <div style={{ padding: '80px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+              <div style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.5 }}>🍽️</div>
+              <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '24px', color: 'var(--text-primary)', marginBottom: '8px' }}>No items found</h2>
+              <p style={{ fontSize: '14px', lineHeight: 1.5 }}>
+                We couldn't find anything matching "{searchQuery}".<br/>
+                Try searching for something else.
+              </p>
+            </div>
+          )}
+
           {CATEGORIES.map((category) => {
             const categoryItems = getCategoryItems(category.id);
             if (categoryItems.length === 0) return null;
