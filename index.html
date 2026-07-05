@@ -31,17 +31,33 @@
         }
         
         .wind-text {
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
           animation: windFlyText 6s cubic-bezier(0.25, 1, 0.5, 1) forwards;
         }
 
-        .aura-text {
+        .aura-title {
           font-family: 'Playfair Display', Georgia, serif;
           font-weight: 500;
           font-style: italic;
-          font-size: 52px;
-          letter-spacing: 4px;
+          font-size: 64px;
+          letter-spacing: 6px;
           color: #c9a876;
-          margin-left: 4px;
+          margin-left: 6px;
+          line-height: 1.1;
+        }
+
+        .aura-subtitle {
+          font-family: 'Playfair Display', Georgia, serif;
+          font-weight: 400;
+          font-style: italic;
+          font-size: 32px;
+          letter-spacing: 12px;
+          color: rgba(201, 168, 118, 0.8);
+          margin-top: 2px;
+          margin-left: 12px;
         }
 
         .wind-hat {
@@ -83,7 +99,8 @@
       </style>
       <div class="loader-content">
         <div class="wind-text">
-          <div class="aura-text">AURA Menu</div>
+          <div class="aura-title">AURA</div>
+          <div class="aura-subtitle">Menu</div>
         </div>
         <div class="wind-hat">
           <img src="/images/glassy_3d_chef.png" alt="Glassy Chef Hat" class="glassy-chef-img" />
