@@ -250,222 +250,236 @@ export default function CartDrawer({
                         key={`${cartItem.item.id}-${cartItem.variant}-${idx}`}
                         style={{
                           display: 'flex',
-                          alignItems: 'center',
-                          gap: '16px',
+                          flexDirection: 'column',
+                          gap: '12px',
                           paddingBottom: '16px',
                           borderBottom: '1px solid rgba(255,255,255,0.03)'
                         }}
                       >
-                        {/* Tiny circular photo */}
-                        <div
-                          style={{
-                            width: '50px',
-                            height: '50px',
-                            borderRadius: '50%',
-                            overflow: 'hidden',
-                            border: '1px solid rgba(201,168,118,0.2)',
-                            flexShrink: 0
-                          }}
-                        >
-                          <img
-                            src={cartItem.item.imageUrl}
-                            alt={cartItem.item.name}
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          />
-                        </div>
-
-                        {/* Title details */}
-                        <div style={{ flexGrow: 1, minWidth: 0 }}>
-                          <span
+                        {/* Top Row: Image on left, Controls on right */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          {/* Tiny circular photo */}
+                          <div
                             style={{
-                              fontFamily: 'var(--font-serif)',
-                              fontSize: '15px',
-                              fontWeight: 500,
-                              color: 'var(--text-primary)',
-                              display: 'block'
+                              width: '50px',
+                              height: '50px',
+                              borderRadius: '50%',
+                              overflow: 'hidden',
+                              border: '1px solid rgba(201,168,118,0.2)',
+                              flexShrink: 0
                             }}
                           >
-                            {cartItem.item.name}
-                          </span>
-                          {cartItem.variant && (
-                            <span
-                              style={{
-                                fontFamily: 'var(--font-sans)',
-                                fontSize: '11px',
-                                color: 'var(--accent-gold)',
-                                display: 'block',
-                                marginTop: '1px'
-                              }}
-                            >
-                              {cartItem.variant}
-                            </span>
-                          )}
-                          <span
-                            style={{
-                              fontFamily: 'var(--font-sans)',
-                              fontSize: '13px',
-                              color: 'var(--text-secondary)',
-                              display: 'block',
-                              marginTop: '2px'
-                            }}
-                          >
-                            {itemPrice} Birr each
-                          </span>
-                        </div>
+                            <img
+                              src={cartItem.item.imageUrl}
+                              alt={cartItem.item.name}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            />
+                          </div>
 
-                        {/* Quantity edits or read-only */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          {activeTab === 'tray' ? (
-                            <>
-                              <div
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  backgroundColor: 'rgba(255,255,255,0.03)',
-                                  border: '1px solid rgba(255,255,255,0.08)',
-                                  borderRadius: '20px',
-                                  padding: '2px 4px',
-                                  gap: '2px'
-                                }}
-                              >
+                          {/* Quantity edits or read-only */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                            {activeTab === 'tray' ? (
+                              <>
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    backgroundColor: 'rgba(255,255,255,0.03)',
+                                    border: '1px solid rgba(255,255,255,0.08)',
+                                    borderRadius: '20px',
+                                    padding: '2px 4px',
+                                    gap: '2px'
+                                  }}
+                                >
+                                  <button
+                                    onClick={() => onUpdateQuantity(idx, -1)}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: 'var(--text-secondary)',
+                                      width: '24px',
+                                      height: '24px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      cursor: 'pointer',
+                                      borderRadius: '50%',
+                                      transition: 'background-color 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
+                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                  >
+                                    <Minus size={12} />
+                                  </button>
+                                  <span
+                                    style={{
+                                      fontFamily: 'var(--font-sans)',
+                                      fontSize: '13px',
+                                      fontWeight: 600,
+                                      width: '20px',
+                                      textAlign: 'center',
+                                      color: 'var(--text-primary)'
+                                    }}
+                                  >
+                                    {cartItem.quantity}
+                                  </span>
+                                  <button
+                                    onClick={() => onUpdateQuantity(idx, 1)}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: 'var(--text-secondary)',
+                                      width: '24px',
+                                      height: '24px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      cursor: 'pointer',
+                                      borderRadius: '50%',
+                                      transition: 'background-color 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
+                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                  >
+                                    <Plus size={12} />
+                                  </button>
+                                </div>
                                 <button
-                                  onClick={() => onUpdateQuantity(idx, -1)}
+                                  onClick={() => onRemoveItem(idx)}
                                   style={{
                                     background: 'none',
                                     border: 'none',
-                                    color: 'var(--text-secondary)',
-                                    width: '24px',
-                                    height: '24px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    cursor: 'pointer',
-                                    borderRadius: '50%',
-                                    transition: 'background-color 0.2s'
-                                  }}
-                                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
-                                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                                >
-                                  <Minus size={12} />
-                                </button>
-                                <span
-                                  style={{
-                                    fontFamily: 'var(--font-sans)',
-                                    fontSize: '13px',
-                                    fontWeight: 600,
-                                    width: '20px',
-                                    textAlign: 'center',
-                                    color: 'var(--text-primary)'
-                                  }}
-                                >
-                                  {cartItem.quantity}
-                                </span>
-                                <button
-                                  onClick={() => onUpdateQuantity(idx, 1)}
-                                  style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: 'var(--text-secondary)',
-                                    width: '24px',
-                                    height: '24px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    cursor: 'pointer',
-                                    borderRadius: '50%',
-                                    transition: 'background-color 0.2s'
-                                  }}
-                                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
-                                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                                >
-                                  <Plus size={12} />
-                                </button>
-                              </div>
-                              <button
-                                onClick={() => onRemoveItem(idx)}
-                                style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  color: '#a94a42',
-                                  cursor: 'pointer',
-                                  padding: '4px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  marginLeft: '4px'
-                                }}
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              {/* Status Tag */}
-                              {cartItem.status === 'complete' ? (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'rgba(100, 200, 100, 0.1)', border: '1px solid rgba(100, 200, 100, 0.3)', padding: '4px 8px', borderRadius: '4px', color: '#8cd98c' }}>
-                                  <CheckCircle2 size={12} />
-                                  <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>Complete</span>
-                                </div>
-                              ) : cartItem.status === 'pending' ? (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'rgba(201, 168, 118, 0.1)', border: '1px solid rgba(201, 168, 118, 0.3)', padding: '4px 8px', borderRadius: '4px', color: 'var(--accent-gold)' }}>
-                                  <Flame size={12} />
-                                  <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>Pending</span>
-                                </div>
-                              ) : (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'rgba(255, 100, 100, 0.1)', border: '1px solid #ff6666', padding: '4px 10px', borderRadius: '20px', color: '#ff6666' }}>
-                                  <Clock size={12} />
-                                  <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>Not Started</span>
-                                </div>
-                              )}
-
-                              <div
-                                style={{
-                                  backgroundColor: 'rgba(255,255,255,0.03)',
-                                  border: '1px solid rgba(255,255,255,0.05)',
-                                  color: 'var(--text-primary)',
-                                  height: '28px',
-                                  width: '28px',
-                                  minWidth: '28px',
-                                  minHeight: '28px',
-                                  borderRadius: '50%',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  fontFamily: 'var(--font-sans)',
-                                  flexShrink: 0
-                                }}
-                              >
-                                <span style={{ fontSize: '12px', fontWeight: 600, transform: 'translateY(-1px)' }}>{cartItem.quantity}</span>
-                                <span style={{ fontSize: '9px', marginLeft: '1px', opacity: 0.7, fontWeight: 500, transform: 'translateY(1px)' }}>x</span>
-                              </div>
-
-                              {/* Undo Button if not_started */}
-                              {cartItem.status === 'not_started' && cartItem.orderId && (
-                                <button
-                                  onClick={() => onUndoOrder(cartItem.orderId!)}
-                                  title="Delete Order"
-                                  style={{
-                                    background: 'none',
-                                    border: '1px solid rgba(255, 100, 100, 0.3)',
-                                    backgroundColor: 'rgba(255, 100, 100, 0.05)',
-                                    color: '#ff6666',
+                                    color: '#a94a42',
                                     cursor: 'pointer',
                                     padding: '4px',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    justifyContent: 'center',
-                                    marginLeft: '4px',
+                                    marginLeft: '2px'
+                                  }}
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <div
+                                  style={{
+                                    backgroundColor: 'rgba(255,255,255,0.03)',
+                                    border: '1px solid rgba(255,255,255,0.05)',
+                                    color: 'var(--text-primary)',
+                                    height: '28px',
+                                    width: '28px',
+                                    minWidth: '28px',
+                                    minHeight: '28px',
                                     borderRadius: '50%',
-                                    height: '24px',
-                                    width: '24px',
-                                    transition: 'all 0.3s ease',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontFamily: 'var(--font-sans)',
                                     flexShrink: 0
                                   }}
                                 >
-                                  <Trash2 size={12} />
-                                </button>
-                              )}
-                            </>
-                          )}
+                                  <span style={{ fontSize: '12px', fontWeight: 600, transform: 'translateY(-1px)' }}>{cartItem.quantity}</span>
+                                  <span style={{ fontSize: '9px', marginLeft: '1px', opacity: 0.7, fontWeight: 500, transform: 'translateY(1px)' }}>x</span>
+                                </div>
+
+                                {/* Undo Button if not_started */}
+                                {cartItem.status === 'not_started' && cartItem.orderId && (
+                                  <button
+                                    onClick={() => onUndoOrder(cartItem.orderId!)}
+                                    title="Delete Order"
+                                    style={{
+                                      background: 'none',
+                                      border: '1px solid rgba(255, 100, 100, 0.3)',
+                                      backgroundColor: 'rgba(255, 100, 100, 0.05)',
+                                      color: '#ff6666',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      borderRadius: '50%',
+                                      height: '28px',
+                                      width: '28px',
+                                      transition: 'all 0.3s ease',
+                                      flexShrink: 0
+                                    }}
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Bottom Row: Info on left, Status tag on right */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
+                          {/* Title details */}
+                          <div style={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <span
+                              style={{
+                                fontFamily: 'var(--font-serif)',
+                                fontSize: '15px',
+                                fontWeight: 500,
+                                color: 'var(--text-primary)',
+                                display: 'block',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis'
+                              }}
+                            >
+                              {cartItem.item.name}
+                            </span>
+                            {cartItem.variant && (
+                              <span
+                                style={{
+                                  fontFamily: 'var(--font-sans)',
+                                  fontSize: '11px',
+                                  color: 'var(--accent-gold)',
+                                  display: 'block'
+                                }}
+                              >
+                                {cartItem.variant}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Right side: Status and Price */}
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px', flexShrink: 0 }}>
+                            {/* Status Tag for Kitchen */}
+                            {activeTab === 'kitchen' && (
+                              <div>
+                                {cartItem.status === 'complete' ? (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'rgba(100, 200, 100, 0.1)', border: '1px solid rgba(100, 200, 100, 0.3)', padding: '2px 8px', borderRadius: '4px', color: '#8cd98c' }}>
+                                    <CheckCircle2 size={10} />
+                                    <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase' }}>Complete</span>
+                                  </div>
+                                ) : cartItem.status === 'pending' ? (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'rgba(201, 168, 118, 0.1)', border: '1px solid rgba(201, 168, 118, 0.3)', padding: '2px 8px', borderRadius: '4px', color: 'var(--accent-gold)' }}>
+                                    <Flame size={10} />
+                                    <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase' }}>Pending</span>
+                                  </div>
+                                ) : (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'rgba(255, 100, 100, 0.1)', border: '1px solid #ff6666', padding: '2px 8px', borderRadius: '20px', color: '#ff6666' }}>
+                                    <Clock size={10} />
+                                    <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Not Started</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            
+                            {/* Price */}
+                            <span
+                              style={{
+                                fontFamily: 'var(--font-sans)',
+                                fontSize: '12px',
+                                color: 'var(--text-secondary)',
+                                fontWeight: 500
+                              }}
+                            >
+                              {itemPrice} Birr
+                            </span>
+                          </div>
                         </div>
                       </div>
                     );
