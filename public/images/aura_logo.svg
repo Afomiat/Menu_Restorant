@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <defs>
+    <linearGradient id="bright-gold" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#FFEFA3" />
+      <stop offset="40%" stop-color="#FFD700" />
+      <stop offset="100%" stop-color="#D4AF37" />
+    </linearGradient>
+  </defs>
+  
+  <g transform="translate(60, 60)">
+    <!-- Outer elegant ring -->
+    <circle cx="0" cy="0" r="48" fill="none" stroke="url(#bright-gold)" stroke-width="1.5" />
+    <circle cx="0" cy="0" r="42" fill="none" stroke="url(#bright-gold)" stroke-width="0.5" stroke-dasharray="2 4" />
+    
+    <!-- Abstract Leaf / Star Crest -->
+    <path d="M0 -30 C10 -10, 30 0, 30 0 C10 10, 0 30, 0 30 C-10 10, -30 0, -30 0 C-10 -10, 0 -30, 0 -30 Z" fill="url(#bright-gold)" />
+    
+    <!-- Center cutout -->
+    <path d="M0 -8 L8 0 L0 8 L-8 0 Z" fill="#121316" />
+  </g>
+</svg>
