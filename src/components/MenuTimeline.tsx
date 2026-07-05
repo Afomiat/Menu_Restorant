@@ -241,9 +241,11 @@ function MobileCard({ item, idx, onItemSelect }: { item: MenuItem; idx: number; 
           if (isTouching) {
             plateRingRef.current.style.boxShadow = '0 0 25px rgba(201, 168, 118, 0.6)';
             plateRingRef.current.style.borderColor = 'var(--accent-gold)';
+            plateContainerRef.current.style.transform = 'scale(1.06) rotate(3deg)';
           } else {
             plateRingRef.current.style.boxShadow = 'none';
             plateRingRef.current.style.borderColor = 'rgba(201, 168, 118, 0.25)';
+            plateContainerRef.current.style.transform = '';
           }
         }
       } catch (e) {
@@ -629,9 +631,11 @@ function DesktopCard({ item, idx, onItemSelect }: { item: MenuItem; idx: number;
           if (isTouching) {
             plateRingRef.current.style.boxShadow = '0 0 25px rgba(201, 168, 118, 0.6)';
             plateRingRef.current.style.borderColor = 'var(--accent-gold)';
+            plateContainerRef.current.style.transform = 'scale(1.06) rotate(3deg)';
           } else {
             plateRingRef.current.style.boxShadow = 'none';
             plateRingRef.current.style.borderColor = 'rgba(201, 168, 118, 0.25)';
+            plateContainerRef.current.style.transform = '';
           }
         }
       } catch (e) {
