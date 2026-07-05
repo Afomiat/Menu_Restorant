@@ -23,47 +23,74 @@
           justify-content: center;
           transition: opacity 0.5s ease-in-out, visibility 0.5s;
         }
-        .chef-img {
-          width: 180px;
-          height: 180px;
-          object-fit: cover;
-          border-radius: 50%;
-          mask-image: radial-gradient(circle, black 40%, transparent 70%);
-          -webkit-mask-image: radial-gradient(circle, black 40%, transparent 70%);
-          animation: bounceIn 1s cubic-bezier(0.175, 0.885, 0.32, 1.275), gently-bounce-chef 2s ease-in-out infinite 1s;
-          margin-bottom: 20px;
+        .loader-content {
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
+        
+        .wind-text {
+          animation: windFlyText 4.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        }
+
         .aura-text {
-          font-family: Georgia, serif;
-          font-size: 32px;
-          letter-spacing: 6px;
+          font-family: 'Varela Round', 'Nunito', 'Quicksand', 'Segoe UI', sans-serif;
+          font-weight: 900;
+          font-size: 42px;
+          letter-spacing: 8px;
           color: #c9a876;
-          margin-left: 6px;
-          animation: fadeInUp 1s ease-out, pulse 2s ease-in-out infinite;
+          margin-left: 8px;
         }
-        @keyframes bounceIn {
-          0% { transform: scale(0.5); opacity: 0; }
-          100% { transform: scale(1); opacity: 1; }
+
+        .wind-hat {
+          position: absolute;
+          top: -30px;
+          right: -20px;
+          width: 55px;
+          height: 55px;
+          animation: windFlyHat 4.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+          z-index: 10;
         }
-        @keyframes gently-bounce-chef {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-12px); }
+
+        @keyframes windFlyText {
+          0% { transform: translateX(-150vw) rotate(-10deg); opacity: 0; }
+          15% { transform: translateX(10px) rotate(5deg); opacity: 1; }
+          25% { transform: translateX(0) rotate(0deg); opacity: 1; }
+          85% { transform: translateX(0) rotate(0deg); opacity: 1; }
+          100% { transform: translateX(-150vw) rotate(-10deg); opacity: 0; }
         }
-        @keyframes fadeInUp {
-          0% { transform: translateY(20px); opacity: 0; }
-          100% { transform: translateY(0); opacity: 1; }
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 0.5; transform: scale(0.98); }
-          50% { opacity: 1; transform: scale(1.02); }
+
+        @keyframes windFlyHat {
+          0% { transform: translate(100vw, -50vh) rotate(90deg) scale(0.5); opacity: 0; }
+          20% { transform: translate(-10px, -5px) rotate(10deg) scale(1.1); opacity: 1; }
+          30% { transform: translate(0, 0) rotate(25deg) scale(1); opacity: 1; } /* Lands tilted */
+          85% { transform: translate(0, 0) rotate(25deg) scale(1); opacity: 1; }
+          100% { transform: translate(100vw, -50vh) rotate(90deg) scale(0.5); opacity: 0; }
         }
       </style>
-      <img src="/images/cute_3d_chef.png" alt="AURA 3D Chef" class="chef-img" />
-      <div class="aura-text">AURA</div>
+      <div class="loader-content">
+        <div class="wind-text">
+          <div class="aura-text">AURA</div>
+        </div>
+        <div class="wind-hat">
+          <svg viewBox="0 0 100 100" fill="none">
+            <defs>
+              <linearGradient id="hat-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#FFEFA3" />
+                <stop offset="50%" stop-color="#FFD700" />
+                <stop offset="100%" stop-color="#D4AF37" />
+              </linearGradient>
+            </defs>
+            <path d="M 15 55 C 5 55, 5 30, 25 30 C 25 10, 50 10, 50 10 C 50 10, 75 10, 75 30 C 95 30, 95 55, 85 55 Z" fill="url(#hat-gold)" />
+            <rect x="25" y="55" width="50" height="15" rx="5" fill="url(#hat-gold)" />
+          </svg>
+        </div>
+      </div>
     </div>
     
     <script>
-      // Force the loader to stay for exactly 4 seconds
+      // Force the loader to stay for exactly 4.5 seconds to complete the animation
       window.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
           const loader = document.getElementById('initial-loader-overlay');
@@ -72,7 +99,7 @@
             loader.style.visibility = 'hidden';
             setTimeout(() => loader.remove(), 500); // Remove from DOM after fade out
           }
-        }, 4000);
+        }, 4500);
       });
     </script>
 
