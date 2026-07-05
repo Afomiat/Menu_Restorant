@@ -88,15 +88,15 @@ export default function Header({
         </div>
 
         {/* Right side controls: Search + Table + Cart */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flexShrink: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', minWidth: 0, flex: 1 }}>
 
           {/* Pill Search — full width remaining on mobile */}
           <div
             style={{
               position: 'relative',
-              width: 'clamp(100px, 30vw, 320px)',
-              flexShrink: 1,
-              minWidth: 0,
+              flex: 1,
+              maxWidth: '320px',
+              minWidth: '140px',
             }}
           >
             <Search
