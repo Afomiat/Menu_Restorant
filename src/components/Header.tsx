@@ -55,7 +55,7 @@ export default function Header({
         {/* Logo — smaller on phone */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
           <img 
-            src="/images/aura_logo.png" 
+            src="/images/aura_logo.webp" 
             alt="Aura Logo" 
             style={{ width: 'clamp(36px, 10vw, 48px)', height: 'clamp(36px, 10vw, 48px)', borderRadius: '6px', objectFit: 'cover', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }} 
           />
