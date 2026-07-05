@@ -96,7 +96,7 @@ export default function Header({
               position: 'relative',
               flex: 1,
               maxWidth: '320px',
-              minWidth: '150px',
+              minWidth: '145px',
             }}
           >
             <Search
