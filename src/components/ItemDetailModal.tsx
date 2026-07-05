@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Minus, Check, Leaf, AlertTriangle, ShieldCheck, Heart } from 'lucide-react';
+import { X, Plus, Minus, Check, Leaf, AlertTriangle, ShieldCheck } from 'lucide-react';
 import type { MenuItem } from '../data/menuData';
 
 interface ItemDetailModalProps {

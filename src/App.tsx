@@ -8,7 +8,6 @@ import OfflineBanner from './components/OfflineBanner';
 import SkeletonLoader from './components/SkeletonLoader';
 import { CATEGORIES, MENU_ITEMS } from './data/menuData';
 import type { MenuItem } from './data/menuData';
-import { HelpCircle } from 'lucide-react';
 
 export default function App() {
   const [tableNumber, setTableNumber] = useState<string | null>(null);
