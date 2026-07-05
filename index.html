@@ -35,7 +35,7 @@
           display: flex;
           flex-direction: column;
           align-items: center;
-          animation: windFlyText 6s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+          animation: windFlyText 3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
         }
 
         .aura-title {
@@ -66,7 +66,7 @@
           right: -35px;
           width: 90px;
           height: 90px;
-          animation: windFlyHat 6s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+          animation: windFlyHat 3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
           z-index: 10;
         }
         
@@ -109,7 +109,7 @@
     </div>
     
     <script>
-      // Force the loader to stay for exactly 6 seconds to complete the animation
+      // Force the loader to stay for exactly 3 seconds to complete the animation
       window.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
           const loader = document.getElementById('initial-loader-overlay');
@@ -118,7 +118,7 @@
             loader.style.visibility = 'hidden';
             setTimeout(() => loader.remove(), 500); // Remove from DOM after fade out
           }
-        }, 6000);
+        }, 3000);
       });
     </script>
 
