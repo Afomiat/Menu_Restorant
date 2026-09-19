@@ -1,8 +1,9 @@
-import { Search, X, ShoppingBag } from 'lucide-react';
-import CategoryNav from './CategoryNav';
-import type { Category } from '../data/menuData';
+import { ShoppingBag } from 'lucide-react';
+import ClassicCategoryNav from './ClassicCategoryNav';
+import type { Category } from '../../types';
+import SearchBar from '../../components/common/SearchBar';
 
-interface HeaderProps {
+interface ClassicHeaderProps {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   categories: Category[];
@@ -10,18 +11,21 @@ interface HeaderProps {
   onCategorySelect: (id: string) => void;
   totalCartItems: number;
   onCartClick: () => void;
+  restaurantName?: string;
+  restaurantTagline?: string;
 }
 
-export default function Header({
+export default function ClassicHeader({
   searchQuery,
   setSearchQuery,
   categories,
   activeCategory,
   onCategorySelect,
   totalCartItems,
-  onCartClick
-}: HeaderProps) {
-
+  onCartClick,
+  restaurantName,
+  restaurantTagline,
+}: ClassicHeaderProps) {
   return (
     <header
       style={{
@@ -37,7 +41,6 @@ export default function Header({
         top: 0,
         zIndex: 40,
         width: '100%',
-        /* Safe area inset for notched phones */
         paddingTop: 'max(clamp(10px, 3vw, 16px), env(safe-area-inset-top, 0px))',
       }}
     >
@@ -52,12 +55,12 @@ export default function Header({
           minWidth: 0,
         }}
       >
-        {/* Logo — smaller on phone */}
+        {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-          <img 
-            src="/images/aura_logo.svg" 
-            alt="Aura Logo" 
-            style={{ width: 'clamp(36px, 10vw, 48px)', height: 'clamp(36px, 10vw, 48px)', objectFit: 'contain' }} 
+          <img
+            src="/images/aura_logo.svg"
+            alt="Aura Logo"
+            style={{ width: 'clamp(36px, 10vw, 48px)', height: 'clamp(36px, 10vw, 48px)', objectFit: 'contain' }}
           />
           <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
             <h1
@@ -67,10 +70,10 @@ export default function Header({
                 fontWeight: 500,
                 letterSpacing: '1px',
                 color: 'var(--text-primary)',
-                lineHeight: 1.1
+                lineHeight: 1.1,
               }}
             >
-              AURA
+              {restaurantName ?? 'AURA'}
             </h1>
             <span
               style={{
@@ -79,85 +82,23 @@ export default function Header({
                 textTransform: 'uppercase',
                 letterSpacing: '3px',
                 color: 'var(--accent-gold)',
-                marginTop: '1px'
+                marginTop: '1px',
               }}
             >
-              ristorante
+              {restaurantTagline ?? 'ristorante'}
             </span>
           </div>
         </div>
 
-        {/* Right side controls: Search + Table + Cart */}
+        {/* Right side controls: Search + Cart */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flexShrink: 1 }}>
-
-          {/* Pill Search — full width remaining on mobile */}
-          <div
-            style={{
-              position: 'relative',
-              width: 'clamp(115px, 32vw, 320px)',
-              flexShrink: 1,
-            }}
-          >
-            <Search
-              size={12}
-              style={{
-                position: 'absolute',
-                left: '10px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: 'var(--text-secondary)',
-                pointerEvents: 'none'
-              }}
-            />
-            <input
-              type="text"
-              placeholder="Search…"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                width: '100%',
-                backgroundColor: 'rgba(255, 255, 255, 0.04)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                borderRadius: '20px',
-                padding: '7px 10px 7px 28px',
-                fontFamily: 'var(--font-sans)',
-                fontSize: '13px',
-                color: 'var(--text-primary)',
-                outline: 'none',
-                transition: 'var(--transition-smooth)',
-                /* Prevent iOS zoom on focus */
-                WebkitTextSizeAdjust: '100%',
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = 'var(--accent-gold)';
-                e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.06)';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = 'rgba(255, 255, 255, 0.08)';
-                e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.04)';
-              }}
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                style={{
-                  position: 'absolute',
-                  right: '8px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '2px'
-                }}
-              >
-                <X size={11} />
-              </button>
-            )}
-          </div>
+          {/* Pill Search */}
+          <SearchBar
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search…"
+            variant="classic"
+          />
 
           {/* Shopping Bag Icon with Count Badge */}
           <button
@@ -198,7 +139,7 @@ export default function Header({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 0 6px var(--accent-gold)'
+                  boxShadow: '0 0 6px var(--accent-gold)',
                 }}
               >
                 {totalCartItems > 9 ? '9+' : totalCartItems}
@@ -208,8 +149,8 @@ export default function Header({
         </div>
       </div>
 
-      {/* Category Horizontal Navigation — always inside header */}
-      <CategoryNav
+      {/* Category Horizontal Navigation */}
+      <ClassicCategoryNav
         categories={categories}
         activeCategory={activeCategory}
         onCategorySelect={onCategorySelect}

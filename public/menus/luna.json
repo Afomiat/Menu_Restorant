@@ -1,0 +1,27 @@
+{
+  "meta": {
+    "name": "Luna",
+    "tagline": "Mediterranean Coastal Lounge",
+    "template": "modern",
+    "deliveryAddress": "Marina Walk, Jeddah",
+    "heroImageUrl": "/images/pasta_meat_frying.webp",
+    "colors": {
+      "primary": "#0D9488",
+      "secondary": "#0F766E",
+      "background": "#F0FDFA",
+      "surface": "#FFFFFF",
+      "darkBar": "#134E4A"
+    },
+    "currency": "ETB"
+  },
+  "prices": {
+    "breath-food-1": 580,
+    "breath-food-2": 950,
+    "breath-food-3": 720,
+    "breath-food-4": 820,
+    "breath-snack-1": 380,
+    "breath-snack-2": 320,
+    "breath-drinks-1": 390,
+    "breath-fruits-1": 450
+  }
+}

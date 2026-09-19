@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import type { MenuItem } from '../data/menuData';
-import { MENU_ITEMS } from '../data/menuData';
+import type { MenuItem } from '../../types';
+import { formatPrice } from '../../utils/currency';
 
-interface MenuTimelineProps {
+interface ClassicTimelineProps {
   items: MenuItem[];
+  currency?: string;
   onItemSelect: (item: MenuItem) => void;
 }
 
@@ -204,9 +205,9 @@ function useIsMobile() {
   return isMobile;
 }
 
-function MobileCard({ item, idx, onItemSelect }: { item: MenuItem; idx: number; onItemSelect: (item: MenuItem) => void }) {
-  const globalIdx = MENU_ITEMS.findIndex(m => m.id === item.id);
-  const decoIdx = globalIdx >= 0 ? globalIdx % 8 : idx % 8;
+function MobileCard({ item, idx, currency = 'ETB', onItemSelect }: { item: MenuItem; idx: number; currency?: string; onItemSelect: (item: MenuItem) => void }) {
+  const decoIdx = idx % 8;
+  const isSoldOut = item.available === false;
 
   const containerRef = useRef<HTMLDivElement>(null);
   const pathRef = useRef<SVGPathElement>(null);
@@ -239,16 +240,20 @@ function MobileCard({ item, idx, onItemSelect }: { item: MenuItem; idx: number; 
           const plateRect = plateContainerRef.current.getBoundingClientRect();
           const isTouching = plateRect.top <= windowHeight / 2 && plateRect.bottom >= windowHeight / 2;
           if (isTouching) {
-            plateRingRef.current.style.boxShadow = '0 0 25px rgba(201, 168, 118, 0.6)';
-            plateRingRef.current.style.borderColor = 'var(--accent-gold)';
-            plateContainerRef.current.style.transform = 'scale(1.06) rotate(3deg)';
+            plateRingRef.current.style.boxShadow = isSoldOut
+              ? '0 0 40px rgba(239, 68, 68, 0.7), 0 0 80px rgba(239, 68, 68, 0.3)'
+              : '0 0 40px rgba(201, 168, 118, 0.95), 0 0 80px rgba(201, 168, 118, 0.4)';
+            plateRingRef.current.style.borderColor = isSoldOut ? '#ef4444' : 'var(--accent-gold)';
+            plateRingRef.current.style.borderWidth = '2px';
+            plateContainerRef.current.style.transform = 'scale(1.1) rotate(8deg)';
           } else {
             plateRingRef.current.style.boxShadow = 'none';
-            plateRingRef.current.style.borderColor = 'rgba(201, 168, 118, 0.25)';
+            plateRingRef.current.style.borderColor = isSoldOut ? 'rgba(239, 68, 68, 0.3)' : 'rgba(201, 168, 118, 0.25)';
+            plateRingRef.current.style.borderWidth = '1px';
             plateContainerRef.current.style.transform = '';
           }
         }
-      } catch (e) {
+      } catch {
         // SVG methods might fail initially
       }
     };
@@ -256,7 +261,7 @@ function MobileCard({ item, idx, onItemSelect }: { item: MenuItem; idx: number; 
     window.addEventListener('scroll', handleScroll, { passive: true });
     setTimeout(handleScroll, 50);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [isSoldOut]);
 
   return (
     <div
@@ -369,7 +374,7 @@ function MobileCard({ item, idx, onItemSelect }: { item: MenuItem; idx: number; 
             position: 'absolute',
             top: '-5px', left: '-5px', right: '-5px', bottom: '-5px',
             borderRadius: '50%',
-            border: '1px solid rgba(201, 168, 118, 0.25)',
+            border: isSoldOut ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(201, 168, 118, 0.25)',
             transition: 'all 0.4s ease',
             pointerEvents: 'none',
           }}
@@ -381,9 +386,10 @@ function MobileCard({ item, idx, onItemSelect }: { item: MenuItem; idx: number; 
             height: '100%',
             borderRadius: '50%',
             overflow: 'hidden',
-            border: '2px solid rgba(201, 168, 118, 0.2)',
+            border: isSoldOut ? '2px solid rgba(239, 68, 68, 0.5)' : '2px solid rgba(201, 168, 118, 0.2)',
             boxShadow: 'var(--shadow-luxury)',
             backgroundColor: '#1b1d26',
+            position: 'relative',
           }}
         >
           <img
@@ -394,9 +400,40 @@ function MobileCard({ item, idx, onItemSelect }: { item: MenuItem; idx: number; 
               width: '100%', height: '100%',
               objectFit: 'cover',
               transition: 'transform 0.5s ease',
+              filter: isSoldOut ? 'grayscale(75%) brightness(0.8)' : undefined,
             }}
             className="dish-image"
           />
+          {isSoldOut && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.45)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 5,
+              }}
+            >
+              <span
+                style={{
+                  backgroundColor: '#ef4444',
+                  color: '#ffffff',
+                  fontFamily: 'var(--font-sans)',
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  letterSpacing: '1px',
+                  padding: '4px 10px',
+                  borderRadius: '999px',
+                  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.5)',
+                  textTransform: 'uppercase',
+                }}
+              >
+                SOLD OUT
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Weight badge */}
@@ -431,7 +468,7 @@ function MobileCard({ item, idx, onItemSelect }: { item: MenuItem; idx: number; 
           width: '100%',
           maxWidth: '420px',
           backgroundColor: 'var(--bg-card)',
-          border: '1px solid var(--bg-card-border)',
+          border: isSoldOut ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid var(--bg-card-border)',
           /* top padding pushes text clear of overlapping plate */
           paddingTop: 'calc(var(--plate-size) * 0.5 + 14px)',
           paddingBottom: '18px',
@@ -444,6 +481,7 @@ function MobileCard({ item, idx, onItemSelect }: { item: MenuItem; idx: number; 
           boxShadow: 'var(--shadow-luxury)',
           transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.4s ease',
           position: 'relative',
+          opacity: isSoldOut ? 0.85 : 1,
           WebkitMaskImage: 'linear-gradient(to bottom, transparent 0px, transparent 20px, black 90px)',
           maskImage: 'linear-gradient(to bottom, transparent 0px, transparent 20px, black 90px)',
         }}
@@ -463,17 +501,37 @@ function MobileCard({ item, idx, onItemSelect }: { item: MenuItem; idx: number; 
             gap: '8px',
           }}
         >
-          <span style={{ flexShrink: 1, minWidth: 0 }}>{item.name}</span>
+          <span style={{ flexShrink: 1, minWidth: 0, display: 'inline-flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span>{item.name}</span>
+            {isSoldOut && (
+              <span
+                style={{
+                  fontSize: '9.5px',
+                  fontFamily: 'var(--font-sans)',
+                  fontWeight: 800,
+                  padding: '2px 8px',
+                  borderRadius: '999px',
+                  backgroundColor: '#ef4444',
+                  color: '#ffffff',
+                  letterSpacing: '0.6px',
+                  fontStyle: 'normal',
+                  display: 'inline-block',
+                }}
+              >
+                SOLD OUT
+              </span>
+            )}
+          </span>
           <span
             style={{
               fontFamily: 'var(--font-sans)',
               fontSize: 'var(--font-size-title)',
-              color: 'var(--accent-gold)',
+              color: isSoldOut ? '#ef4444' : 'var(--accent-gold)',
               fontWeight: 500,
               flexShrink: 0,
             }}
           >
-            {item.price} Br
+            {formatPrice(item.price, currency)}
           </span>
         </h3>
 
@@ -593,9 +651,9 @@ function MobileCard({ item, idx, onItemSelect }: { item: MenuItem; idx: number; 
 }
 
 // ── Desktop Side-by-Side Card ──────────────────────────────────────────────
-function DesktopCard({ item, idx, onItemSelect }: { item: MenuItem; idx: number; onItemSelect: (item: MenuItem) => void }) {
-  const globalIdx = MENU_ITEMS.findIndex(m => m.id === item.id);
-  const decoIdx = globalIdx >= 0 ? globalIdx % 8 : idx % 8;
+function DesktopCard({ item, idx, currency = 'ETB', onItemSelect }: { item: MenuItem; idx: number; currency?: string; onItemSelect: (item: MenuItem) => void }) {
+  const decoIdx = idx % 8;
+  const isSoldOut = item.available === false;
 
   const isLeft = idx % 2 === 0;
   const containerRef = useRef<HTMLDivElement>(null);
@@ -629,16 +687,20 @@ function DesktopCard({ item, idx, onItemSelect }: { item: MenuItem; idx: number;
           const plateRect = plateContainerRef.current.getBoundingClientRect();
           const isTouching = plateRect.top <= windowHeight / 2 && plateRect.bottom >= windowHeight / 2;
           if (isTouching) {
-            plateRingRef.current.style.boxShadow = '0 0 25px rgba(201, 168, 118, 0.6)';
-            plateRingRef.current.style.borderColor = 'var(--accent-gold)';
-            plateContainerRef.current.style.transform = 'scale(1.06) rotate(3deg)';
+            plateRingRef.current.style.boxShadow = isSoldOut
+              ? '0 0 40px rgba(239, 68, 68, 0.7), 0 0 80px rgba(239, 68, 68, 0.3)'
+              : '0 0 40px rgba(201, 168, 118, 0.95), 0 0 80px rgba(201, 168, 118, 0.4)';
+            plateRingRef.current.style.borderColor = isSoldOut ? '#ef4444' : 'var(--accent-gold)';
+            plateRingRef.current.style.borderWidth = '2px';
+            plateContainerRef.current.style.transform = 'scale(1.1) rotate(8deg)';
           } else {
             plateRingRef.current.style.boxShadow = 'none';
-            plateRingRef.current.style.borderColor = 'rgba(201, 168, 118, 0.25)';
+            plateRingRef.current.style.borderColor = isSoldOut ? 'rgba(239, 68, 68, 0.3)' : 'rgba(201, 168, 118, 0.25)';
+            plateRingRef.current.style.borderWidth = '1px';
             plateContainerRef.current.style.transform = '';
           }
         }
-      } catch (e) {
+      } catch {
         // SVG methods might fail initially
       }
     };
@@ -646,7 +708,7 @@ function DesktopCard({ item, idx, onItemSelect }: { item: MenuItem; idx: number;
     window.addEventListener('scroll', handleScroll, { passive: true });
     setTimeout(handleScroll, 50);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [isSoldOut]);
 
   const PlateElement = (
     <div
@@ -670,7 +732,7 @@ function DesktopCard({ item, idx, onItemSelect }: { item: MenuItem; idx: number;
           position: 'absolute',
           top: '-6px', left: '-6px', right: '-6px', bottom: '-6px',
           borderRadius: '50%',
-          border: '1px solid rgba(201, 168, 118, 0.25)',
+          border: isSoldOut ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(201, 168, 118, 0.25)',
           transition: 'all 0.4s ease',
           pointerEvents: 'none',
         }}
@@ -682,18 +744,54 @@ function DesktopCard({ item, idx, onItemSelect }: { item: MenuItem; idx: number;
           width: '100%', height: '100%',
           borderRadius: '50%',
           overflow: 'hidden',
-          border: '2px solid rgba(201, 168, 118, 0.15)',
+          border: isSoldOut ? '2px solid rgba(239, 68, 68, 0.5)' : '2px solid rgba(201, 168, 118, 0.15)',
           boxShadow: 'var(--shadow-luxury)',
           backgroundColor: '#1b1d26',
+          position: 'relative',
         }}
       >
         <img
           src={item.imageUrl}
           alt={item.name}
           loading={idx === 0 ? 'eager' : 'lazy'}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.5s ease' }}
+          style={{
+            width: '100%', height: '100%',
+            objectFit: 'cover',
+            transition: 'transform 0.5s ease',
+            filter: isSoldOut ? 'grayscale(75%) brightness(0.8)' : undefined,
+          }}
           className="dish-image"
         />
+        {isSoldOut && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.45)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 5,
+            }}
+          >
+            <span
+              style={{
+                backgroundColor: '#ef4444',
+                color: '#ffffff',
+                fontFamily: 'var(--font-sans)',
+                fontSize: '12px',
+                fontWeight: 800,
+                letterSpacing: '1px',
+                padding: '5px 12px',
+                borderRadius: '999px',
+                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.5)',
+                textTransform: 'uppercase',
+              }}
+            >
+              SOLD OUT
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Weight badge */}
@@ -730,7 +828,7 @@ function DesktopCard({ item, idx, onItemSelect }: { item: MenuItem; idx: number;
         width: '100%',
         maxWidth: '520px',
         backgroundColor: 'var(--bg-card)',
-        border: '1px solid var(--bg-card-border)',
+        border: isSoldOut ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid var(--bg-card-border)',
         paddingTop: '20px',
         paddingBottom: '20px',
         paddingLeft: isLeft ? 'var(--card-padding-overlap)' : '24px',
@@ -743,6 +841,7 @@ function DesktopCard({ item, idx, onItemSelect }: { item: MenuItem; idx: number;
         marginRight: !isLeft ? 'var(--card-overlap-margin)' : '0',
         boxShadow: 'var(--shadow-luxury)',
         transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.4s ease',
+        opacity: isSoldOut ? 0.85 : 1,
         WebkitMaskImage: isLeft 
           ? 'linear-gradient(to right, transparent 0px, transparent 20px, black 100px)' 
           : 'linear-gradient(to left, transparent 0px, transparent 20px, black 100px)',
@@ -767,17 +866,37 @@ function DesktopCard({ item, idx, onItemSelect }: { item: MenuItem; idx: number;
           gap: '8px',
         }}
       >
-        <span style={{ flexShrink: 1, minWidth: 0 }}>{item.name}</span>
+        <span style={{ flexShrink: 1, minWidth: 0, display: 'inline-flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <span>{item.name}</span>
+          {isSoldOut && (
+            <span
+              style={{
+                fontSize: '9.5px',
+                fontFamily: 'var(--font-sans)',
+                fontWeight: 800,
+                padding: '2px 8px',
+                borderRadius: '999px',
+                backgroundColor: '#ef4444',
+                color: '#ffffff',
+                letterSpacing: '0.6px',
+                fontStyle: 'normal',
+                display: 'inline-block',
+              }}
+            >
+              SOLD OUT
+            </span>
+          )}
+        </span>
         <span
           style={{
             fontFamily: 'var(--font-sans)',
             fontSize: 'var(--font-size-title)',
-            color: 'var(--accent-gold)',
+            color: isSoldOut ? '#ef4444' : 'var(--accent-gold)',
             fontWeight: 500,
             flexShrink: 0,
           }}
         >
-          {item.price} Birr
+          {formatPrice(item.price, currency)}
         </span>
       </h3>
 
@@ -927,7 +1046,7 @@ function DesktopCard({ item, idx, onItemSelect }: { item: MenuItem; idx: number;
 }
 
 // ── Main Export ────────────────────────────────────────────────────────────
-export default function MenuTimeline({ items, onItemSelect }: MenuTimelineProps) {
+export default function ClassicTimeline({ items, currency = 'ETB', onItemSelect }: ClassicTimelineProps) {
   const isMobile = useIsMobile();
 
   if (items.length === 0) {
@@ -957,9 +1076,9 @@ export default function MenuTimeline({ items, onItemSelect }: MenuTimelineProps)
     >
       {items.map((item, idx) =>
         isMobile ? (
-          <MobileCard key={item.id} item={item} idx={idx} onItemSelect={onItemSelect} />
+          <MobileCard key={item.id} item={item} idx={idx} currency={currency} onItemSelect={onItemSelect} />
         ) : (
-          <DesktopCard key={item.id} item={item} idx={idx} onItemSelect={onItemSelect} />
+          <DesktopCard key={item.id} item={item} idx={idx} currency={currency} onItemSelect={onItemSelect} />
         )
       )}
     </div>

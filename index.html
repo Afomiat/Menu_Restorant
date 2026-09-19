@@ -100,8 +100,8 @@
       </style>
       <div class="loader-content">
         <div class="wind-text">
-          <div class="aura-title">AURA</div>
-          <div class="aura-subtitle">Menu</div>
+          <div class="aura-title" id="loader-title">AURA</div>
+          <div class="aura-subtitle" id="loader-subtitle">Menu</div>
         </div>
         <div class="wind-hat">
           <img src="/images/glassy_3d_chef.png" alt="Glassy Chef Hat" class="glassy-chef-img" />
@@ -110,16 +110,30 @@
     </div>
     
     <script>
-      // Force the loader to stay for exactly 3 seconds to complete the animation
+      // Dynamically set restaurant title from URL slug instantly without duplicate network requests
+      (function() {
+        var path = window.location.pathname.replace(/^\/+|\/+$/g, '');
+        if (path) {
+          var slug = path.split('/')[0].toLowerCase().trim();
+          var fallback = slug.charAt(0).toUpperCase() + slug.slice(1);
+          var titleEl = document.getElementById('loader-title');
+          if (titleEl) {
+            titleEl.textContent = fallback;
+            document.title = fallback + ' — Menu';
+          }
+        }
+      })();
+
+      // Smoothly hide the splash animation once the page is ready
       window.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
           const loader = document.getElementById('initial-loader-overlay');
           if (loader) {
             loader.style.opacity = '0';
             loader.style.visibility = 'hidden';
-            setTimeout(() => loader.remove(), 500); // Remove from DOM after fade out
+            setTimeout(() => loader.remove(), 400);
           }
-        }, 3000);
+        }, 900);
       });
     </script>
 

@@ -26,9 +26,9 @@
 
   /* --- MOBILE FIRST (xs: < 400px phones) --- */
   /* Stacked layout on mobile: plate sits centered above card */
-  --plate-size: 90px;
-  --card-overlap-margin: -22px;   /* 25% of 90px */
-  --card-padding-overlap: 32px;
+  --plate-size: 130px;
+  --card-overlap-margin: -32px;
+  --card-padding-overlap: 46px;
   --timeline-row-padding: 24px 16px;
   --font-size-title: 15px;
   --font-size-desc: 12px;
@@ -41,9 +41,9 @@
 /* sm: 400px+ phones (iPhone 14, Pixel 7) */
 @media (min-width: 400px) {
   :root {
-    --plate-size: 110px;
-    --card-overlap-margin: -27px;
-    --card-padding-overlap: 38px;
+    --plate-size: 158px;
+    --card-overlap-margin: -39px;
+    --card-padding-overlap: 54px;
     --timeline-row-padding: 26px 18px;
     --font-size-title: 17px;
     --font-size-desc: 12.5px;
@@ -195,8 +195,106 @@ body {
 }
 
 /* ──────────────────────────────────────────────
-   Category Nav
+   Classic Category Nav & Cute Gold Arrow Controls
 ────────────────────────────────────────────── */
+.classic-category-nav-container {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.classic-category-scroll-track {
+  display: flex;
+  overflow-x: auto;
+  background-color: transparent;
+  flex: 1;
+  min-width: 0;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 4px;
+}
+
+.classic-cat-nav-arrow {
+  position: static;
+  transform: none;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background-color: rgba(27, 29, 38, 0.94);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(201, 168, 118, 0.4);
+  color: var(--accent-gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 0;
+}
+
+.classic-cat-nav-arrow:hover:not(:disabled) {
+  transform: scale(1.1);
+  border-color: var(--accent-gold);
+  background-color: rgba(35, 38, 50, 0.98);
+  box-shadow: 0 4px 18px rgba(201, 168, 118, 0.3);
+}
+
+.classic-cat-nav-arrow:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.classic-cat-nav-arrow:disabled,
+.classic-cat-nav-arrow.is-disabled {
+  opacity: 0.18;
+  cursor: default;
+  pointer-events: none;
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+.classic-cat-nav-btn {
+  background: none;
+  border: none;
+  padding: 6px 4px;
+  color: var(--text-secondary);
+  font-family: var(--font-serif);
+  font-size: clamp(14px, 1.8vw, 17px);
+  font-style: italic;
+  font-weight: 500;
+  text-transform: capitalize;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  position: relative;
+  white-space: nowrap;
+}
+
+.classic-cat-nav-btn:hover {
+  color: var(--text-primary);
+}
+
+.classic-cat-nav-btn.active {
+  color: var(--accent-gold);
+}
+
+.classic-cat-nav-indicator {
+  position: absolute;
+  bottom: -8px;
+  left: 10%;
+  right: 10%;
+  height: 2px;
+  background-color: var(--accent-gold);
+  box-shadow: var(--shadow-glow);
+  animation: fadeIn 0.3s ease forwards;
+}
+
 .category-nav-wrapper {
   display: flex;
   gap: 16px;
@@ -264,7 +362,7 @@ body {
    Timeline — Mobile Stacked card hover effects
 ────────────────────────────────────────────── */
 .dish-plate-container:hover {
-  transform: scale(1.06) rotate(3deg);
+  transform: scale(1.1) rotate(8deg);
 }
 .dish-card:hover {
   border-color: rgba(201, 168, 118, 0.45);
