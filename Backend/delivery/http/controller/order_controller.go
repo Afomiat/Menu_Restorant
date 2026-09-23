@@ -2,6 +2,7 @@ package controller
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -25,24 +26,25 @@ func NewOrderController(orderUsecase domain.OrderUsecase, hub *ws.Hub) *OrderCon
 
 type OrderItemModifierRequest struct {
 	ModifierID   uuid.UUID `json:"modifier_id" binding:"required"`
-	ModifierName string    `json:"modifier_name" binding:"required"`
+	ModifierName string    `json:"modifier_name"`
 	PriceApplied float64   `json:"price_applied"`
 }
 
 type OrderItemRequest struct {
 	MenuItemID uuid.UUID                  `json:"menu_item_id" binding:"required"`
-	ItemName   string                     `json:"item_name" binding:"required"`
-	UnitPrice  float64                    `json:"unit_price" binding:"gte=0"`
-	Quantity   int32                      `json:"quantity" binding:"required,gt=0"`
-	Notes      string                     `json:"notes"`
+	ItemName   string                     `json:"item_name"`
+	UnitPrice  float64                    `json:"unit_price"`
+	Quantity   int32                      `json:"quantity" binding:"required,gt=0,lte=50"`
+	Notes      string                     `json:"notes" binding:"max=500"`
 	Modifiers  []OrderItemModifierRequest `json:"modifiers"`
 }
 
 type PlaceOrderRequest struct {
-	TableNumber string             `json:"table_number" binding:"required"`
-	TableToken  string             `json:"table_token" binding:"required"`
-	Items       []OrderItemRequest `json:"items" binding:"required,min=1"`
+	TableNumber string             `json:"table_number" binding:"required,max=20"`
+	TableToken  string             `json:"table_token" binding:"max=128"`
+	Items       []OrderItemRequest `json:"items" binding:"required,min=1,max=50"`
 }
+
 
 // PlaceOrder handles POST /api/v1/menus/:slug/orders
 // Customers place an order. Initiates the 60-second Undo window.
@@ -200,6 +202,7 @@ func (ctrl *OrderController) ListActiveOrders(c *gin.Context) {
 		return
 	}
 
+
 	orders, err := ctrl.orderUsecase.GetActiveKitchenOrders(c.Request.Context(), tenantID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch kitchen orders"})
@@ -235,6 +238,11 @@ func (ctrl *OrderController) UpdateOrderStatus(c *gin.Context) {
 		return
 	}
 
+	// Map frontend "complete" alias to backend StatusDelivered
+	if req.Status == "complete" {
+		req.Status = string(domain.StatusDelivered)
+	}
+
 	// Validate allowed status transitions
 	orderStatus := domain.OrderStatus(req.Status)
 	switch orderStatus {
@@ -263,4 +271,37 @@ func (ctrl *OrderController) UpdateOrderStatus(c *gin.Context) {
 		"order_id": orderID,
 		"status":   orderStatus,
 	})
+}
+
+// CancelTableOrders handles DELETE /api/v1/admin/orders/table/:number
+func (ctrl *OrderController) CancelTableOrders(c *gin.Context) {
+	tenantID, ok := middleware.GetTenantIDFromContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "restaurant tenant identification missing"})
+		return
+	}
+	tableNumber := strings.TrimSpace(c.Param("number"))
+	if tableNumber == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "table number is required"})
+		return
+	}
+	if err := ctrl.orderUsecase.BulkCancelTableOrders(c.Request.Context(), tenantID, tableNumber); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to cancel table orders"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "table orders cancelled"})
+}
+
+// CancelAllActiveOrders handles DELETE /api/v1/admin/orders
+func (ctrl *OrderController) CancelAllActiveOrders(c *gin.Context) {
+	tenantID, ok := middleware.GetTenantIDFromContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "restaurant tenant identification missing"})
+		return
+	}
+	if err := ctrl.orderUsecase.BulkCancelAllActive(c.Request.Context(), tenantID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to cancel all orders"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "all active orders cancelled"})
 }

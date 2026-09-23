@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { X, Plus, Minus, Trash2, CheckCircle2, ChefHat, Clock, ShoppingBag } from 'lucide-react';
+import { X, Plus, Minus, Trash2, CheckCircle2, ChefHat, ShoppingBag, RotateCcw } from 'lucide-react';
 import type { CartItem } from '../../types';
 import { formatPrice } from '../../utils/currency';
+import { useCartDrawerLogic } from '../../hooks/useCartDrawerLogic';
 
 interface ModernCartDrawerProps {
   cart: CartItem[];
@@ -11,9 +11,12 @@ interface ModernCartDrawerProps {
   onClose: () => void;
   onUpdateQuantity: (idx: number, change: number) => void;
   onRemoveItem: (idx: number) => void;
-  onPlaceOrder: (tableNum?: string) => void;
+  onPlaceOrder: (tableNum?: string) => void | Promise<any>;
   onUndoOrder: (orderId: string) => void;
+  orderError?: string | null;
   initialTab?: 'tray' | 'orders';
+  tableNumber?: string | null;
+  isTableVerified?: boolean;
 }
 
 export default function ModernCartDrawer({
@@ -26,55 +29,36 @@ export default function ModernCartDrawer({
   onRemoveItem,
   onPlaceOrder,
   onUndoOrder,
+  orderError,
   initialTab = 'tray',
+  tableNumber,
+  isTableVerified = false,
 }: ModernCartDrawerProps) {
-  const [activeTab, setActiveTab] = useState<'tray' | 'orders'>(initialTab);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [customerTable, setCustomerTable] = useState('');
-  const [tableError, setTableError] = useState('');
-
-  // Sync activeTab whenever drawer opens with a specified tab
-  useEffect(() => {
-    if (isOpen) {
-      setActiveTab(initialTab);
-    }
-  }, [isOpen, initialTab]);
+  const {
+    activeTab,
+    setActiveTab,
+    isSubmitting,
+    customerTable,
+    totalCartCount,
+    totalPlacedCount,
+    subtotal,
+    placedTotal,
+    getItemTotalPrice,
+    handlePlaceOrderClick,
+  } = useCartDrawerLogic({
+    cart,
+    placedOrders,
+    isOpen,
+    tableNumber,
+    isTableVerified,
+    initialTab,
+    ordersTabName: 'orders',
+    onPlaceOrder,
+    submitDelay: 600,
+    inputElementId: 'modern-table-num-input',
+  });
 
   if (!isOpen) return null;
-
-  const totalCartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-  const totalPlacedCount = placedOrders
-    .filter((o) => o.status !== 'complete' && o.status !== 'cancelled')
-    .reduce((sum, item) => sum + item.quantity, 0);
-
-  const subtotal = cart.reduce((sum, item) => {
-    const variantAdj =
-      item.item.variants?.find((v) => v.name === item.variant)?.priceAdjustment || 0;
-    return sum + (item.item.price + variantAdj) * item.quantity;
-  }, 0);
-
-  const placedTotal = placedOrders.reduce((sum, order) => {
-    const variantAdj =
-      order.item.variants?.find((v) => v.name === order.variant)?.priceAdjustment || 0;
-    return sum + (order.item.price + variantAdj) * order.quantity;
-  }, 0);
-
-  const handlePlaceOrderClick = () => {
-    const trimmed = customerTable.trim();
-    if (!trimmed) {
-      setTableError('Please enter your table number to send order to kitchen');
-      const input = document.getElementById('modern-table-num-input');
-      if (input) input.focus();
-      return;
-    }
-    setTableError('');
-    setIsSubmitting(true);
-    setTimeout(() => {
-      onPlaceOrder(trimmed);
-      setIsSubmitting(false);
-      setActiveTab('orders');
-    }, 600);
-  };
 
   return (
     <div
@@ -146,10 +130,7 @@ export default function ModernCartDrawer({
             ) : (
               <div className="modern-cart-items-list">
                 {cart.map((cartItem, idx) => {
-                  const variantAdj =
-                    cartItem.item.variants?.find((v) => v.name === cartItem.variant)
-                      ?.priceAdjustment || 0;
-                  const itemPrice = (cartItem.item.price + variantAdj) * cartItem.quantity;
+                  const itemPrice = getItemTotalPrice(cartItem);
 
                   return (
                     <div key={`${cartItem.item.id}-${cartItem.variant}-${idx}`} className="modern-cart-item-card">
@@ -219,64 +200,109 @@ export default function ModernCartDrawer({
                   </span>
                 </div>
 
-                {/* Table Number Input for Customer */}
-                <div style={{ marginTop: '12px', marginBottom: '8px', textAlign: 'left' }}>
-                  <label
-                    htmlFor="modern-table-num-input"
+                {/* Table Identification Status */}
+                {isTableVerified && customerTable ? (
+                  <div
                     style={{
-                      display: 'block',
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      color: 'var(--modern-text-dark)',
-                      marginBottom: '6px',
+                      marginTop: '14px',
+                      marginBottom: '10px',
+                      padding: '12px 14px',
+                      borderRadius: '12px',
+                      backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                      border: '1.5px solid rgba(16, 185, 129, 0.25)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      textAlign: 'left',
                     }}
                   >
-                    🪑 Your Table Number <span style={{ color: 'var(--modern-primary)' }}>*</span>
-                  </label>
-                  <input
-                    id="modern-table-num-input"
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="Enter your table number (e.g. 5)"
-                    value={customerTable}
-                    onChange={(e) => {
-                      setCustomerTable(e.target.value);
-                      setTableError('');
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '10px 14px',
-                      fontSize: '14px',
-                      fontWeight: 600,
-                      borderRadius: '12px',
-                      border: tableError ? '1.5px solid var(--modern-primary)' : '1.5px solid #e2e8f0',
-                      backgroundColor: '#f8f9fb',
-                      color: '#121417',
-                      outline: 'none',
-                      transition: 'border-color 0.2s ease',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                  {tableError && (
-                    <div style={{ color: 'var(--modern-primary)', fontSize: '11px', fontWeight: 600, marginTop: '4px' }}>
-                      {tableError}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '20px' }}>📍</span>
+                      <div>
+                        <div style={{ fontSize: '14px', fontWeight: 800, color: '#065f46', letterSpacing: '-0.2px' }}>
+                          Table {customerTable}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#047857', fontWeight: 600 }}>
+                          Verified Dine-In QR Session
+                        </div>
+                      </div>
                     </div>
-                  )}
-                </div>
+                    <span
+                      style={{
+                        fontSize: '10px',
+                        fontWeight: 800,
+                        padding: '3px 8px',
+                        borderRadius: '999px',
+                        backgroundColor: '#10b981',
+                        color: '#ffffff',
+                        letterSpacing: '0.5px',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Active
+                    </span>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      marginTop: '14px',
+                      marginBottom: '10px',
+                      padding: '12px 14px',
+                      borderRadius: '12px',
+                      backgroundColor: 'rgba(245, 158, 11, 0.08)',
+                      border: '1.5px dashed rgba(245, 158, 11, 0.35)',
+                      textAlign: 'center',
+                    }}
+                  >
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#92400e', marginBottom: '3px' }}>
+                      📲 Dine-In QR Scan Required
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#b45309', lineHeight: 1.4 }}>
+                      Scan the QR code on your dining table to dispatch orders directly to the kitchen.
+                    </div>
+                  </div>
+                )}
+
+                {orderError && (
+                  <div
+                    style={{
+                      backgroundColor: '#fee2e2',
+                      border: '1px solid #fca5a5',
+                      borderRadius: '10px',
+                      padding: '10px 14px',
+                      color: '#b91c1c',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      marginBottom: '10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                  >
+                    <span>⚠️ {orderError}</span>
+                  </div>
+                )}
 
                 <button
                   type="button"
                   className="modern-modal-cta-btn"
-                  style={{ width: '100%', marginTop: '4px' }}
+                  style={{
+                    width: '100%',
+                    marginTop: '4px',
+                    opacity: isSubmitting || !isTableVerified ? 0.75 : 1,
+                    cursor: !isTableVerified ? 'not-allowed' : 'pointer',
+                  }}
                   onClick={handlePlaceOrderClick}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !isTableVerified}
                 >
                   {isSubmitting ? (
                     'Sending to Kitchen...'
+                  ) : !isTableVerified ? (
+                    <span>Scan Table QR to Order</span>
                   ) : (
                     <>
                       <CheckCircle2 size={18} />
-                      Confirm & Send to Kitchen
+                      Send Order to Kitchen • {formatPrice(subtotal, currency)}
                     </>
                   )}
                 </button>
@@ -313,7 +339,7 @@ export default function ModernCartDrawer({
                         <span className="modern-pulse-dot" /> Kitchen Preparing
                       </div>
                       <div className="modern-top-bill-count">
-                        {totalPlacedCount} {totalPlacedCount === 1 ? 'item' : 'items'} ordered
+                        <span>{totalPlacedCount} {totalPlacedCount === 1 ? 'item' : 'items'} ordered</span>
                       </div>
                     </div>
                   </div>
@@ -329,16 +355,13 @@ export default function ModernCartDrawer({
                     overflowY: 'auto',
                   }}
                 >
-                  {placedOrders.map((order) => {
-                    const variantAdj =
-                      order.item.variants?.find((v) => v.name === order.variant)?.priceAdjustment || 0;
-                    const itemTotalPrice = (order.item.price + variantAdj) * order.quantity;
+                  {placedOrders.map((order, idx) => {
+                    const itemTotalPrice = getItemTotalPrice(order);
                     const status = order.status || 'not_started';
-                    const isCookingOrBeyond = status === 'preparing' || status === 'ready' || status === 'complete';
 
                     return (
                       <div
-                        key={order.orderId}
+                        key={`${order.orderId || 'order'}-${order.item.id}-${idx}`}
                         className="modern-cart-item-card"
                         style={{
                           backgroundColor: status === 'ready' ? '#f0fdf4' : '#fffdfb',
@@ -367,7 +390,7 @@ export default function ModernCartDrawer({
                                   gap: '3px',
                                 }}
                               >
-                                <Clock size={10} /> Sent to Kitchen
+                                Sent to Kitchen
                               </span>
                             )}
 
@@ -398,19 +421,22 @@ export default function ModernCartDrawer({
                                 type="button"
                                 onClick={() => onUndoOrder(order.orderId!)}
                                 style={{
-                                  background: 'none',
-                                  border: '1px solid #cbd5e1',
+                                  background: '#fff',
+                                  border: '1px solid #f87171',
                                   borderRadius: '999px',
                                   padding: '4px 12px',
                                   fontSize: '11px',
-                                  fontWeight: 600,
-                                  color: '#475569',
+                                  fontWeight: 700,
+                                  color: '#dc2626',
                                   cursor: 'pointer',
                                   whiteSpace: 'nowrap',
                                   transition: 'all 0.2s ease',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
                                 }}
                               >
-                                Undo
+                                <RotateCcw size={11} /> Undo
                               </button>
                             ) : status === 'preparing' ? (
                               <span

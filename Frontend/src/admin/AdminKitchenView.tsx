@@ -9,19 +9,19 @@ import {
   Trash2,
   Sparkles,
   Layers,
-  Search,
-  X,
   Timer,
   UtensilsCrossed,
+  RotateCcw,
 } from 'lucide-react';
 import type { CartItem, MenuItem, OrderStatus, RestaurantMeta } from '../types';
 import {
   updateOrderStatus,
   updateTableOrdersStatus,
   clearCompletedOrders,
-  clearAllRestaurantOrders,
-  deleteTableOrders,
+  cancelTableOrders,       // ← NEW (replaces deleteTableOrders)
+  cancelAllActiveOrders,   // ← NEW (replaces clearAllRestaurantOrders)
 } from '../services/orderService';
+
 import { formatPrice } from '../utils/currency';
 import AdminConfirmModal from './AdminConfirmModal';
 import SearchBar from '../components/common/SearchBar';
@@ -32,6 +32,12 @@ interface AdminKitchenViewProps {
   orders: CartItem[];
   items?: MenuItem[];
   onBackToMenu?: () => void;
+  onOrderStatusChange?: (orderId: string, status: OrderStatus) => void;
+  onTableStatusChange?: (tableNumber: string, status: OrderStatus) => void;
+  onTableCancel?: (tableNumber: string) => void;
+  onClearAllQueue?: () => void;
+  onClearHistory?: () => void;
+  onUpgradePlan?: () => void;
 }
 
 export default function AdminKitchenView({
@@ -40,6 +46,12 @@ export default function AdminKitchenView({
   orders = [],
   items = [],
   onBackToMenu,
+  onOrderStatusChange,
+  onTableStatusChange,
+  onTableCancel,
+  onClearAllQueue,
+  onClearHistory,
+  onUpgradePlan,
 }: AdminKitchenViewProps) {
   const [filterTab, setFilterTab] = useState<'active' | 'cooking' | 'ready' | 'history'>('active');
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,6 +60,7 @@ export default function AdminKitchenView({
   const [isClearAllModalOpen, setIsClearAllModalOpen] = useState(false);
   const [isClearHistoryModalOpen, setIsClearHistoryModalOpen] = useState(false);
   const [tableToDelete, setTableToDelete] = useState<string | null>(null);
+  const [orderToCancel, setOrderToCancel] = useState<{ orderId: string; dishName: string; tableNumber?: string } | null>(null);
 
   const activeCurrency = meta?.currency || 'ETB';
 
@@ -62,7 +75,7 @@ export default function AdminKitchenView({
           id: existingItem?.id || (order as any)?.itemId || `unknown-${index}`,
           name: existingItem?.name || (order as any)?.name || 'Dish Item',
           price: typeof existingItem?.price === 'number' ? existingItem.price : (order as any)?.price || 0,
-          imageUrl: existingItem?.imageUrl || '/images/cat_food.jpg',
+          imageUrl: existingItem?.imageUrl || '/images/default_food.png',
           description: existingItem?.description || '',
           tags: existingItem?.tags || [],
           available: existingItem?.available !== false,
@@ -159,40 +172,270 @@ export default function AdminKitchenView({
   };
 
   const handleStatusChange = (orderId: string, status: OrderStatus) => {
-    updateOrderStatus(slug, orderId, status);
+    if (onOrderStatusChange) {
+      onOrderStatusChange(orderId, status);
+    } else {
+      updateOrderStatus(slug, orderId, status);
+    }
   };
 
   const handleStartTableCooking = (tableKey: string) => {
     const rawTable = tableKey.replace('Table ', '').trim();
-    updateTableOrdersStatus(slug, rawTable, 'preparing');
+    if (onTableStatusChange) {
+      onTableStatusChange(rawTable, 'preparing');
+    } else {
+      updateTableOrdersStatus(slug, rawTable, 'preparing');
+    }
   };
 
   const handleMarkTableReady = (tableKey: string) => {
     const rawTable = tableKey.replace('Table ', '').trim();
-    updateTableOrdersStatus(slug, rawTable, 'ready');
+    if (onTableStatusChange) {
+      onTableStatusChange(rawTable, 'ready');
+    } else {
+      updateTableOrdersStatus(slug, rawTable, 'ready');
+    }
   };
 
   const handleCompleteTable = (tableKey: string) => {
     const rawTable = tableKey.replace('Table ', '').trim();
-    updateTableOrdersStatus(slug, rawTable, 'complete');
+    if (onTableStatusChange) {
+      onTableStatusChange(rawTable, 'complete');
+    } else {
+      updateTableOrdersStatus(slug, rawTable, 'complete');
+    }
   };
 
-  const confirmDeleteTable = () => {
-    if (!tableToDelete) return;
-    const rawTable = tableToDelete.replace('Table ', '').trim();
-    deleteTableOrders(slug, rawTable);
-    setTableToDelete(null);
-  };
+// DELETE TABLE — cancels in PostgreSQL atomically
+const confirmDeleteTable = async () => {
+  if (!tableToDelete) return;
+  const rawTable = tableToDelete.replace('Table ', '').trim();
+  if (onTableCancel) {
+    onTableCancel(rawTable);
+  } else {
+    try { await cancelTableOrders(slug, rawTable); } catch {}
+  }
+  setTableToDelete(null);
+};
 
-  const confirmClearAllQueue = () => {
-    clearAllRestaurantOrders(slug);
-    setIsClearAllModalOpen(false);
-  };
+// CANCEL SINGLE ORDER — cancels one dish in PostgreSQL atomically
+const confirmCancelSingleOrder = async () => {
+  if (!orderToCancel) return;
+  if (onOrderStatusChange) {
+    onOrderStatusChange(orderToCancel.orderId, 'cancelled');
+  } else {
+    try {
+      await updateOrderStatus(slug, orderToCancel.orderId, 'cancelled');
+    } catch (err) {
+      console.error('Failed to cancel order:', err);
+    }
+  }
+  setOrderToCancel(null);
+};
 
-  const confirmClearHistory = () => {
+// CLEAR ALL QUEUE — cancels all active orders in PostgreSQL
+const confirmClearAllQueue = async () => {
+  if (onClearAllQueue) {
+    onClearAllQueue();
+  } else {
+    try { await cancelAllActiveOrders(slug); } catch {}
+  }
+  setIsClearAllModalOpen(false);
+};
+
+// CLEAR HISTORY — local only (completed/cancelled already excluded by backend)
+const confirmClearHistory = () => {
+  if (onClearHistory) {
+    onClearHistory();
+  } else {
     clearCompletedOrders(slug);
-    setIsClearHistoryModalOpen(false);
-  };
+  }
+  setIsClearHistoryModalOpen(false);
+};
+
+
+  if (meta?.plan === 'standard') {
+    return (
+      <div className="admin-kitchen-page-view" style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 20px' }}>
+        <div
+          style={{
+            maxWidth: '680px',
+            width: '100%',
+            backgroundColor: '#ffffff',
+            borderRadius: '24px',
+            border: '1.5px solid var(--admin-border, #e2e8f0)',
+            boxShadow: '0 20px 40px -15px rgba(0, 0, 0, 0.08)',
+            padding: '48px 36px',
+            textAlign: 'center',
+            position: 'relative',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Top Decorative Gradient Accent */}
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '6px',
+              background: 'linear-gradient(90deg, #f59e0b, #ec4899, #8b5cf6)',
+            }}
+          />
+
+          {/* Badge Icon */}
+          <div
+            style={{
+              width: '76px',
+              height: '76px',
+              margin: '0 auto 20px auto',
+              borderRadius: '20px',
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(139, 92, 246, 0.15))',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '36px',
+            }}
+          >
+            👑
+          </div>
+
+          <span
+            style={{
+              fontSize: '12px',
+              fontWeight: 800,
+              textTransform: 'uppercase',
+              letterSpacing: '1px',
+              padding: '4px 12px',
+              borderRadius: '999px',
+              backgroundColor: 'rgba(245, 158, 11, 0.15)',
+              color: '#d97706',
+              display: 'inline-block',
+              marginBottom: '12px',
+            }}
+          >
+            VIP License Feature
+          </span>
+
+          <h2
+            style={{
+              fontSize: '28px',
+              fontWeight: 800,
+              color: 'var(--admin-text-dark, #0f172a)',
+              marginBottom: '12px',
+              letterSpacing: '-0.5px',
+            }}
+          >
+            Kitchen Display System (KDS)
+          </h2>
+
+          <p
+            style={{
+              fontSize: '15px',
+              color: 'var(--admin-text-muted, #64748b)',
+              lineHeight: 1.6,
+              maxWidth: '520px',
+              margin: '0 auto 28px auto',
+            }}
+          >
+            <strong>{meta.name || 'Your restaurant'}</strong> is currently on the <strong>Standard Plan (Digital QR Menu)</strong>. Upgrade to VIP to activate full contactless table ordering and kitchen dispatch tablets.
+          </p>
+
+          {/* Feature Comparison Grid */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '14px',
+              textAlign: 'left',
+              marginBottom: '32px',
+              padding: '20px',
+              borderRadius: '16px',
+              backgroundColor: '#f8fafc',
+              border: '1px solid #e2e8f0',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+              <span style={{ color: '#10b981', fontSize: '18px', fontWeight: 800 }}>✓</span>
+              <div>
+                <strong style={{ fontSize: '13px', color: '#0f172a', display: 'block' }}>Real-time Kitchen Tablets</strong>
+                <span style={{ fontSize: '12px', color: '#64748b' }}>Instant WebSocket dispatch with audio chime</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+              <span style={{ color: '#10b981', fontSize: '18px', fontWeight: 800 }}>✓</span>
+              <div>
+                <strong style={{ fontSize: '13px', color: '#0f172a', display: 'block' }}>Contactless Table Ordering</strong>
+                <span style={{ fontSize: '12px', color: '#64748b' }}>Guests send orders directly from their phone</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+              <span style={{ color: '#10b981', fontSize: '18px', fontWeight: 800 }}>✓</span>
+              <div>
+                <strong style={{ fontSize: '13px', color: '#0f172a', display: 'block' }}>Per-Dish Status Progression</strong>
+                <span style={{ fontSize: '12px', color: '#64748b' }}>Preparing, Ready, Served & 60s customer undo</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+              <span style={{ color: '#10b981', fontSize: '18px', fontWeight: 800 }}>✓</span>
+              <div>
+                <strong style={{ fontSize: '13px', color: '#0f172a', display: 'block' }}>Tamper-Proof Table QR</strong>
+                <span style={{ fontSize: '12px', color: '#64748b' }}>HMAC signed dine-in dining tokens</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            {onUpgradePlan && (
+              <button
+                type="button"
+                className="admin-save-pill-btn"
+                onClick={onUpgradePlan}
+                style={{
+                  padding: '14px 28px',
+                  fontSize: '15px',
+                  fontWeight: 800,
+                  borderRadius: '12px',
+                  background: 'linear-gradient(135deg, #f59e0b, #ea580c)',
+                  border: 'none',
+                  color: '#ffffff',
+                  boxShadow: '0 8px 20px -4px rgba(234, 88, 12, 0.4)',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <span>🚀</span>
+                <span>Upgrade to VIP Tier (Instant Activation)</span>
+              </button>
+            )}
+
+            {onBackToMenu && (
+              <button
+                type="button"
+                className="admin-sec-pill-btn"
+                onClick={onBackToMenu}
+                style={{
+                  padding: '14px 24px',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  borderRadius: '12px',
+                  borderColor: '#cbd5e1',
+                }}
+              >
+                Back to Menu Management
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="admin-kitchen-page-view">
@@ -528,46 +771,102 @@ export default function AdminKitchenView({
                         {/* Status Indicator & Positive Progression Action */}
                         <div className="admin-kitchen-dish-right">
                           {status === 'not_started' && (
-                            <button
-                              type="button"
-                              className="admin-kitchen-action-btn start"
-                              onClick={() => handleStatusChange(order.orderId!, 'preparing')}
-                              title="Start preparing dish. This locks customer from undoing."
-                            >
-                              <Flame size={14} />
-                              <span>Start Cooking</span>
-                            </button>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <button
+                                type="button"
+                                className="admin-kitchen-action-btn start"
+                                onClick={() => handleStatusChange(order.orderId!, 'preparing')}
+                                title="Start preparing dish."
+                              >
+                                <Flame size={14} />
+                                <span>Start Cooking</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                className="admin-kitchen-dish-cancel-btn"
+                                onClick={() => setOrderToCancel({ orderId: order.orderId!, dishName: itemName, tableNumber: order.tableNumber || undefined })}
+                                title={`Cancel ${itemName} from table order`}
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
                           )}
 
                           {status === 'preparing' && (
-                            <button
-                              type="button"
-                              className="admin-kitchen-action-btn ready"
-                              onClick={() => handleStatusChange(order.orderId!, 'ready')}
-                              title="Mark dish ready for table delivery"
-                            >
-                              <Check size={14} />
-                              <span>Mark Ready</span>
-                            </button>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <button
+                                type="button"
+                                className="admin-kitchen-dish-revert-btn"
+                                onClick={() => handleStatusChange(order.orderId!, 'not_started')}
+                                title="Undo: Revert status back to New / Not Started"
+                              >
+                                <RotateCcw size={12} />
+                                <span>Undo</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                className="admin-kitchen-action-btn ready"
+                                onClick={() => handleStatusChange(order.orderId!, 'ready')}
+                                title="Mark dish ready for table delivery"
+                              >
+                                <Check size={14} />
+                                <span>Mark Ready</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                className="admin-kitchen-dish-cancel-btn"
+                                onClick={() => setOrderToCancel({ orderId: order.orderId!, dishName: itemName, tableNumber: order.tableNumber || undefined })}
+                                title={`Cancel ${itemName} from table order`}
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
                           )}
 
                           {status === 'ready' && (
-                            <button
-                              type="button"
-                              className="admin-kitchen-action-btn complete"
-                              onClick={() => handleStatusChange(order.orderId!, 'complete')}
-                              title="Mark dish as delivered / served"
-                            >
-                              <CheckCircle2 size={14} />
-                              <span>Served</span>
-                            </button>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <button
+                                type="button"
+                                className="admin-kitchen-dish-revert-btn"
+                                onClick={() => handleStatusChange(order.orderId!, 'preparing')}
+                                title="Undo: Revert status back to Cooking"
+                              >
+                                <RotateCcw size={12} />
+                                <span>Undo</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                className="admin-kitchen-action-btn complete"
+                                onClick={() => handleStatusChange(order.orderId!, 'complete')}
+                                title="Mark dish as delivered / served"
+                              >
+                                <CheckCircle2 size={14} />
+                                <span>Served</span>
+                              </button>
+                            </div>
                           )}
 
                           {status === 'complete' && (
-                            <span className="admin-kitchen-status-pill complete">
-                              <CheckCircle2 size={13} />
-                              <span>Served</span>
-                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <button
+                                type="button"
+                                className="admin-kitchen-dish-revert-btn"
+                                onClick={() => handleStatusChange(order.orderId!, 'ready')}
+                                title="Undo: Revert status back to Ready"
+                              >
+                                <RotateCcw size={12} />
+                                <span>Undo</span>
+                              </button>
+
+                              <span className="admin-kitchen-status-pill complete">
+                                <CheckCircle2 size={13} />
+                                <span>Served</span>
+                              </span>
+                            </div>
                           )}
 
                           {status === 'cancelled' && (
@@ -615,6 +914,18 @@ export default function AdminKitchenView({
         isDestructive={true}
         onConfirm={confirmDeleteTable}
         onClose={() => setTableToDelete(null)}
+      />
+
+      {/* Confirmation Modal for Cancelling a Single Dish Order */}
+      <AdminConfirmModal
+        isOpen={Boolean(orderToCancel)}
+        title="Cancel Dish Order"
+        message={`Are you sure you want to cancel "${orderToCancel?.dishName}"? Only this single dish will be removed from Table ${orderToCancel?.tableNumber || 'Direct'}.`}
+        itemName={orderToCancel?.dishName}
+        confirmLabel="Cancel Dish"
+        isDestructive={true}
+        onConfirm={confirmCancelSingleOrder}
+        onClose={() => setOrderToCancel(null)}
       />
 
       {/* Confirmation Modal for Clearing History */}

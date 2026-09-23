@@ -1,7 +1,6 @@
 import { useState, useMemo, type CSSProperties } from 'react';
 import {
   ShoppingBag,
-  Search,
   SlidersHorizontal,
   X,
   Home,
@@ -17,8 +16,10 @@ import ModernFoodGrid from './ModernFoodGrid';
 import ModernItemModal from './ModernItemModal';
 import ModernCartDrawer from './ModernCartDrawer';
 import useMenuCart from '../../hooks/useMenuCart';
+import { useFeatureGate } from '../../hooks/useFeatureGate';
 import { formatPrice } from '../../utils/currency';
 import SearchBar from '../../components/common/SearchBar';
+import OfflineBanner from '../../components/common/OfflineBanner';
 
 import './modern.css';
 
@@ -88,6 +89,7 @@ export default function ModernMenuPage({
   restaurantSlug,
   tableNumber,
 }: ModernMenuPageProps) {
+  const { can } = useFeatureGate();
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
@@ -110,10 +112,13 @@ export default function ModernMenuPage({
     handleRemoveItem,
     handlePlaceOrder,
     handleUndoOrder,
+    orderError,
     totalCartItems,
     totalPlacedItems,
     totalPrice,
     getItemCartQuantity,
+    resolvedTable,
+    isTableVerified,
   } = useMenuCart({
     restaurantSlug,
     items,
@@ -207,6 +212,7 @@ export default function ModernMenuPage({
 
   return (
     <div className="modern-template-wrapper" style={themeStyles}>
+      <OfflineBanner />
       {/* 1. Full-Width Sticky Header Bar */}
       <header className="modern-header-outer">
         <div className="modern-container">
@@ -253,25 +259,44 @@ export default function ModernMenuPage({
 
             {/* Header Right Actions (Desktop Only) */}
             <div className="modern-header-actions">
-              {/* Desktop View: Full Cart Trigger with subtotal */}
-              <button
-                type="button"
-                className="modern-desktop-cart-btn"
-                onClick={() => {
-                  setCartDrawerTab('tray');
-                  setIsCartOpen(true);
-                }}
-                aria-label="View current cart"
-              >
-                <ShoppingBag size={18} />
-                <span>Tray</span>
-                {totalCartItems > 0 && (
-                  <>
-                    <span className="modern-desktop-cart-count">{totalCartItems}</span>
-                    <span>{formatPrice(totalPrice, activeCurrency)}</span>
-                  </>
-                )}
-              </button>
+              {can('ordering') ? (
+                /* Desktop View: Full Cart Trigger with subtotal */
+                <button
+                  type="button"
+                  className="modern-desktop-cart-btn"
+                  onClick={() => {
+                    setCartDrawerTab('tray');
+                    setIsCartOpen(true);
+                  }}
+                  aria-label="View current cart"
+                >
+                  <ShoppingBag size={18} />
+                  <span>Tray</span>
+                  {totalCartItems > 0 && (
+                    <>
+                      <span className="modern-desktop-cart-count">{totalCartItems}</span>
+                      <span>{formatPrice(totalPrice, activeCurrency)}</span>
+                    </>
+                  )}
+                </button>
+              ) : (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    padding: '8px 16px',
+                    borderRadius: '999px',
+                    backgroundColor: 'var(--modern-primary-light, rgba(255, 90, 54, 0.08))',
+                    color: 'var(--modern-primary, #ff5a36)',
+                    letterSpacing: '0.3px',
+                  }}
+                >
+                  📖 Digital QR Menu
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -427,7 +452,7 @@ export default function ModernMenuPage({
             <div>
               <div className="modern-footer-brand-title">{meta.name}</div>
               <div className="modern-footer-brand-tag">
-                {meta.tagline || 'Contactless Dining & Kitchen Ordering'}
+                {meta.tagline || (can('ordering') ? 'Contactless Dining & Kitchen Ordering' : 'Digital QR Menu')}
               </div>
             </div>
 
@@ -454,31 +479,33 @@ export default function ModernMenuPage({
           </div>
         </button>
 
-        <button
-          type="button"
-          className={`modern-nav-tab ${activeNavTab === 'cart' ? 'active' : ''}`}
-          onClick={() => handleNavClick('cart')}
-          aria-label="Order tray and kitchen status"
-        >
-          <div className="modern-nav-tab-inner">
-            <div className="modern-nav-icon-wrap">
-              <ShoppingBag size={20} strokeWidth={2.4} />
-              {activeNavTab !== 'cart' && (totalCartItems > 0 || totalPlacedItems > 0) && (
-                <span className="modern-nav-badge">
-                  {totalCartItems > 0 ? totalCartItems : totalPlacedItems}
-                </span>
-              )}
+        {can('ordering') && (
+          <button
+            type="button"
+            className={`modern-nav-tab ${activeNavTab === 'cart' ? 'active' : ''}`}
+            onClick={() => handleNavClick('cart')}
+            aria-label="Order tray and kitchen status"
+          >
+            <div className="modern-nav-tab-inner">
+              <div className="modern-nav-icon-wrap">
+                <ShoppingBag size={20} strokeWidth={2.4} />
+                {activeNavTab !== 'cart' && (totalCartItems > 0 || totalPlacedItems > 0) && (
+                  <span className="modern-nav-badge">
+                    {totalCartItems > 0 ? totalCartItems : totalPlacedItems}
+                  </span>
+                )}
+              </div>
+              <span className="modern-nav-label">
+                Tray
+                {(totalCartItems > 0 || totalPlacedItems > 0) && (
+                  <span className="modern-nav-pill-count">
+                    {totalCartItems > 0 ? totalCartItems : totalPlacedItems}
+                  </span>
+                )}
+              </span>
             </div>
-            <span className="modern-nav-label">
-              Tray
-              {(totalCartItems > 0 || totalPlacedItems > 0) && (
-                <span className="modern-nav-pill-count">
-                  {totalCartItems > 0 ? totalCartItems : totalPlacedItems}
-                </span>
-              )}
-            </span>
-          </div>
-        </button>
+          </button>
+        )}
 
         <button
           type="button"
@@ -515,7 +542,10 @@ export default function ModernMenuPage({
         onRemoveItem={handleRemoveItem}
         onPlaceOrder={handlePlaceOrder}
         onUndoOrder={handleUndoOrder}
+        orderError={orderError}
         initialTab={cartDrawerTab}
+        tableNumber={resolvedTable || tableNumber}
+        isTableVerified={isTableVerified}
       />
 
       {/* Restaurant Information Modal */}

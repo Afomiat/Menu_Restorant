@@ -1,10 +1,34 @@
 import { useState, useEffect, useMemo, useRef, type CSSProperties } from 'react';
 import { useParams } from 'react-router-dom';
-import { Search, Plus, AlertCircle, Sparkles, X, ChefHat, Settings, ExternalLink, UtensilsCrossed, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, AlertCircle, Sparkles, ChefHat, ExternalLink, UtensilsCrossed, ChevronLeft, ChevronRight } from 'lucide-react';
 import useRestaurantMenu from '../hooks/useRestaurantMenu';
-import { saveRestaurantMenu, resetRestaurantMenu } from '../services/menuService';
-import { getRestaurantOrders, subscribeToOrders } from '../services/orderService';
-import type { MenuItem, Category, RestaurantMeta, RestaurantMenu, CartItem } from '../types';
+import { PlanProvider } from '../context/PlanContext';
+import {
+  saveRestaurantMenu,
+  resetRestaurantMenu,
+  createAdminItem,
+  updateAdminItem,
+  deleteAdminItem,
+  createAdminCategory,
+  updateAdminCategory,
+  deleteAdminCategory,
+  updateAdminTenantTheme,
+} from '../services/menuService';
+import {
+  saveRestaurantOrders,
+  fetchAdminActiveOrders,
+  mapBackendOrderToCartItems,
+  mapBackendStatusToFrontend,
+  toggleAdminItemSoldOut,
+  updateOrderStatus,
+  updateTableOrdersStatus,
+  cancelTableOrders,
+  cancelAllActiveOrders,
+  clearCompletedOrders,
+} from '../services/orderService';
+import { ensureStaffSession, getAdminToken, clearAdminToken } from '../services/apiClient';
+import { useKitchenWebSocket } from '../hooks/useKitchenWebSocket';
+import type { MenuItem, Category, RestaurantMeta, RestaurantMenu, CartItem, OrderStatus } from '../types';
 import { matchesSearchQuery } from '../utils/search';
 import SkeletonLoader from '../components/common/SkeletonLoader';
 import NotFoundPage from '../pages/NotFoundPage';
@@ -17,8 +41,11 @@ import AdminItemModal from './AdminItemModal';
 import AdminSoldOutModal from './AdminSoldOutModal';
 import AdminConfirmModal from './AdminConfirmModal';
 import AdminSettingsModal from './AdminSettingsModal';
+import AdminTablesModal from './AdminTablesModal';
 import AdminKitchenView from './AdminKitchenView';
+import AdminLoginModal from './AdminLoginModal';
 import SearchBar from '../components/common/SearchBar';
+import OfflineBanner from '../components/common/OfflineBanner';
 import './admin.css';
 
 export default function AdminDashboardPage() {
@@ -27,6 +54,10 @@ export default function AdminDashboardPage() {
 
   const { meta: initialMeta, categories: initialCategories, items: initialItems, loading, error } =
     useRestaurantMenu(slug);
+
+  // The plan tier is derived exclusively from the backend API response (PostgreSQL tenants.plan).
+  // It is NOT overridable from the UI — the backend RequireVIPPlan middleware is the real gate.
+  const planFromBackend: 'standard' | 'vip' = initialMeta?.plan || 'standard';
 
   // Active top-level view: 'menu' (Dashboard/Dishes) or 'kitchen' (Live KDS Orders)
   const [activeView, setActiveView] = useState<'menu' | 'kitchen'>('menu');
@@ -97,6 +128,7 @@ export default function AdminDashboardPage() {
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isSoldOutModalOpen, setIsSoldOutModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isTablesModalOpen, setIsTablesModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<MenuItem | null>(null);
   const [categoryToEdit, setCategoryToEdit] = useState<Category | null>(null);
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
@@ -120,14 +152,161 @@ export default function AdminDashboardPage() {
     }
   }, [initialMeta, initialCategories, initialItems]);
 
-  // Subscribe to live kitchen orders
+  const [adminToken, setAdminToken] = useState<string | null>(getAdminToken());
+
+  // Live WebSocket feed for real-time Kitchen Display System (VIP Plan)
+  useKitchenWebSocket({
+    token: adminToken,
+    onOrderCreated: (orderData: any) => {
+      if (!orderData) return;
+      const newItems = mapBackendOrderToCartItems(orderData, items);
+      setKitchenOrders((prev) => {
+        const filtered = prev.filter((o) => o.orderId !== orderData.id);
+        const updated = [...newItems, ...filtered];
+        saveRestaurantOrders(slug, updated);
+        return updated;
+      });
+      showToast(`🔔 New Order #${orderData.id?.slice(-4)} received (Table ${orderData.table_number || 'Direct'})`);
+    },
+    onOrderCancelled: (cancelledOrderId: string) => {
+      if (!cancelledOrderId) return;
+      setKitchenOrders((prev) => {
+        const updated = prev.map((o) =>
+          o.orderId === cancelledOrderId ? { ...o, status: 'cancelled' as const } : o
+        );
+        saveRestaurantOrders(slug, updated);
+        return updated;
+      });
+      showToast(`⚠️ Order #${cancelledOrderId.slice(-4)} cancelled`);
+    },
+    onOrderStatusUpdated: (orderId: string, status: string) => {
+      if (!orderId || !status) return;
+      const mapped = mapBackendStatusToFrontend(status);
+      setKitchenOrders((prev) => {
+        const updated = prev.map((o) => (o.orderId === orderId ? { ...o, status: mapped } : o));
+        saveRestaurantOrders(slug, updated);
+        return updated;
+      });
+    },
+  });
+
+  // Listen for unauthorized 401 events to prompt login
   useEffect(() => {
-    setKitchenOrders(getRestaurantOrders(slug));
-    const unsubscribe = subscribeToOrders(slug, (latest) => {
-      setKitchenOrders(latest);
+    const handleUnauthorized = () => {
+      setAdminToken(null);
+    };
+    window.addEventListener('azai:auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('azai:auth:unauthorized', handleUnauthorized);
+  }, []);
+
+  // Authoritatively fetch active kitchen orders from PostgreSQL backend
+  useEffect(() => {
+    if (!adminToken) {
+      ensureStaffSession().then((token) => {
+        if (token) setAdminToken(token);
+      });
+      return;
+    }
+
+    fetchAdminActiveOrders().then((backendOrders) => {
+      if (backendOrders && backendOrders.length > 0) {
+        const liveItems = backendOrders.flatMap((bo) => mapBackendOrderToCartItems(bo, items));
+        setKitchenOrders(liveItems);
+        saveRestaurantOrders(slug, liveItems);
+      } else {
+        setKitchenOrders([]);
+        saveRestaurantOrders(slug, []);
+      }
     });
-    return () => unsubscribe();
-  }, [slug]);
+  }, [slug, items, adminToken]);
+
+  const handleLogout = () => {
+    clearAdminToken();
+    setAdminToken(null);
+    showToast('Signed out of staff console');
+  };
+
+  // ── Optimistic Kitchen Order Handlers (Instant 0ms UI feedback) ───────────
+  const handleKitchenOrderStatusChange = (orderId: string, status: OrderStatus) => {
+    // 1. Optimistically update local React state immediately (0ms perceived latency)
+    setKitchenOrders((prev) => {
+      const updated = prev.map((o) =>
+        o.orderId === orderId ? { ...o, status, statusUpdatedAt: Date.now() } : o
+      );
+      saveRestaurantOrders(slug, updated);
+      return updated;
+    });
+
+    // 2. Persist to server in background with rollback warning
+    updateOrderStatus(slug, orderId, status).catch((err) => {
+      console.error('Failed to update order status on server:', err);
+      showToast('⚠️ Failed to sync status with server');
+    });
+  };
+
+  const handleKitchenTableStatusChange = (tableNumber: string, status: OrderStatus) => {
+    // 1. Optimistically update all orders at this table immediately
+    setKitchenOrders((prev) => {
+      const updated = prev.map((o) =>
+        o.tableNumber === tableNumber && o.status !== 'complete' && o.status !== 'cancelled'
+          ? { ...o, status, statusUpdatedAt: Date.now() }
+          : o
+      );
+      saveRestaurantOrders(slug, updated);
+      return updated;
+    });
+
+    // 2. Persist to server in background
+    updateTableOrdersStatus(slug, tableNumber, status).catch((err) => {
+      console.error('Failed to update table orders on server:', err);
+      showToast('⚠️ Failed to sync table status with server');
+    });
+  };
+
+  const handleKitchenTableCancel = (tableNumber: string) => {
+    // 1. Optimistic instant UI update
+    setKitchenOrders((prev) => {
+      const updated = prev.map((o) =>
+        o.tableNumber === tableNumber && o.status !== 'complete' && o.status !== 'cancelled'
+          ? { ...o, status: 'cancelled' as const }
+          : o
+      );
+      saveRestaurantOrders(slug, updated);
+      return updated;
+    });
+
+    cancelTableOrders(slug, tableNumber).catch((err) => {
+      console.error('Failed to cancel table orders on server:', err);
+      showToast('⚠️ Failed to cancel table orders on server');
+    });
+  };
+
+  const handleKitchenClearAllQueue = () => {
+    // 1. Optimistic instant UI update
+    setKitchenOrders((prev) => {
+      const updated = prev.map((o) =>
+        o.status !== 'complete' && o.status !== 'cancelled'
+          ? { ...o, status: 'cancelled' as const }
+          : o
+      );
+      saveRestaurantOrders(slug, updated);
+      return updated;
+    });
+
+    cancelAllActiveOrders(slug).catch((err) => {
+      console.error('Failed to clear kitchen queue on server:', err);
+      showToast('⚠️ Failed to clear queue on server');
+    });
+  };
+
+  const handleKitchenClearHistory = () => {
+    setKitchenOrders((prev) => {
+      const updated = prev.filter((o) => o.status !== 'complete' && o.status !== 'cancelled');
+      saveRestaurantOrders(slug, updated);
+      return updated;
+    });
+    clearCompletedOrders(slug);
+  };
 
   // Compute dynamic brand theme color for admin dashboard
   const adminThemeStyle = useMemo<CSSProperties>(() => {
@@ -169,6 +348,15 @@ export default function AdminDashboardPage() {
     setMeta(updatedMeta);
     persistChanges(items, categories, updatedMeta);
     showToast(`✅ Settings saved (Currency: ${updatedMeta.currency || 'ETB'})`);
+
+    const themeToSave = {
+      ...(updatedMeta.theme || updatedMeta.colors || {}),
+      welcomeMessage: updatedMeta.tagline,
+      bannerUrl: updatedMeta.heroImageUrl,
+    };
+    updateAdminTenantTheme(themeToSave).catch((err) =>
+      console.warn('Failed to sync theme with backend:', err)
+    );
   };
 
   const handleResetToDefault = () => {
@@ -235,6 +423,19 @@ export default function AdminDashboardPage() {
     setItems(updated);
     persistChanges(updated);
     showToast(`Updated price to ${newPrice} ${activeCurrency}`);
+
+    const it = updated.find((x) => x.id === itemId);
+    if (it && itemId && itemId.length > 20) {
+      updateAdminItem(itemId, {
+        categoryId: it.categoryId,
+        name: it.name,
+        description: it.description,
+        price: newPrice,
+        imageUrl: it.imageUrl,
+        tags: it.tags,
+        isAvailable: it.available !== false,
+      }).catch((err) => console.warn('Failed to update price on backend:', err));
+    }
   };
 
   const handleToggleStock = (itemId: string) => {
@@ -245,6 +446,10 @@ export default function AdminDashboardPage() {
     persistChanges(updated);
     const toggled = updated.find((it) => it.id === itemId);
     showToast(toggled?.available ? `"${toggled.name}" is now In Stock` : `"${toggled?.name}" marked as Sold Out`);
+
+    if (itemId && itemId.length > 20 && toggled) {
+      toggleAdminItemSoldOut(itemId, !toggled.available).catch(() => {});
+    }
   };
 
   const handleDeleteItem = (itemId: string) => {
@@ -252,6 +457,10 @@ export default function AdminDashboardPage() {
     setItems(updated);
     persistChanges(updated);
     showToast('Dish removed from menu');
+
+    if (itemId && itemId.length > 20) {
+      deleteAdminItem(itemId).catch((err) => console.warn('Failed to delete item on backend:', err));
+    }
   };
 
   const handleSaveItem = (savedItem: MenuItem) => {
@@ -259,8 +468,33 @@ export default function AdminDashboardPage() {
     const exists = items.some((it) => it.id === savedItem.id);
     if (exists) {
       updated = items.map((it) => (it.id === savedItem.id ? savedItem : it));
+      if (savedItem.id && savedItem.id.length > 20) {
+        updateAdminItem(savedItem.id, {
+          categoryId: savedItem.categoryId,
+          name: savedItem.name,
+          description: savedItem.description,
+          price: savedItem.price,
+          imageUrl: savedItem.imageUrl,
+          tags: savedItem.tags,
+          isAvailable: savedItem.available !== false,
+        }).catch((err) => console.warn('Failed to update item on backend:', err));
+      }
     } else {
       updated = [savedItem, ...items];
+      createAdminItem({
+        categoryId: savedItem.categoryId,
+        name: savedItem.name,
+        description: savedItem.description,
+        price: savedItem.price,
+        imageUrl: savedItem.imageUrl,
+        tags: savedItem.tags,
+      })
+        .then((created) => {
+          if (created?.id) {
+            setItems((prev) => prev.map((it) => (it.id === savedItem.id ? { ...it, id: created.id } : it)));
+          }
+        })
+        .catch((err) => console.warn('Failed to create item on backend:', err));
     }
     setItems(updated);
     persistChanges(updated);
@@ -271,6 +505,19 @@ export default function AdminDashboardPage() {
     setCategories(newCategories);
     persistChanges(items, newCategories);
     showToast('Categories updated');
+
+    const existingCatIds = new Set(categories.map((c) => c.id));
+    newCategories.forEach((nc, idx) => {
+      if (!existingCatIds.has(nc.id)) {
+        createAdminCategory(nc.name, idx)
+          .then((created) => {
+            if (created?.id) {
+              setCategories((prev) => prev.map((c) => (c.id === nc.id ? { ...c, id: created.id } : c)));
+            }
+          })
+          .catch((err) => console.warn('Failed to create category on backend:', err));
+      }
+    });
   };
 
   const handleRenameCategory = (categoryId: string, newName: string) => {
@@ -280,18 +527,31 @@ export default function AdminDashboardPage() {
     setCategories(updated);
     persistChanges(items, updated);
     showToast(`Renamed category to "${newName}"`);
+
+    if (categoryId && categoryId.length > 20) {
+      updateAdminCategory(categoryId, newName).catch((err) =>
+        console.warn('Failed to update category on backend:', err)
+      );
+    }
   };
 
   const confirmDeleteCategory = () => {
     if (!categoryToDelete) return;
-    const updated = categories.filter((c) => c.id !== categoryToDelete.id);
+    const catId = categoryToDelete.id;
+    const updated = categories.filter((c) => c.id !== catId);
     setCategories(updated);
-    if (selectedCategory === categoryToDelete.id) {
+    if (selectedCategory === catId) {
       setSelectedCategory('all');
     }
     persistChanges(items, updated);
     showToast(`Category "${categoryToDelete.name}" deleted`);
     setCategoryToDelete(null);
+
+    if (catId && catId.length > 20) {
+      deleteAdminCategory(catId).catch((err) =>
+        console.warn('Failed to delete category on backend:', err)
+      );
+    }
   };
 
   const handleSaveSoldOut = (soldOutIds: Set<string>) => {
@@ -302,6 +562,14 @@ export default function AdminDashboardPage() {
     setItems(updated);
     persistChanges(updated);
     showToast(`✅ Updated sold out items (${soldOutIds.size} sold out)`);
+
+    // Sync sold-out status with backend
+    items.forEach((it) => {
+      const isSoldOut = soldOutIds.has(it.id);
+      if (it.available === isSoldOut && it.id.length > 20) {
+        toggleAdminItemSoldOut(it.id, isSoldOut).catch(() => {});
+      }
+    });
   };
 
   const itemsInDeletingCat = categoryToDelete
@@ -313,14 +581,18 @@ export default function AdminDashboardPage() {
   ).length;
 
   return (
+    <PlanProvider plan={planFromBackend}>
     <div className="admin-layout-root" style={adminThemeStyle}>
+      <OfflineBanner />
       {/* GoMeal Style Left Navigation Sidebar with Mobile Drawer Support */}
       <AdminSidebar
-        meta={meta}
+        meta={meta!}
         slug={slug}
         activeView={activeView}
         onSelectView={(view) => setActiveView(view)}
         activeOrdersCount={activeOrdersCount}
+        onOpenTables={() => setIsTablesModalOpen(true)}
+        onLogout={handleLogout}
         isMobileOpen={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
@@ -355,21 +627,55 @@ export default function AdminDashboardPage() {
           /* ── Full Dashboard Kitchen Orders View ────────────────────────────── */
           <AdminKitchenView
             slug={slug}
-            meta={meta}
+            meta={meta!}
             orders={kitchenOrders}
             items={items}
             onBackToMenu={() => setActiveView('menu')}
+            onOrderStatusChange={handleKitchenOrderStatusChange}
+            onTableStatusChange={handleKitchenTableStatusChange}
+            onTableCancel={handleKitchenTableCancel}
+            onClearAllQueue={handleKitchenClearAllQueue}
+            onClearHistory={handleKitchenClearHistory}
+            onUpgradePlan={() => setActiveView('menu')}
           />
         ) : (
           /* ── Full Dashboard Menu Management View ───────────────────────────── */
           <>
             {/* Top Navigation Bar: Title, and Tools */}
             <div className="admin-top-nav">
-              <div className="admin-top-title-wrap">
+              <div className="admin-top-title-wrap" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                 <h1 className="admin-top-title admin-fancy-staff-title">
                   <span className="staff-part">Staff</span>{' '}
                   <span className="dashboard-part">Dashboard</span>
                 </h1>
+
+                {/* Plan Tier Badge (read-only — reflects PostgreSQL tenants.plan) */}
+                <span
+                  title={`Plan tier: ${planFromBackend.toUpperCase()}. Managed via backend.`}
+                  style={{
+                    border: 'none',
+                    borderRadius: '999px',
+                    padding: '5px 12px',
+                    fontSize: '11px',
+                    fontWeight: 800,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    letterSpacing: '0.5px',
+                    textTransform: 'uppercase',
+                    background:
+                      planFromBackend === 'vip'
+                        ? 'linear-gradient(135deg, #f59e0b, #ea580c)'
+                        : 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                    color: '#ffffff',
+                    boxShadow:
+                      planFromBackend === 'vip'
+                        ? '0 2px 8px rgba(245, 158, 11, 0.35)'
+                        : '0 2px 8px rgba(59, 130, 246, 0.35)',
+                  }}
+                >
+                  <span>{planFromBackend === 'vip' ? '👑 VIP Tier' : '⚡ Standard Tier'}</span>
+                </span>
               </div>
 
               {/* Right Action Tools */}
@@ -730,6 +1036,13 @@ export default function AdminDashboardPage() {
         onResetToDefault={handleResetToDefault}
       />
 
+      {/* Dining Tables & QR Code Generator Modal */}
+      <AdminTablesModal
+        isOpen={isTablesModalOpen}
+        onClose={() => setIsTablesModalOpen(false)}
+        restaurantSlug={slug}
+      />
+
       {/* Floating Toast Notification */}
       {toastMessage && (
         <div className="admin-toast">
@@ -773,6 +1086,16 @@ export default function AdminDashboardPage() {
           <span>Menu</span>
         </a>
       </nav>
+
+      {/* Staff Production Login Modal */}
+      <AdminLoginModal
+        isOpen={!adminToken}
+        onSuccess={(token) => {
+          setAdminToken(token);
+          showToast('Signed in successfully');
+        }}
+      />
     </div>
+    </PlanProvider>
   );
 }

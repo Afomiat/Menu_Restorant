@@ -396,6 +396,9 @@ function MobileCard({ item, idx, currency = 'ETB', onItemSelect }: { item: MenuI
             src={item.imageUrl}
             alt={item.name}
             loading={idx === 0 ? 'eager' : 'lazy'}
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = '/images/default_food.png';
+            }}
             style={{
               width: '100%', height: '100%',
               objectFit: 'cover',
@@ -754,6 +757,9 @@ function DesktopCard({ item, idx, currency = 'ETB', onItemSelect }: { item: Menu
           src={item.imageUrl}
           alt={item.name}
           loading={idx === 0 ? 'eager' : 'lazy'}
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = '/images/default_food.png';
+          }}
           style={{
             width: '100%', height: '100%',
             objectFit: 'cover',

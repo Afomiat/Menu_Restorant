@@ -1,6 +1,7 @@
 import { Plus, Minus } from 'lucide-react';
 import type { MenuItem } from '../../types';
 import { formatNumber } from '../../utils/currency';
+import { useFeatureGate } from '../../hooks/useFeatureGate';
 
 interface ModernFoodGridProps {
   items: MenuItem[];
@@ -19,6 +20,7 @@ export default function ModernFoodGrid({
   onQuickSubtract,
   getItemQuantity,
 }: ModernFoodGridProps) {
+  const { can } = useFeatureGate();
   if (items.length === 0) {
     return (
       <div className="modern-empty-state">
@@ -67,6 +69,9 @@ export default function ModernFoodGrid({
                 className="modern-card-image"
                 loading="lazy"
                 style={isSoldOut ? { filter: 'grayscale(50%)' } : undefined}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/images/default_food.png';
+                }}
               />
               {isSoldOut ? (
                 <span
@@ -98,41 +103,56 @@ export default function ModernFoodGrid({
               </div>
 
               {!isSoldOut && (
-                qty > 0 ? (
-                  <div
-                    className="modern-card-qty-pill"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                can('ordering') ? (
+                  qty > 0 ? (
+                    <div
+                      className="modern-card-qty-pill"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        className="modern-card-qty-btn"
+                        onClick={() => onQuickSubtract(item.id)}
+                        aria-label={`Decrease ${item.name} quantity`}
+                      >
+                        <Minus size={12} />
+                      </button>
+                      <span className="modern-card-qty-num">{qty}</span>
+                      <button
+                        type="button"
+                        className="modern-card-qty-btn"
+                        onClick={() => onQuickAdd(item)}
+                        aria-label={`Increase ${item.name} quantity`}
+                      >
+                        <Plus size={12} />
+                      </button>
+                    </div>
+                  ) : (
                     <button
                       type="button"
-                      className="modern-card-qty-btn"
-                      onClick={() => onQuickSubtract(item.id)}
-                      aria-label={`Decrease ${item.name} quantity`}
+                      className="modern-card-action-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onQuickAdd(item);
+                      }}
+                      aria-label={`Add ${item.name} to tray`}
                     >
-                      <Minus size={12} />
+                      <Plus size={16} />
                     </button>
-                    <span className="modern-card-qty-num">{qty}</span>
-                    <button
-                      type="button"
-                      className="modern-card-qty-btn"
-                      onClick={() => onQuickAdd(item)}
-                      aria-label={`Increase ${item.name} quantity`}
-                    >
-                      <Plus size={12} />
-                    </button>
-                  </div>
+                  )
                 ) : (
-                  <button
-                    type="button"
-                    className="modern-card-action-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onQuickAdd(item);
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      color: 'var(--modern-text-muted)',
+                      fontWeight: 600,
+                      padding: '4px 10px',
+                      borderRadius: '999px',
+                      backgroundColor: 'rgba(0, 0, 0, 0.05)',
                     }}
-                    aria-label={`Add ${item.name} to tray`}
                   >
-                    <Plus size={16} />
-                  </button>
+                    Details &rarr;
+                  </span>
                 )
               )}
             </div>

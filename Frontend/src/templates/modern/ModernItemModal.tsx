@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
 import { X, Plus, Minus, Flame, Leaf, ShieldAlert } from 'lucide-react';
 import type { MenuItem } from '../../types';
 import { formatPrice } from '../../utils/currency';
+import { useItemModalLogic } from '../../hooks/useItemModalLogic';
+import { useFeatureGate } from '../../hooks/useFeatureGate';
 
 interface ModernItemModalProps {
   item: MenuItem | null;
@@ -16,30 +17,18 @@ export default function ModernItemModal({
   onClose,
   onAddToCart,
 }: ModernItemModalProps) {
-  const [quantity, setQuantity] = useState(1);
-  const [selectedVariant, setSelectedVariant] = useState('');
-
-  // Reset state when opening a new item
-  useEffect(() => {
-    if (item) {
-      setQuantity(1);
-      setSelectedVariant(item.variants?.[0]?.name || '');
-      // Prevent background scrolling
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [item]);
+  const { can } = useFeatureGate();
+  const {
+    quantity,
+    selectedVariant,
+    setSelectedVariant,
+    unitPrice,
+    totalPrice,
+    incrementQuantity,
+    decrementQuantity,
+  } = useItemModalLogic({ item });
 
   if (!item) return null;
-
-  const variantAdjustment =
-    item.variants?.find((v) => v.name === selectedVariant)?.priceAdjustment || 0;
-  const unitPrice = item.price + variantAdjustment;
-  const totalPrice = unitPrice * quantity;
 
   const handleAdd = () => {
     onAddToCart(item, quantity, selectedVariant);
@@ -78,7 +67,7 @@ export default function ModernItemModal({
         </div>
 
         {/* Modal Body */}
-        <div className="modern-modal-body">
+        <div className="modern-modal-body" style={!can('ordering') ? { paddingBottom: '32px' } : undefined}>
           <div className="modern-modal-title-row">
             <div>
               <h2 id="modal-dish-title" className="modern-modal-title">
@@ -173,47 +162,50 @@ export default function ModernItemModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="modern-modal-footer">
-          <div className="modern-modal-qty-control">
-            <button
-              type="button"
-              className="modern-modal-qty-btn"
-              onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-              disabled={quantity <= 1}
-              aria-label="Decrease quantity"
-            >
-              <Minus size={14} />
-            </button>
-            <span className="modern-modal-qty-text">{quantity}</span>
-            <button
-              type="button"
-              className="modern-modal-qty-btn"
-              onClick={() => setQuantity((q) => q + 1)}
-              aria-label="Increase quantity"
-            >
-              <Plus size={14} />
-            </button>
-          </div>
+        {/* Modal Footer - only rendered when ordering is enabled */}
+        {can('ordering') && (
+          <div className="modern-modal-footer">
+            <div className="modern-modal-qty-control">
+              <button
+                type="button"
+                className="modern-modal-qty-btn"
+                onClick={decrementQuantity}
+                disabled={quantity <= 1}
+                aria-label="Decrease quantity"
+              >
+                <Minus size={14} />
+              </button>
+              <span className="modern-modal-qty-text">{quantity}</span>
+              <button
+                type="button"
+                className="modern-modal-qty-btn"
+                onClick={incrementQuantity}
+                aria-label="Increase quantity"
+              >
+                <Plus size={14} />
+              </button>
+            </div>
 
-          {item.available === false ? (
-            <button
-              type="button"
-              className="modern-modal-cta-btn"
-              disabled
-              style={{ backgroundColor: '#ef4444', cursor: 'not-allowed', opacity: 0.85 }}
-            >
-              Currently Sold Out
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="modern-modal-cta-btn"
-              onClick={handleAdd}
-            >
-              Add to Order • {formatPrice(totalPrice, currency)}
-            </button>
-          )}
-        </div>
+            {item.available === false ? (
+              <button
+                type="button"
+                className="modern-modal-cta-btn"
+                disabled
+                style={{ backgroundColor: '#ef4444', cursor: 'not-allowed', opacity: 0.85 }}
+              >
+                Currently Sold Out
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="modern-modal-cta-btn"
+                onClick={handleAdd}
+              >
+                Add to Order • {formatPrice(totalPrice, currency)}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import ClassicItemModal from './ClassicItemModal';
 import ClassicCartDrawer from './ClassicCartDrawer';
 import OfflineBanner from '../../components/common/OfflineBanner';
 import useMenuCart from '../../hooks/useMenuCart';
+import { useFeatureGate } from '../../hooks/useFeatureGate';
 import type { MenuItem, Category, RestaurantMeta, RestaurantTheme } from '../../types';
 import { matchesSearchQuery } from '../../utils/search';
 
@@ -52,6 +53,7 @@ export default function ClassicMenuPage({
   restaurantSlug,
   tableNumber,
 }: ClassicMenuPageProps) {
+  const { can } = useFeatureGate();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('');
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
@@ -66,7 +68,10 @@ export default function ClassicMenuPage({
     handleRemoveItem,
     handlePlaceOrder,
     handleUndoOrder,
+    orderError,
     totalCartItems,
+    resolvedTable,
+    isTableVerified,
   } = useMenuCart({
     restaurantSlug,
     items,
@@ -273,19 +278,23 @@ export default function ClassicMenuPage({
         }}
       />
 
-      {/* Bottom Cart Drawer */}
-      <ClassicCartDrawer
-        cart={cart}
-        tableNumber={tableNumber}
-        currency={meta.currency || 'ETB'}
-        isOpen={isCartOpen}
-        setIsOpen={setIsCartOpen}
-        onUpdateQuantity={handleUpdateQuantity}
-        onRemoveItem={handleRemoveItem}
-        onPlaceOrder={handlePlaceOrder}
-        placedOrders={placedOrders}
-        onUndoOrder={handleUndoOrder}
-      />
+      {/* Bottom Cart Drawer (VIP Only) */}
+      {can('ordering') && (
+        <ClassicCartDrawer
+          cart={cart}
+          tableNumber={resolvedTable || tableNumber}
+          isTableVerified={isTableVerified}
+          currency={meta.currency || 'ETB'}
+          isOpen={isCartOpen}
+          setIsOpen={setIsCartOpen}
+          onUpdateQuantity={handleUpdateQuantity}
+          onRemoveItem={handleRemoveItem}
+          onPlaceOrder={handlePlaceOrder}
+          placedOrders={placedOrders}
+          onUndoOrder={handleUndoOrder}
+          orderError={orderError}
+        />
+      )}
 
       {/* Footer Branding — uses restaurant meta */}
       <footer

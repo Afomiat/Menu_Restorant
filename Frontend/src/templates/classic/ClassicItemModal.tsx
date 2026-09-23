@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { X, Plus, Minus, Check, Flame, Star, ShieldAlert } from 'lucide-react';
 import type { MenuItem } from '../../types';
 import { formatPrice } from '../../utils/currency';
+import { useItemModalLogic } from '../../hooks/useItemModalLogic';
+import { useFeatureGate } from '../../hooks/useFeatureGate';
 
 interface ClassicItemModalProps {
   item: MenuItem | null;
@@ -16,29 +18,19 @@ export default function ClassicItemModal({
   onClose,
   onAddToOrder,
 }: ClassicItemModalProps) {
-  const [quantity, setQuantity] = useState(1);
-  const [selectedVariant, setSelectedVariant] = useState('');
+  const { can } = useFeatureGate();
   const [addedAnimation, setAddedAnimation] = useState(false);
-
-  useEffect(() => {
-    if (item) {
-      setQuantity(1);
-      setSelectedVariant(item.variants && item.variants.length > 0 ? item.variants[0].name : '');
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [item]);
+  const {
+    quantity,
+    selectedVariant,
+    setSelectedVariant,
+    unitPrice,
+    totalPrice,
+    incrementQuantity,
+    decrementQuantity,
+  } = useItemModalLogic({ item });
 
   if (!item) return null;
-
-  const variantAdjustment =
-    item.variants?.find((v) => v.name === selectedVariant)?.priceAdjustment || 0;
-  const unitPrice = item.price + variantAdjustment;
-  const totalPrice = unitPrice * quantity;
 
   const handleAdd = () => {
     onAddToOrder(item, quantity, selectedVariant);
@@ -453,150 +445,152 @@ export default function ClassicItemModal({
           )}
         </div>
 
-        {/* Sticky Bottom Action Bar (matches Screenshot 2) */}
-        <div
-          style={{
-            padding: '16px 22px',
-            paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))',
-            borderTop: '1px solid rgba(255, 255, 255, 0.06)',
-            backgroundColor: '#121317',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '14px',
-          }}
-        >
-          {/* Add to Order Button Pill */}
-          {item.available === false ? (
-            <button
-              type="button"
-              disabled
-              style={{
-                flex: 1,
-                height: '48px',
-                borderRadius: '999px',
-                border: 'none',
-                backgroundColor: '#ef4444',
-                color: '#ffffff',
-                fontFamily: 'var(--font-sans)',
-                fontSize: '14.5px',
-                fontWeight: 800,
-                cursor: 'not-allowed',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                letterSpacing: '0.5px',
-                textTransform: 'uppercase',
-                boxShadow: '0 4px 14px rgba(239, 68, 68, 0.4)',
-              }}
-            >
-              <ShieldAlert size={18} />
-              <span>Currently Sold Out</span>
-            </button>
-          ) : (
-            <>
-              {/* Stepper Pill */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: '999px',
-                  padding: '4px',
-                  gap: '4px',
-                  height: '48px',
-                  boxSizing: 'border-box',
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                  disabled={quantity <= 1}
-                  aria-label="Decrease quantity"
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: quantity <= 1 ? 'rgba(255, 255, 255, 0.2)' : 'var(--text-primary)',
-                    width: '38px',
-                    height: '38px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: quantity <= 1 ? 'default' : 'pointer',
-                    borderRadius: '50%',
-                  }}
-                >
-                  <Minus size={15} />
-                </button>
-                <span
-                  style={{
-                    fontFamily: 'var(--font-sans)',
-                    fontSize: '16px',
-                    fontWeight: 700,
-                    width: '28px',
-                    textAlign: 'center',
-                    color: 'var(--text-primary)',
-                  }}
-                >
-                  {quantity}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setQuantity((q) => q + 1)}
-                  aria-label="Increase quantity"
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--text-primary)',
-                    width: '38px',
-                    height: '38px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    borderRadius: '50%',
-                  }}
-                >
-                  <Plus size={15} />
-                </button>
-              </div>
-
+        {/* Sticky Bottom Action Bar (VIP Only) */}
+        {can('ordering') && (
+          <div
+            style={{
+              padding: '16px 22px',
+              paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))',
+              borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+              backgroundColor: '#121317',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '14px',
+            }}
+          >
+            {/* Add to Order Button Pill */}
+            {item.available === false ? (
               <button
                 type="button"
-                onClick={handleAdd}
-                disabled={addedAnimation}
+                disabled
                 style={{
                   flex: 1,
                   height: '48px',
                   borderRadius: '999px',
                   border: 'none',
-                  backgroundColor: addedAnimation ? '#46553e' : 'var(--accent-gold)',
-                  color: addedAnimation ? '#f2efe9' : '#121316',
+                  backgroundColor: '#ef4444',
+                  color: '#ffffff',
                   fontFamily: 'var(--font-sans)',
-                  fontSize: '15px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
+                  fontSize: '14.5px',
+                  fontWeight: 800,
+                  cursor: 'not-allowed',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  boxShadow: '0 4px 16px rgba(201, 168, 118, 0.35)',
-                  transition: 'all 0.2s ease',
+                  letterSpacing: '0.5px',
+                  textTransform: 'uppercase',
+                  boxShadow: '0 4px 14px rgba(239, 68, 68, 0.4)',
                 }}
               >
-                {addedAnimation ? (
-                  <>
-                    <Check size={18} />
-                    <span>Added to Tray!</span>
-                  </>
-                ) : (
-                  <span>Add to Order • {formatPrice(totalPrice, currency)}</span>
-                )}
+                <ShieldAlert size={18} />
+                <span>Currently Sold Out</span>
               </button>
-            </>
-          )}
-        </div>
+            ) : (
+              <>
+                {/* Stepper Pill */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '999px',
+                    padding: '4px',
+                    gap: '4px',
+                    height: '48px',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={decrementQuantity}
+                    disabled={quantity <= 1}
+                    aria-label="Decrease quantity"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: quantity <= 1 ? 'rgba(255, 255, 255, 0.2)' : 'var(--text-primary)',
+                      width: '38px',
+                      height: '38px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: quantity <= 1 ? 'default' : 'pointer',
+                      borderRadius: '50%',
+                    }}
+                  >
+                    <Minus size={15} />
+                  </button>
+                  <span
+                    style={{
+                      fontFamily: 'var(--font-sans)',
+                      fontSize: '16px',
+                      fontWeight: 700,
+                      width: '28px',
+                      textAlign: 'center',
+                      color: 'var(--text-primary)',
+                    }}
+                  >
+                    {quantity}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={incrementQuantity}
+                    aria-label="Increase quantity"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text-primary)',
+                      width: '38px',
+                      height: '38px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      borderRadius: '50%',
+                    }}
+                  >
+                    <Plus size={15} />
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleAdd}
+                  disabled={addedAnimation}
+                  style={{
+                    flex: 1,
+                    height: '48px',
+                    borderRadius: '999px',
+                    border: 'none',
+                    backgroundColor: addedAnimation ? '#46553e' : 'var(--accent-gold)',
+                    color: addedAnimation ? '#f2efe9' : '#121316',
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: '15px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 16px rgba(201, 168, 118, 0.35)',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  {addedAnimation ? (
+                    <>
+                      <Check size={18} />
+                      <span>Added to Tray!</span>
+                    </>
+                  ) : (
+                    <span>Add to Order • {formatPrice(totalPrice, currency)}</span>
+                  )}
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

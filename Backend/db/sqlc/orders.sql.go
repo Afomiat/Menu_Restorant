@@ -358,3 +358,32 @@ func (q *Queries) UpdateOrderStatus(ctx context.Context, arg UpdateOrderStatusPa
 	)
 	return i, err
 }
+const bulkCancelTableOrders = `-- name: BulkCancelTableOrders :exec
+UPDATE orders
+SET status = 'cancelled', updated_at = NOW()
+WHERE tenant_id = $1
+  AND table_number = $2
+  AND status NOT IN ('delivered', 'cancelled')
+`
+
+type BulkCancelTableOrdersParams struct {
+	TenantID    pgtype.UUID `json:"tenant_id"`
+	TableNumber string      `json:"table_number"`
+}
+
+func (q *Queries) BulkCancelTableOrders(ctx context.Context, arg BulkCancelTableOrdersParams) error {
+	_, err := q.db.Exec(ctx, bulkCancelTableOrders, arg.TenantID, arg.TableNumber)
+	return err
+}
+
+const bulkCancelAllActiveOrders = `-- name: BulkCancelAllActiveOrders :exec
+UPDATE orders
+SET status = 'cancelled', updated_at = NOW()
+WHERE tenant_id = $1
+  AND status NOT IN ('delivered', 'cancelled')
+`
+
+func (q *Queries) BulkCancelAllActiveOrders(ctx context.Context, tenantID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, bulkCancelAllActiveOrders, tenantID)
+	return err
+}

@@ -36,3 +36,19 @@ RETURNING id, tenant_id, name, is_sold_out;
 -- name: DeleteMenuItem :exec
 DELETE FROM menu_items
 WHERE id = $1 AND tenant_id = $2;
+
+-- name: GetModifierByID :one
+SELECT m.id, m.modifier_group_id, m.name, m.price_adjustment, mg.tenant_id
+FROM modifiers m
+JOIN modifier_groups mg ON m.modifier_group_id = mg.id
+WHERE m.id = $1 AND mg.tenant_id = $2
+LIMIT 1;
+
+-- name: GetModifierByIDAndMenuItemID :one
+SELECT m.id, m.modifier_group_id, m.name, m.price_adjustment, mg.tenant_id
+FROM modifiers m
+JOIN modifier_groups mg ON m.modifier_group_id = mg.id
+JOIN item_modifier_groups img ON img.modifier_group_id = mg.id
+WHERE m.id = $1 AND img.menu_item_id = $2 AND mg.tenant_id = $3
+LIMIT 1;
+

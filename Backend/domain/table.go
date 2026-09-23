@@ -11,7 +11,7 @@ type RestaurantTable struct {
 	ID          uuid.UUID `json:"id"`
 	TenantID    uuid.UUID `json:"tenant_id"`
 	TableNumber string    `json:"table_number"`
-	QrSecret    string    `json:"qr_secret"`
+	QrSecret    string    `json:"-"`
 	IsActive    bool      `json:"is_active"`
 }
 

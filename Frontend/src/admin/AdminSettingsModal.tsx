@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Settings, RefreshCw, DollarSign, Store, MapPin, Palette, Image as ImageIcon } from 'lucide-react';
+import { X, Settings, RefreshCw, DollarSign, Store, MapPin, Palette, Image as ImageIcon, UploadCloud, Loader2, Trash2 } from 'lucide-react';
 import type { RestaurantMeta } from '../types';
 import AdminConfirmModal from './AdminConfirmModal';
+import { uploadImageToCloudinary } from '../services/uploadService';
 
 interface AdminSettingsModalProps {
   isOpen: boolean;
@@ -37,6 +38,9 @@ export default function AdminSettingsModal({
   const [heroImageUrl, setHeroImageUrl] = useState('');
   const [primaryColor, setPrimaryColor] = useState('#FF5A36');
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
+  const [isUploadingHero, setIsUploadingHero] = useState(false);
+  const [heroUploadError, setHeroUploadError] = useState<string | null>(null);
+  const heroFileInputRef = useRef<HTMLInputElement>(null);
 
   const prevOpenRef = useRef(false);
 
@@ -64,6 +68,36 @@ export default function AdminSettingsModal({
   }, [isOpen, meta]);
 
   if (!isOpen || !meta) return null;
+
+  const handleHeroFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    setHeroUploadError(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setHeroUploadError('Please select a valid image file (PNG, JPG, WEBP).');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setHeroUploadError('Image size is too large (max 5MB).');
+      return;
+    }
+
+    setIsUploadingHero(true);
+    try {
+      const secureUrl = await uploadImageToCloudinary(file, 'branding');
+      setHeroImageUrl(secureUrl);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to upload hero image.';
+      setHeroUploadError(msg);
+    } finally {
+      setIsUploadingHero(false);
+      if (heroFileInputRef.current) {
+        heroFileInputRef.current.value = '';
+      }
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -214,13 +248,74 @@ export default function AdminSettingsModal({
                 <ImageIcon size={14} style={{ display: 'inline', marginRight: '5px' }} />
                 Hero Banner Showcase Image (Diagonal Cut)
               </label>
-              <input
-                type="text"
-                className="admin-input-control"
-                value={heroImageUrl}
-                onChange={(e) => setHeroImageUrl(e.target.value)}
-                placeholder="e.g. /images/burger_classic.jpg or image URL"
-              />
+
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  className="admin-input-control"
+                  style={{ flex: 1 }}
+                  value={heroImageUrl}
+                  onChange={(e) => setHeroImageUrl(e.target.value)}
+                  placeholder="e.g. /images/burger_classic.jpg or image URL"
+                />
+                <input
+                  ref={heroFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={handleHeroFileUpload}
+                />
+                <button
+                  type="button"
+                  className="admin-sec-pill-btn"
+                  disabled={isUploadingHero}
+                  onClick={() => heroFileInputRef.current?.click()}
+                  style={{ height: '38px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  {isUploadingHero ? (
+                    <>
+                      <Loader2 size={14} className="admin-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <UploadCloud size={14} />
+                      Upload
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {heroImageUrl && (
+                <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '10px', background: '#f8fafc', padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--admin-border)' }}>
+                  <img
+                    src={heroImageUrl}
+                    alt="Hero banner preview"
+                    style={{ width: '40px', height: '40px', borderRadius: '6px', objectFit: 'cover' }}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                  <span style={{ fontSize: '11.5px', color: 'var(--admin-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                    {heroImageUrl}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setHeroImageUrl('')}
+                    style={{ background: 'none', border: 'none', color: 'var(--admin-danger)', cursor: 'pointer', padding: '4px' }}
+                    title="Remove image"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              )}
+
+              {heroUploadError && (
+                <p style={{ fontSize: '11.5px', color: 'var(--admin-danger)', margin: '4px 0 0 2px' }}>
+                  {heroUploadError}
+                </p>
+              )}
+
               <p style={{ fontSize: '11.5px', color: 'var(--admin-text-muted)', margin: '5px 0 0 2px' }}>
                 Displayed with a diagonal cut and blurred atmospheric backdrop on the customer menu hero banner.
               </p>
@@ -301,8 +396,13 @@ export default function AdminSettingsModal({
             <button
               type="submit"
               className="admin-modal-btn admin-modal-btn-save"
+              disabled={isUploadingHero}
+              style={{
+                opacity: isUploadingHero ? 0.7 : 1,
+                cursor: isUploadingHero ? 'not-allowed' : 'pointer',
+              }}
             >
-              Save Settings
+              {isUploadingHero ? 'Uploading...' : 'Save Settings'}
             </button>
           </div>
         </form>

@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
-import { ShoppingBag, X, Plus, Minus, Trash2, CheckCircle2, ChefHat, Clock } from 'lucide-react';
+import { ShoppingBag, X, Plus, Minus, Trash2, CheckCircle2, ChefHat, RotateCcw } from 'lucide-react';
 import type { CartItem } from '../../types';
 import { formatPrice } from '../../utils/currency';
+import { useCartDrawerLogic } from '../../hooks/useCartDrawerLogic';
 
 interface ClassicCartDrawerProps {
   cart: CartItem[];
@@ -14,6 +14,8 @@ interface ClassicCartDrawerProps {
   onPlaceOrder: (customTableNumber?: string) => void;
   placedOrders: CartItem[];
   onUndoOrder: (orderId: string) => void;
+  orderError?: string | null;
+  isTableVerified?: boolean;
 }
 
 export default function ClassicCartDrawer({
@@ -27,69 +29,31 @@ export default function ClassicCartDrawer({
   onPlaceOrder,
   placedOrders,
   onUndoOrder,
+  orderError,
+  isTableVerified = false,
 }: ClassicCartDrawerProps) {
-  const [activeTab, setActiveTab] = useState<'tray' | 'kitchen'>('tray');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [customerTable, setCustomerTable] = useState(tableNumber || '');
-  const [tableError, setTableError] = useState('');
-
-  // Sync table number if provided from URL
-  useEffect(() => {
-    if (tableNumber) {
-      setCustomerTable(tableNumber);
-    }
-  }, [tableNumber]);
-
-  useEffect(() => {
-    if (isOpen) {
-      setTableError('');
-    }
-  }, [isOpen]);
-
-  const totalCartCount = useMemo(
-    () => cart.reduce((sum, item) => sum + item.quantity, 0),
-    [cart]
-  );
-  const totalPlacedCount = useMemo(
-    () =>
-      placedOrders
-        .filter((o) => o.status !== 'complete' && o.status !== 'cancelled')
-        .reduce((sum, item) => sum + item.quantity, 0),
-    [placedOrders]
-  );
-
-  const subtotal = useMemo(() => {
-    return cart.reduce((sum, current) => {
-      const variantAdjustment =
-        current.item.variants?.find((v) => v.name === current.variant)?.priceAdjustment || 0;
-      return sum + (current.item.price + variantAdjustment) * current.quantity;
-    }, 0);
-  }, [cart]);
-
-  const placedTotal = useMemo(() => {
-    return placedOrders.reduce((sum, order) => {
-      const variantAdjustment =
-        order.item.variants?.find((v) => v.name === order.variant)?.priceAdjustment || 0;
-      return sum + (order.item.price + variantAdjustment) * order.quantity;
-    }, 0);
-  }, [placedOrders]);
-
-  const handlePlaceOrderClick = () => {
-    const trimmed = customerTable.trim();
-    if (!trimmed) {
-      setTableError('Please enter your table number to send order to kitchen');
-      return;
-    }
-
-    setTableError('');
-    setIsSubmitting(true);
-
-    setTimeout(() => {
-      onPlaceOrder(trimmed);
-      setIsSubmitting(false);
-      setActiveTab('kitchen');
-    }, 800);
-  };
+  const {
+    activeTab,
+    setActiveTab,
+    isSubmitting,
+    customerTable,
+    totalCartCount,
+    totalPlacedCount,
+    subtotal,
+    placedTotal,
+    getItemTotalPrice,
+    handlePlaceOrderClick,
+  } = useCartDrawerLogic({
+    cart,
+    placedOrders,
+    isOpen,
+    tableNumber,
+    isTableVerified,
+    initialTab: 'tray',
+    ordersTabName: 'kitchen',
+    onPlaceOrder,
+    submitDelay: 800,
+  });
 
   const handleClose = () => {
     if (!isSubmitting) {
@@ -346,9 +310,7 @@ export default function ClassicCartDrawer({
                   }}
                 >
                   {cart.map((cartItem, idx) => {
-                    const variantAdj =
-                      cartItem.item.variants?.find((v) => v.name === cartItem.variant)?.priceAdjustment || 0;
-                    const itemUnitTotal = (cartItem.item.price + variantAdj) * cartItem.quantity;
+                    const itemUnitTotal = getItemTotalPrice(cartItem);
 
                     return (
                       <div
@@ -536,81 +498,122 @@ export default function ClassicCartDrawer({
                     </div>
                   </div>
 
-                  {/* Table Number Input (Matches Screenshot 3) */}
-                  <div style={{ marginBottom: '14px' }}>
-                    <label
-                      htmlFor="classic-table-input"
+                  {/* Table Identification Status */}
+                  {isTableVerified && customerTable ? (
+                    <div
                       style={{
-                        display: 'block',
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        color: 'var(--text-primary)',
-                        marginBottom: '6px',
-                        fontFamily: 'var(--font-sans)',
+                        marginBottom: '14px',
+                        padding: '12px 14px',
+                        borderRadius: '12px',
+                        backgroundColor: 'rgba(201, 168, 118, 0.08)',
+                        border: '1.5px solid rgba(201, 168, 118, 0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
                       }}
                     >
-                      🪑 Your Table Number <span style={{ color: 'var(--accent-gold)' }}>*</span>
-                    </label>
-                    <input
-                      id="classic-table-input"
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="Enter table number (e.g. 4)"
-                      value={customerTable}
-                      onChange={(e) => {
-                        setCustomerTable(e.target.value);
-                        setTableError('');
-                      }}
-                      style={{
-                        width: '100%',
-                        padding: '12px 14px',
-                        fontSize: '15px',
-                        fontWeight: 700,
-                        borderRadius: '12px',
-                        border: tableError ? '1.5px solid #ff6666' : '1.5px solid rgba(255, 255, 255, 0.12)',
-                        backgroundColor: '#1b1d26',
-                        color: 'var(--text-primary)',
-                        outline: 'none',
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                    {tableError && (
-                      <div style={{ color: '#ff6666', fontSize: '11px', fontWeight: 600, marginTop: '4px' }}>
-                        {tableError}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '18px' }}>📍</span>
+                        <div>
+                          <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--accent-gold)' }}>
+                            Table {customerTable}
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                            Verified Dine-In QR Session
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </div>
+                      <span
+                        style={{
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          padding: '3px 8px',
+                          borderRadius: '999px',
+                          backgroundColor: 'rgba(201, 168, 118, 0.2)',
+                          color: 'var(--accent-gold)',
+                          border: '1px solid var(--accent-gold)',
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        Active
+                      </span>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        marginBottom: '14px',
+                        padding: '12px 14px',
+                        borderRadius: '12px',
+                        backgroundColor: 'rgba(201, 168, 118, 0.06)',
+                        border: '1.5px dashed rgba(201, 168, 118, 0.3)',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent-gold)', marginBottom: '3px' }}>
+                        📲 Dine-In QR Scan Required
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                        Scan the QR code on your dining table to dispatch orders directly to the kitchen.
+                      </div>
+                    </div>
+                  )}
 
-                  {/* Confirm & Send Button (Matches Screenshot 3: Dark pill with checkmark) */}
+                  {orderError && (
+                    <div
+                      style={{
+                        backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                        borderRadius: '12px',
+                        padding: '10px 14px',
+                        color: '#fca5a5',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        marginBottom: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                      }}
+                    >
+                      <span>⚠️ {orderError}</span>
+                    </div>
+                  )}
+
+                  {/* Confirm & Send Button */}
                   <button
                     type="button"
                     onClick={handlePlaceOrderClick}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || !isTableVerified}
                     style={{
                       width: '100%',
                       height: '50px',
                       borderRadius: '999px',
                       border: '1px solid var(--accent-gold)',
-                      backgroundColor: isSubmitting ? 'rgba(201, 168, 118, 0.2)' : 'var(--accent-gold)',
-                      color: '#121316',
+                      backgroundColor:
+                        isSubmitting || !isTableVerified
+                          ? 'rgba(201, 168, 118, 0.15)'
+                          : 'var(--accent-gold)',
+                      color: isSubmitting || !isTableVerified ? 'var(--text-secondary)' : '#121316',
                       fontFamily: 'var(--font-sans)',
                       fontSize: '15px',
                       fontWeight: 700,
-                      cursor: 'pointer',
+                      cursor: !isTableVerified ? 'not-allowed' : 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '8px',
-                      boxShadow: '0 4px 18px rgba(201, 168, 118, 0.3)',
+                      boxShadow: isTableVerified ? '0 4px 18px rgba(201, 168, 118, 0.3)' : 'none',
                       transition: 'all 0.2s ease',
+                      opacity: isSubmitting || !isTableVerified ? 0.75 : 1,
                     }}
                   >
                     {isSubmitting ? (
                       <span>Sending to Kitchen...</span>
+                    ) : !isTableVerified ? (
+                      <span>Scan Table QR to Order</span>
                     ) : (
                       <>
                         <CheckCircle2 size={18} />
-                        <span>Confirm & Send to Kitchen</span>
+                        <span>Send Order to Kitchen • {formatPrice(subtotal, currency)}</span>
                       </>
                     )}
                   </button>
@@ -715,9 +718,11 @@ export default function ClassicCartDrawer({
                     >
                       {formatPrice(placedTotal, currency)}
                     </span>
-                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                      {totalPlacedCount} item{totalPlacedCount !== 1 ? 's' : ''} ordered
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                        {totalPlacedCount} item{totalPlacedCount !== 1 ? 's' : ''} ordered
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -732,14 +737,13 @@ export default function ClassicCartDrawer({
                     paddingBottom: '20px',
                   }}
                 >
-                  {placedOrders.map((order) => {
-                    const variantAdj =
-                      order.item.variants?.find((v) => v.name === order.variant)?.priceAdjustment || 0;
-                    const itemTotal = (order.item.price + variantAdj) * order.quantity;
+                  {placedOrders.map((order, idx) => {
+                    const itemTotal = getItemTotalPrice(order);
+                    const status = order.status || 'not_started';
 
                     return (
                       <div
-                        key={order.orderId}
+                        key={`${order.orderId || 'order'}-${order.item.id}-${idx}`}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -768,7 +772,7 @@ export default function ClassicCartDrawer({
                           {/* Row 1: Badges & Undo Button */}
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                              {(!order.status || order.status === 'not_started') && (
+                              {(!status || status === 'not_started') && (
                                 <span
                                   style={{
                                     backgroundColor: 'rgba(255, 255, 255, 0.08)',
@@ -783,7 +787,7 @@ export default function ClassicCartDrawer({
                                     gap: '3px',
                                   }}
                                 >
-                                  <Clock size={10} /> Sent to Kitchen
+                                  Sent to Kitchen
                                 </span>
                               )}
 
@@ -795,25 +799,28 @@ export default function ClassicCartDrawer({
                             {/* Action / Live Status Badge */}
                             {order.orderId && (
                               <div style={{ flexShrink: 0 }}>
-                                {(!order.status || order.status === 'not_started') ? (
+                                {(!status || status === 'not_started') ? (
                                   <button
                                     type="button"
                                     onClick={() => onUndoOrder(order.orderId!)}
                                     style={{
                                       background: 'none',
-                                      border: '1px solid rgba(255, 255, 255, 0.25)',
+                                      border: '1px solid rgba(248, 113, 113, 0.5)',
                                       borderRadius: '999px',
-                                      padding: '4px 12px',
-                                      color: 'var(--text-primary)',
+                                      padding: '4px 10px',
+                                      color: '#f87171',
                                       fontSize: '11px',
-                                      fontWeight: 600,
+                                      fontWeight: 700,
                                       cursor: 'pointer',
                                       transition: 'all 0.2s ease',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
                                     }}
                                   >
-                                    Undo
+                                    <RotateCcw size={11} /> Undo
                                   </button>
-                                ) : order.status === 'preparing' ? (
+                                ) : status === 'preparing' ? (
                                   <span
                                     style={{
                                       backgroundColor: 'var(--accent-gold)',
@@ -829,9 +836,9 @@ export default function ClassicCartDrawer({
                                       boxShadow: '0 2px 8px rgba(201, 168, 118, 0.3)',
                                     }}
                                   >
-                                    <ChefHat size={12} /> Cooking Started
+                                    <ChefHat size={12} /> Cooking
                                   </span>
-                                ) : order.status === 'ready' ? (
+                                ) : status === 'ready' ? (
                                   <span
                                     style={{
                                       backgroundColor: '#10b981',
@@ -847,7 +854,7 @@ export default function ClassicCartDrawer({
                                       boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)',
                                     }}
                                   >
-                                    <CheckCircle2 size={12} /> Ready for Table
+                                    <CheckCircle2 size={12} /> Ready
                                   </span>
                                 ) : (
                                   <span
@@ -871,7 +878,7 @@ export default function ClassicCartDrawer({
                             )}
                           </div>
 
-                          {/* Row 2: Dish Name on Left + Price on Right (under Undo button) */}
+                          {/* Row 2: Dish Name on Left + Price on Right */}
                           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '8px' }}>
                             <div
                               style={{
@@ -900,7 +907,7 @@ export default function ClassicCartDrawer({
                             </div>
                           </div>
 
-                          {/* Row 3: Description/Portion on Left + Order # on Right (under Price) */}
+                          {/* Row 3: Description/Portion on Left + Order # on Right */}
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                             <div
                               style={{

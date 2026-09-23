@@ -180,6 +180,41 @@ func (r *menuRepository) DeleteItem(ctx context.Context, tenantID, itemID uuid.U
 	})
 }
 
+func (r *menuRepository) GetModifierByID(ctx context.Context, tenantID, modifierID uuid.UUID) (*domain.Modifier, error) {
+	row, err := r.q.GetModifierByID(ctx, sqlc.GetModifierByIDParams{
+		ID:       converter.UUIDToPg(modifierID),
+		TenantID: converter.UUIDToPg(tenantID),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &domain.Modifier{
+		ID:              converter.PgToUUID(row.ID),
+		ModifierGroupID: converter.PgToUUID(row.ModifierGroupID),
+		TenantID:        converter.PgToUUID(row.TenantID),
+		Name:            row.Name,
+		PriceAdjustment: converter.NumericToFloat(row.PriceAdjustment),
+	}, nil
+}
+
+func (r *menuRepository) GetModifierForMenuItem(ctx context.Context, tenantID, menuItemID, modifierID uuid.UUID) (*domain.Modifier, error) {
+	row, err := r.q.GetModifierByIDAndMenuItemID(ctx, sqlc.GetModifierByIDAndMenuItemIDParams{
+		ID:         converter.UUIDToPg(modifierID),
+		MenuItemID: converter.UUIDToPg(menuItemID),
+		TenantID:   converter.UUIDToPg(tenantID),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &domain.Modifier{
+		ID:              converter.PgToUUID(row.ID),
+		ModifierGroupID: converter.PgToUUID(row.ModifierGroupID),
+		TenantID:        converter.PgToUUID(row.TenantID),
+		Name:            row.Name,
+		PriceAdjustment: converter.NumericToFloat(row.PriceAdjustment),
+	}, nil
+}
+
 func toDomainMenuItem(m sqlc.MenuItem) domain.MenuItem {
 	return domain.MenuItem{
 		ID:          converter.PgToUUID(m.ID),
@@ -194,3 +229,4 @@ func toDomainMenuItem(m sqlc.MenuItem) domain.MenuItem {
 		IsSoldOut:   m.IsSoldOut,
 	}
 }
+

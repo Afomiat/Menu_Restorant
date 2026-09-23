@@ -1,4 +1,4 @@
-import { UtensilsCrossed, Sparkles, ChefHat, X } from 'lucide-react';
+import { UtensilsCrossed, Sparkles, ChefHat, X, QrCode, LogOut } from 'lucide-react';
 import type { RestaurantMeta } from '../types';
 
 interface AdminSidebarProps {
@@ -8,6 +8,8 @@ interface AdminSidebarProps {
   onSelectView?: (view: 'menu' | 'kitchen') => void;
   activeOrdersCount?: number;
   onOpenKitchen?: () => void;
+  onOpenTables?: () => void;
+  onLogout?: () => void;
   isMobileOpen?: boolean;
   onCloseMobile?: () => void;
 }
@@ -19,6 +21,8 @@ export default function AdminSidebar({
   onSelectView,
   activeOrdersCount = 0,
   onOpenKitchen,
+  onOpenTables,
+  onLogout,
   isMobileOpen = false,
   onCloseMobile,
 }: AdminSidebarProps) {
@@ -62,10 +66,24 @@ export default function AdminSidebar({
         <div>
           {/* Brand Logo & Mobile Close Button */}
           <div className="admin-sidebar-brand" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span className="admin-sidebar-logo-text">
-              {displayName}
-              <span className="admin-sidebar-logo-dot">.</span>
-            </span>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span className="admin-sidebar-logo-text">
+                {displayName}
+                <span className="admin-sidebar-logo-dot">.</span>
+              </span>
+              <span
+                style={{
+                  fontSize: '10px',
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.6px',
+                  color: meta?.plan === 'vip' ? '#f59e0b' : '#3b82f6',
+                  marginTop: '1px',
+                }}
+              >
+                {meta?.plan === 'vip' ? '👑 VIP Tier' : '⚡ Standard Tier'}
+              </span>
+            </div>
 
             {/* Mobile Close Button */}
             <button
@@ -96,8 +114,21 @@ export default function AdminSidebar({
             >
               <ChefHat size={18} />
               <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                Kitchen Orders
-                {activeOrdersCount > 0 && (
+                <span>Kitchen Orders</span>
+                {meta?.plan === 'standard' ? (
+                  <span
+                    style={{
+                      fontSize: '10px',
+                      fontWeight: 800,
+                      padding: '2px 8px',
+                      borderRadius: '999px',
+                      backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                      color: '#d97706',
+                    }}
+                  >
+                    VIP
+                  </span>
+                ) : activeOrdersCount > 0 ? (
                   <span
                     style={{
                       backgroundColor: activeView === 'kitchen' ? '#ffffff' : 'var(--admin-primary, #ff5a36)',
@@ -111,9 +142,36 @@ export default function AdminSidebar({
                   >
                     {activeOrdersCount}
                   </span>
-                )}
+                ) : null}
               </span>
             </button>
+
+            <button
+              type="button"
+              className="admin-nav-item"
+              onClick={() => {
+                if (onOpenTables) onOpenTables();
+                if (onCloseMobile) onCloseMobile();
+              }}
+            >
+              <QrCode size={18} />
+              <span>Tables & QR Codes</span>
+            </button>
+
+            {onLogout && (
+              <button
+                type="button"
+                className="admin-nav-item"
+                onClick={() => {
+                  onLogout();
+                  if (onCloseMobile) onCloseMobile();
+                }}
+                style={{ color: '#ef4444' }}
+              >
+                <LogOut size={18} />
+                <span>Sign Out</span>
+              </button>
+            )}
           </nav>
         </div>
 

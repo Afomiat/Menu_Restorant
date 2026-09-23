@@ -107,7 +107,7 @@ func (ctrl *MenuController) ListCategories(c *gin.Context) {
 }
 
 type CreateCategoryRequest struct {
-	Name      string `json:"name" binding:"required"`
+	Name      string `json:"name" binding:"required,max=100"`
 	SortOrder int32  `json:"sort_order"`
 }
 
@@ -142,7 +142,7 @@ func (ctrl *MenuController) CreateCategory(c *gin.Context) {
 }
 
 type UpdateCategoryRequest struct {
-	Name      string `json:"name" binding:"required"`
+	Name      string `json:"name" binding:"required,max=100"`
 	SortOrder int32  `json:"sort_order"`
 	IsActive  *bool  `json:"is_active"`
 }
@@ -219,10 +219,10 @@ func (ctrl *MenuController) DeleteCategory(c *gin.Context) {
 
 type CreateItemRequest struct {
 	CategoryID  uuid.UUID `json:"category_id" binding:"required"`
-	Name        string    `json:"name" binding:"required"`
-	Description string    `json:"description"`
+	Name        string    `json:"name" binding:"required,max=150"`
+	Description string    `json:"description" binding:"max=1000"`
 	Price       float64   `json:"price" binding:"required,gte=0"`
-	ImageUrl    string    `json:"image_url"`
+	ImageUrl    string    `json:"image_url" binding:"max=500"`
 	Tags        []string  `json:"tags"`
 }
 
@@ -262,10 +262,10 @@ func (ctrl *MenuController) CreateItem(c *gin.Context) {
 
 type UpdateItemRequest struct {
 	CategoryID  uuid.UUID `json:"category_id" binding:"required"`
-	Name        string    `json:"name" binding:"required"`
-	Description string    `json:"description"`
+	Name        string    `json:"name" binding:"required,max=150"`
+	Description string    `json:"description" binding:"max=1000"`
 	Price       float64   `json:"price" binding:"required,gte=0"`
-	ImageUrl    string    `json:"image_url"`
+	ImageUrl    string    `json:"image_url" binding:"max=500"`
 	Tags        []string  `json:"tags"`
 	IsAvailable bool      `json:"is_available"`
 }

@@ -45,3 +45,7 @@ func (u *tenantUsecase) VerifyVIPAccess(ctx context.Context, tenantID uuid.UUID)
 	}
 	return tenant.HasVIPFeatures(), nil
 }
+
+func (u *tenantUsecase) ListActive(ctx context.Context) ([]domain.Tenant, error) {
+	return u.tenantRepo.ListActive(ctx)
+}

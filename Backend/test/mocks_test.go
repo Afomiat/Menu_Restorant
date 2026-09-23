@@ -30,6 +30,12 @@ func (m *mockTenantRepo) UpdatePlan(ctx context.Context, id uuid.UUID, plan doma
 func (m *mockTenantRepo) UpdateTheme(ctx context.Context, id uuid.UUID, themeConfig map[string]interface{}) (*domain.Tenant, error) {
 	return m.tenant, m.err
 }
+func (m *mockTenantRepo) ListActive(ctx context.Context) ([]domain.Tenant, error) {
+	if m.tenant != nil {
+		return []domain.Tenant{*m.tenant}, nil
+	}
+	return nil, m.err
+}
 
 type mockTableRepo struct {
 	table *domain.RestaurantTable
@@ -55,6 +61,7 @@ func (m *mockTableRepo) UpdateQRSecret(ctx context.Context, id, tenantID uuid.UU
 type mockMenuRepo struct {
 	item     *domain.MenuItem
 	category *domain.Category
+	modifier *domain.Modifier
 	err      error
 }
 
@@ -100,6 +107,18 @@ func (m *mockMenuRepo) ToggleSoldOut(ctx context.Context, tenantID, itemID uuid.
 func (m *mockMenuRepo) DeleteItem(ctx context.Context, tenantID, itemID uuid.UUID) error {
 	return m.err
 }
+func (m *mockMenuRepo) GetModifierByID(ctx context.Context, tenantID, modifierID uuid.UUID) (*domain.Modifier, error) {
+	if m.modifier != nil {
+		return m.modifier, nil
+	}
+	return nil, m.err
+}
+func (m *mockMenuRepo) GetModifierForMenuItem(ctx context.Context, tenantID, menuItemID, modifierID uuid.UUID) (*domain.Modifier, error) {
+	if m.modifier != nil {
+		return m.modifier, nil
+	}
+	return nil, m.err
+}
 
 type mockOrderRepo struct {
 	createdOrder *domain.Order
@@ -128,6 +147,12 @@ func (m *mockOrderRepo) CancelInGrace(ctx context.Context, tenantID, orderID uui
 	m.cancelCalled = true
 	return m.err
 }
+func (m *mockOrderRepo) BulkCancelTableOrders(_ context.Context, _ uuid.UUID, _ string) error {
+	return m.err
+}
+func (m *mockOrderRepo) BulkCancelAllActive(_ context.Context, _ uuid.UUID) error {
+	return m.err
+}
 
 type mockTenantUsecase struct {
 	tenant *domain.Tenant
@@ -149,4 +174,10 @@ func (m *mockTenantUsecase) UpdateTheme(ctx context.Context, id uuid.UUID, theme
 }
 func (m *mockTenantUsecase) VerifyVIPAccess(ctx context.Context, tenantID uuid.UUID) (bool, error) {
 	return m.hasVIP, m.err
+}
+func (m *mockTenantUsecase) ListActive(ctx context.Context) ([]domain.Tenant, error) {
+	if m.tenant != nil {
+		return []domain.Tenant{*m.tenant}, nil
+	}
+	return nil, m.err
 }

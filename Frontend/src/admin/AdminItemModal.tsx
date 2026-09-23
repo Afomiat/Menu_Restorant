@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, type ChangeEvent } from 'react';
-import { X, Check, Image as ImageIcon, UploadCloud, Link as LinkIcon, Trash2, Sparkles } from 'lucide-react';
+import { X, Check, Image as ImageIcon, UploadCloud, Link as LinkIcon, Trash2, Sparkles, Loader2 } from 'lucide-react';
 import type { MenuItem, Category } from '../types';
+import { uploadImageToCloudinary } from '../services/uploadService';
 
 interface AdminItemModalProps {
   isOpen: boolean;
@@ -58,6 +59,7 @@ export default function AdminItemModal({
 
   const [imageInputMode, setImageInputMode] = useState<'upload' | 'preset' | 'url'>('upload');
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Track previous open state and itemId to only re-initialize when modal actually opens or item changes,
@@ -105,7 +107,7 @@ export default function AdminItemModal({
 
   if (!isOpen) return null;
 
-  const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     setImageUploadError(null);
     const file = e.target.files?.[0];
     if (!file) return;
@@ -121,17 +123,19 @@ export default function AdminItemModal({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (loadEvent) => {
-      const result = loadEvent.target?.result as string;
-      if (result) {
-        setFormData((prev) => ({ ...prev, imageUrl: result }));
+    setIsUploading(true);
+    try {
+      const secureUrl = await uploadImageToCloudinary(file, 'dishes');
+      setFormData((prev) => ({ ...prev, imageUrl: secureUrl }));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to upload image. Please try again.';
+      setImageUploadError(msg);
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
       }
-    };
-    reader.onerror = () => {
-      setImageUploadError('Failed to read image file. Please try another image.');
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -149,7 +153,7 @@ export default function AdminItemModal({
       price: numericPrice,
       description: formData.description?.trim() || '',
       fullDescription: formData.fullDescription?.trim() || undefined,
-      imageUrl: formData.imageUrl?.trim() || '/images/cat_food.jpg',
+      imageUrl: formData.imageUrl?.trim() || '/images/default_food.png',
       tags: formData.tags || [],
       available: formData.available !== false,
     };
@@ -288,7 +292,7 @@ export default function AdminItemModal({
                       src={formData.imageUrl}
                       alt="Dish preview"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/images/cat_food.jpg';
+                        (e.target as HTMLImageElement).src = '/images/default_food.png';
                       }}
                     />
                   </div>
@@ -335,10 +339,16 @@ export default function AdminItemModal({
               {imageInputMode === 'upload' && (
                 <div
                   className="admin-image-dropzone"
-                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    opacity: isUploading ? 0.75 : 1,
+                    pointerEvents: isUploading ? 'none' : 'auto',
+                    cursor: isUploading ? 'wait' : 'pointer',
+                  }}
+                  onClick={() => !isUploading && fileInputRef.current?.click()}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => {
                     e.preventDefault();
+                    if (isUploading) return;
                     if (e.dataTransfer.files?.[0]) {
                       const file = e.dataTransfer.files[0];
                       const fakeEvent = { target: { files: [file] } } as unknown as ChangeEvent<HTMLInputElement>;
@@ -347,13 +357,19 @@ export default function AdminItemModal({
                   }}
                 >
                   <div className="admin-dropzone-icon">
-                    <UploadCloud size={28} />
+                    {isUploading ? (
+                      <Loader2 size={28} className="admin-spin" />
+                    ) : (
+                      <UploadCloud size={28} />
+                    )}
                   </div>
                   <div style={{ fontSize: '13.5px', fontWeight: 700, color: 'var(--admin-text-main)' }}>
-                    Click to upload food photo from device
+                    {isUploading ? 'Uploading securely to Cloudinary...' : 'Click to upload food photo from device'}
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--admin-text-muted)' }}>
-                    Supports PNG, JPG, WEBP (up to 5MB) or Drag & Drop here
+                    {isUploading
+                      ? 'Generating cryptographic signature & optimizing dynamic CDN delivery'
+                      : 'Supports PNG, JPG, WEBP (up to 5MB) or Drag & Drop here'}
                   </div>
                 </div>
               )}
@@ -413,7 +429,7 @@ export default function AdminItemModal({
                         alt="Preview"
                         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src = '/images/cat_food.jpg';
+                          (e.target as HTMLImageElement).src = '/images/default_food.png';
                         }}
                       />
                     ) : (
@@ -507,9 +523,14 @@ export default function AdminItemModal({
             <button
               type="submit"
               className="admin-save-pill-btn"
-              style={{ backgroundColor: 'var(--admin-primary)' }}
+              disabled={isUploading}
+              style={{
+                backgroundColor: 'var(--admin-primary)',
+                opacity: isUploading ? 0.7 : 1,
+                cursor: isUploading ? 'not-allowed' : 'pointer',
+              }}
             >
-              {item ? 'Save Changes' : 'Add Dish'}
+              {isUploading ? 'Uploading...' : item ? 'Save Changes' : 'Add Dish'}
             </button>
           </div>
         </form>

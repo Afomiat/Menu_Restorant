@@ -104,6 +104,76 @@ func (q *Queries) GetMenuItemByID(ctx context.Context, arg GetMenuItemByIDParams
 	return i, err
 }
 
+const getModifierByID = `-- name: GetModifierByID :one
+SELECT m.id, m.modifier_group_id, m.name, m.price_adjustment, mg.tenant_id
+FROM modifiers m
+JOIN modifier_groups mg ON m.modifier_group_id = mg.id
+WHERE m.id = $1 AND mg.tenant_id = $2
+LIMIT 1
+`
+
+type GetModifierByIDParams struct {
+	ID       pgtype.UUID `json:"id"`
+	TenantID pgtype.UUID `json:"tenant_id"`
+}
+
+type GetModifierByIDRow struct {
+	ID              pgtype.UUID    `json:"id"`
+	ModifierGroupID pgtype.UUID    `json:"modifier_group_id"`
+	Name            string         `json:"name"`
+	PriceAdjustment pgtype.Numeric `json:"price_adjustment"`
+	TenantID        pgtype.UUID    `json:"tenant_id"`
+}
+
+func (q *Queries) GetModifierByID(ctx context.Context, arg GetModifierByIDParams) (GetModifierByIDRow, error) {
+	row := q.db.QueryRow(ctx, getModifierByID, arg.ID, arg.TenantID)
+	var i GetModifierByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.ModifierGroupID,
+		&i.Name,
+		&i.PriceAdjustment,
+		&i.TenantID,
+	)
+	return i, err
+}
+
+const getModifierByIDAndMenuItemID = `-- name: GetModifierByIDAndMenuItemID :one
+SELECT m.id, m.modifier_group_id, m.name, m.price_adjustment, mg.tenant_id
+FROM modifiers m
+JOIN modifier_groups mg ON m.modifier_group_id = mg.id
+JOIN item_modifier_groups img ON img.modifier_group_id = mg.id
+WHERE m.id = $1 AND img.menu_item_id = $2 AND mg.tenant_id = $3
+LIMIT 1
+`
+
+type GetModifierByIDAndMenuItemIDParams struct {
+	ID         pgtype.UUID `json:"id"`
+	MenuItemID pgtype.UUID `json:"menu_item_id"`
+	TenantID   pgtype.UUID `json:"tenant_id"`
+}
+
+type GetModifierByIDAndMenuItemIDRow struct {
+	ID              pgtype.UUID    `json:"id"`
+	ModifierGroupID pgtype.UUID    `json:"modifier_group_id"`
+	Name            string         `json:"name"`
+	PriceAdjustment pgtype.Numeric `json:"price_adjustment"`
+	TenantID        pgtype.UUID    `json:"tenant_id"`
+}
+
+func (q *Queries) GetModifierByIDAndMenuItemID(ctx context.Context, arg GetModifierByIDAndMenuItemIDParams) (GetModifierByIDAndMenuItemIDRow, error) {
+	row := q.db.QueryRow(ctx, getModifierByIDAndMenuItemID, arg.ID, arg.MenuItemID, arg.TenantID)
+	var i GetModifierByIDAndMenuItemIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.ModifierGroupID,
+		&i.Name,
+		&i.PriceAdjustment,
+		&i.TenantID,
+	)
+	return i, err
+}
+
 const listMenuItemsByCategory = `-- name: ListMenuItemsByCategory :many
 SELECT id, tenant_id, category_id, name, description, price, image_url, tags, is_available, is_sold_out, created_at
 FROM menu_items

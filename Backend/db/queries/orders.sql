@@ -53,3 +53,16 @@ WHERE order_id = $1;
 SELECT id, order_item_id, modifier_id, modifier_name, price_applied
 FROM order_item_modifiers
 WHERE order_item_id = $1;
+
+-- name: BulkCancelTableOrders :exec
+UPDATE orders
+SET status = 'cancelled', updated_at = NOW()
+WHERE tenant_id = $1
+  AND table_number = $2
+  AND status NOT IN ('delivered', 'cancelled');
+
+-- name: BulkCancelAllActiveOrders :exec
+UPDATE orders
+SET status = 'cancelled', updated_at = NOW()
+WHERE tenant_id = $1
+  AND status NOT IN ('delivered', 'cancelled');

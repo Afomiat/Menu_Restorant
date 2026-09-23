@@ -8,6 +8,7 @@ interface UseRestaurantMenuResult {
   items: MenuItem[];
   loading: boolean;
   error: 'not-found' | 'network' | null;
+  plan: 'standard' | 'vip';
 }
 
 export default function useRestaurantMenu(restaurantName: string | undefined): UseRestaurantMenuResult {
@@ -91,5 +92,5 @@ export default function useRestaurantMenu(restaurantName: string | undefined): U
     };
   }, [normalizedSlug, loadMenu]);
 
-  return { meta, categories, items, loading, error };
+  return { meta, categories, items, loading, error, plan: meta?.plan || 'standard' };
 }

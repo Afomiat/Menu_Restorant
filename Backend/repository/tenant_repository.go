@@ -77,6 +77,18 @@ func (r *tenantRepository) UpdateTheme(ctx context.Context, id uuid.UUID, themeC
 	return toDomainTenant(t), nil
 }
 
+func (r *tenantRepository) ListActive(ctx context.Context) ([]domain.Tenant, error) {
+	rows, err := r.q.ListActiveTenants(ctx)
+	if err != nil {
+		return nil, err
+	}
+	tenants := make([]domain.Tenant, len(rows))
+	for i, t := range rows {
+		tenants[i] = *toDomainTenant(t)
+	}
+	return tenants, nil
+}
+
 func toDomainTenant(t sqlc.Tenant) *domain.Tenant {
 	var themeConfig map[string]interface{}
 	if len(t.ThemeConfig) > 0 {

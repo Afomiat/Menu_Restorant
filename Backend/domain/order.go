@@ -80,6 +80,9 @@ type OrderRepository interface {
 	ListActiveByTenant(ctx context.Context, tenantID uuid.UUID) ([]Order, error)
 	UpdateStatus(ctx context.Context, tenantID, orderID uuid.UUID, status OrderStatus) error
 	CancelInGrace(ctx context.Context, tenantID, orderID uuid.UUID, sessionToken string) error
+	// OrderRepository — add after CancelInGrace:
+	BulkCancelTableOrders(ctx context.Context, tenantID uuid.UUID, tableNumber string) error
+	BulkCancelAllActive(ctx context.Context, tenantID uuid.UUID) error
 }
 
 // OrderUsecase defines the business rules for order placement, 60s Undo, and KDS
@@ -89,4 +92,7 @@ type OrderUsecase interface {
 	UndoOrder(ctx context.Context, tenantID, orderID uuid.UUID, sessionToken string) error
 	UpdateKitchenStatus(ctx context.Context, tenantID, orderID uuid.UUID, status OrderStatus) error
 	GetActiveKitchenOrders(ctx context.Context, tenantID uuid.UUID) ([]Order, error)
+	BulkCancelTableOrders(ctx context.Context, tenantID uuid.UUID, tableNumber string) error
+	BulkCancelAllActive(ctx context.Context, tenantID uuid.UUID) error
+
 }

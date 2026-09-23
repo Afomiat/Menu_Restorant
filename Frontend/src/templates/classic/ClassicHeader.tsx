@@ -2,6 +2,7 @@ import { ShoppingBag } from 'lucide-react';
 import ClassicCategoryNav from './ClassicCategoryNav';
 import type { Category } from '../../types';
 import SearchBar from '../../components/common/SearchBar';
+import { useFeatureGate } from '../../hooks/useFeatureGate';
 
 interface ClassicHeaderProps {
   searchQuery: string;
@@ -26,6 +27,7 @@ export default function ClassicHeader({
   restaurantName,
   restaurantTagline,
 }: ClassicHeaderProps) {
+  const { can } = useFeatureGate();
   return (
     <header
       style={{
@@ -100,52 +102,73 @@ export default function ClassicHeader({
             variant="classic"
           />
 
-          {/* Shopping Bag Icon with Count Badge */}
-          <button
-            onClick={onCartClick}
-            aria-label="View Order Tray"
-            style={{
-              background: 'none',
-              cursor: 'pointer',
-              color: 'var(--text-primary)',
-              position: 'relative',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'var(--transition-smooth)',
-              borderRadius: '50%',
-              backgroundColor: totalCartItems > 0 ? 'rgba(201, 168, 118, 0.1)' : 'rgba(255, 255, 255, 0.03)',
-              border: totalCartItems > 0 ? '1px solid rgba(201, 168, 118, 0.3)' : '1px solid rgba(255, 255, 255, 0.06)',
-              width: '34px',
-              height: '34px',
-              flexShrink: 0,
-              padding: 0,
-            }}
-          >
-            <ShoppingBag size={15} style={{ color: totalCartItems > 0 ? 'var(--accent-gold)' : 'var(--text-secondary)', transition: 'color 0.3s ease' }} />
-            {totalCartItems > 0 && (
-              <span
-                style={{
-                  position: 'absolute',
-                  top: '-4px',
-                  right: '-4px',
-                  backgroundColor: 'var(--accent-gold)',
-                  color: 'var(--bg-dark)',
-                  fontSize: '9px',
-                  fontWeight: 700,
-                  width: '15px',
-                  height: '15px',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 0 6px var(--accent-gold)',
-                }}
-              >
-                {totalCartItems > 9 ? '9+' : totalCartItems}
-              </span>
-            )}
-          </button>
+          {/* Shopping Bag Icon with Count Badge (VIP Only) */}
+          {can('ordering') ? (
+            <button
+              onClick={onCartClick}
+              aria-label="View Order Tray"
+              style={{
+                background: 'none',
+                cursor: 'pointer',
+                color: 'var(--text-primary)',
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'var(--transition-smooth)',
+                borderRadius: '50%',
+                backgroundColor: totalCartItems > 0 ? 'rgba(201, 168, 118, 0.1)' : 'rgba(255, 255, 255, 0.03)',
+                border: totalCartItems > 0 ? '1px solid rgba(201, 168, 118, 0.3)' : '1px solid rgba(255, 255, 255, 0.06)',
+                width: '34px',
+                height: '34px',
+                flexShrink: 0,
+                padding: 0,
+              }}
+            >
+              <ShoppingBag size={15} style={{ color: totalCartItems > 0 ? 'var(--accent-gold)' : 'var(--text-secondary)', transition: 'color 0.3s ease' }} />
+              {totalCartItems > 0 && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '-4px',
+                    right: '-4px',
+                    backgroundColor: 'var(--accent-gold)',
+                    color: 'var(--bg-dark)',
+                    fontSize: '9px',
+                    fontWeight: 700,
+                    width: '15px',
+                    height: '15px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 0 6px var(--accent-gold)',
+                  }}
+                >
+                  {totalCartItems > 9 ? '9+' : totalCartItems}
+                </span>
+              )}
+            </button>
+          ) : (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: '11px',
+                fontWeight: 600,
+                padding: '4px 10px',
+                borderRadius: '999px',
+                backgroundColor: 'rgba(201, 168, 118, 0.1)',
+                color: 'var(--accent-gold)',
+                border: '1px solid rgba(201, 168, 118, 0.25)',
+                letterSpacing: '0.4px',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              📖 Digital Menu
+            </span>
+          )}
         </div>
       </div>
 

@@ -71,6 +71,14 @@ type UpdateItemInput struct {
 	IsAvailable bool      `json:"is_available"`
 }
 
+type Modifier struct {
+	ID              uuid.UUID `json:"id"`
+	ModifierGroupID uuid.UUID `json:"modifier_group_id"`
+	TenantID        uuid.UUID `json:"tenant_id"`
+	Name            string    `json:"name"`
+	PriceAdjustment float64   `json:"price_adjustment"`
+}
+
 // MenuRepository defines the persistence contract for categories and items
 type MenuRepository interface {
 	ListCategories(ctx context.Context, tenantID uuid.UUID) ([]Category, error)
@@ -85,6 +93,8 @@ type MenuRepository interface {
 	UpdateItem(ctx context.Context, item *MenuItem) error
 	ToggleSoldOut(ctx context.Context, tenantID, itemID uuid.UUID, isSoldOut bool) error
 	DeleteItem(ctx context.Context, tenantID, itemID uuid.UUID) error
+	GetModifierByID(ctx context.Context, tenantID, modifierID uuid.UUID) (*Modifier, error)
+	GetModifierForMenuItem(ctx context.Context, tenantID, menuItemID, modifierID uuid.UUID) (*Modifier, error)
 }
 
 // MenuUsecase defines the business logic contract for menu viewing & management

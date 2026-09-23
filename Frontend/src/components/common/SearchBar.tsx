@@ -26,7 +26,6 @@ export default function SearchBar({
 }: SearchBarProps) {
   const isClassic = variant === 'classic';
   const isModern = variant === 'modern';
-  const isAdmin = variant === 'admin';
 
   const iconSize = isClassic ? 12 : isModern ? 18 : 16;
   const clearIconSize = isClassic ? 11 : isModern ? 16 : 14;

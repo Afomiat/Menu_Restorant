@@ -103,3 +103,17 @@ func (ctrl *TenantController) UpdatePlan(c *gin.Context) {
 		"plan":    planTier,
 	})
 }
+
+// ListPublicTenants handles GET /api/v1/restaurants
+// Returns all active restaurants in the database for the landing discovery view
+func (ctrl *TenantController) ListPublicTenants(c *gin.Context) {
+	tenants, err := ctrl.tenantUsecase.ListActive(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load restaurants"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": tenants,
+	})
+}

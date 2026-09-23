@@ -40,6 +40,12 @@ func (m *mockFullTenantUsecase) UpdateTheme(ctx context.Context, id uuid.UUID, t
 func (m *mockFullTenantUsecase) VerifyVIPAccess(ctx context.Context, tenantID uuid.UUID) (bool, error) {
 	return m.tenant.HasVIPFeatures(), nil
 }
+func (m *mockFullTenantUsecase) ListActive(ctx context.Context) ([]domain.Tenant, error) {
+	if m.tenant != nil {
+		return []domain.Tenant{*m.tenant}, nil
+	}
+	return nil, nil
+}
 
 func setupTestRouter(tenant *domain.Tenant, qrSecret, jwtSecret string) (*gin.Engine, *domain.Order) {
 	cfg := &config.Config{
@@ -161,8 +167,9 @@ func TestAPI_AdminUpgradeToVIP(t *testing.T) {
 	r, _ := setupTestRouter(tenant, qrSecret, jwtSecret)
 
 	ownerToken, _ := security.GenerateJWT(userID, tenantID, "owner", jwtSecret, time.Hour)
+	superAdminToken, _ := security.GenerateJWT(userID, tenantID, "super_admin", jwtSecret, time.Hour)
 
-	// 1. Owner upgrades restaurant to VIP
+	// 1. Security Check: Owner cannot self-upgrade restaurant to VIP (Privilege Escalation Prevention)
 	body, _ := json.Marshal(map[string]string{"plan": "vip"})
 	req := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/tenant/plan", bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+ownerToken)
@@ -170,15 +177,26 @@ func TestAPI_AdminUpgradeToVIP(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for owner trying to self-upgrade plan, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 2. Super Admin can upgrade restaurant to VIP
+	req = httptest.NewRequest(http.MethodPatch, "/api/v1/admin/tenant/plan", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+superAdminToken)
+	req.Header.Set("Content-Type", "application/json")
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
 	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200 for VIP upgrade, got %d: %s", w.Code, w.Body.String())
+		t.Fatalf("expected 200 for super_admin VIP upgrade, got %d: %s", w.Code, w.Body.String())
 	}
 
 	if tenant.Plan != domain.PlanVIP {
 		t.Fatalf("expected tenant plan to be updated to VIP, got %s", tenant.Plan)
 	}
 
-	// 2. Kitchen staff attempts to upgrade plan -> 403 INSUFFICIENT PERMISSIONS
+	// 3. Kitchen staff attempts to upgrade plan -> 403 INSUFFICIENT PERMISSIONS
 	kitchenToken, _ := security.GenerateJWT(userID, tenantID, "kitchen", jwtSecret, time.Hour)
 	req = httptest.NewRequest(http.MethodPatch, "/api/v1/admin/tenant/plan", bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+kitchenToken)
@@ -187,6 +205,6 @@ func TestAPI_AdminUpgradeToVIP(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected 403 for non-owner role, got %d", w.Code)
+		t.Fatalf("expected 403 for kitchen role, got %d", w.Code)
 	}
 }

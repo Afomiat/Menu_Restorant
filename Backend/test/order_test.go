@@ -79,6 +79,35 @@ func TestOrder_TableSpoofingProtection(t *testing.T) {
 	}
 }
 
+func TestOrder_MissingTableTokenRejected(t *testing.T) {
+	tenantID := uuid.New()
+	qrSecret := "test-secret-key-32-chars-abcdef"
+
+	tenantRepo := &mockTenantRepo{
+		tenant: &domain.Tenant{ID: tenantID, Plan: domain.PlanVIP},
+	}
+	orderRepo := &mockOrderRepo{}
+	tableRepo := &mockTableRepo{}
+	menuRepo := &mockMenuRepo{}
+
+	orderUc := usecase.NewOrderUsecase(orderRepo, tenantRepo, tableRepo, menuRepo, qrSecret)
+
+	// Attacker sends empty token
+	input := domain.CreateOrderInput{
+		TenantID:    tenantID,
+		TableNumber: "1",
+		TableToken:  "",
+		Items: []domain.CreateOrderItemInput{
+			{MenuItemID: uuid.New(), Quantity: 1},
+		},
+	}
+
+	_, err := orderUc.PlaceOrder(context.Background(), input)
+	if err == nil {
+		t.Fatal("SECURITY VULNERABILITY: Order succeeded with empty table QR token!")
+	}
+}
+
 func TestOrder_ServerSidePriceLookupAndTamperProofing(t *testing.T) {
 	tenantID := uuid.New()
 	tableID := uuid.New()

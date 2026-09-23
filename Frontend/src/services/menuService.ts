@@ -1,5 +1,15 @@
-import type { RestaurantMenu, MenuItem, Category, RestaurantMeta, RestaurantTheme } from '../types';
+import type {
+  RestaurantMenu,
+  MenuItem,
+  Category,
+  RestaurantMeta,
+  RestaurantTheme,
+  BackendFullMenuResponse,
+  BackendMenuItem,
+  BackendCategory,
+} from '../types';
 import { CANONICAL_MODERN_CATEGORIES, CANONICAL_MODERN_ITEMS } from '../data/modernMenuDefaults';
+import { apiClient, ApiError } from './apiClient';
 
 export class MenuServiceError extends Error {
   code: 'not-found' | 'network' | 'invalid-data';
@@ -9,6 +19,61 @@ export class MenuServiceError extends Error {
     this.name = 'MenuServiceError';
     this.code = code;
   }
+}
+
+function mapBackendToRestaurantMenu(data: BackendFullMenuResponse['data']): RestaurantMenu {
+  const tenant = data.tenant;
+  const rawTheme = tenant.theme_config || {};
+  const primaryColor = String(rawTheme.primaryColor || rawTheme.primary || '#F59E0B');
+
+  const theme: RestaurantTheme = {
+    primary: primaryColor,
+    secondary: rawTheme.secondary ? String(rawTheme.secondary) : undefined,
+    primaryLight: rawTheme.primaryLight ? String(rawTheme.primaryLight) : undefined,
+    background: rawTheme.background ? String(rawTheme.background) : undefined,
+    surface: rawTheme.surface ? String(rawTheme.surface) : undefined,
+    text: rawTheme.text ? String(rawTheme.text) : undefined,
+    textMuted: rawTheme.textMuted ? String(rawTheme.textMuted) : undefined,
+    darkBar: rawTheme.darkBar ? String(rawTheme.darkBar) : undefined,
+    mode: rawTheme.mode === 'dark' || rawTheme.mode === 'light' ? rawTheme.mode : undefined,
+  };
+
+  const meta: RestaurantMeta = {
+    name: tenant.name,
+    tagline: rawTheme.tagline || rawTheme.welcomeMessage || '',
+    themeColor: primaryColor,
+    theme,
+    colors: theme,
+    template: 'modern',
+    currency: tenant.currency || 'ETB',
+    heroImageUrl: rawTheme.bannerUrl || rawTheme.heroImageUrl || 'https://images.unsplash.com/photo-1550547660-d9450f859349',
+    heroTitle: tenant.name,
+    heroSubtitle: rawTheme.welcomeMessage || '',
+    plan: getEffectiveTenantPlan(tenant.slug, tenant.plan),
+  };
+
+  const categories: Category[] = (data.categories || []).map((cat) => ({
+    id: cat.id,
+    name: cat.name,
+    sortOrder: cat.sort_order,
+  }));
+
+  const items: MenuItem[] = (data.items || []).map((item) => ({
+    id: item.id,
+    categoryId: item.category_id,
+    name: item.name,
+    description: item.description,
+    price: item.price,
+    imageUrl: item.image_url || '/images/default_food.png',
+    tags: Array.isArray(item.tags)
+      ? item.tags.map((t: string) => String(t).toLowerCase().trim())
+      : typeof item.tags === 'string' && (item.tags as string).trim()
+      ? (item.tags as string).toLowerCase().split(/[\s,]+/).filter(Boolean) as any
+      : [],
+    available: item.is_available && !item.is_sold_out,
+  }));
+
+  return { meta, categories, items, plan: meta.plan || 'standard' };
 }
 
 /**
@@ -50,6 +115,7 @@ function sanitizeMenuData(raw: any): RestaurantMenu {
     heroTitle: raw.meta?.heroTitle ? String(raw.meta.heroTitle) : undefined,
     heroSubtitle: raw.meta?.heroSubtitle ? String(raw.meta.heroSubtitle) : undefined,
     heroBadges: Array.isArray(raw.meta?.heroBadges) ? raw.meta.heroBadges.map(String) : undefined,
+    plan: raw.plan === 'vip' || raw.meta?.plan === 'vip' ? 'vip' : 'standard',
   };
 
   // 1. Categories: Preserve custom categories or fallback to defaults (excluding any redundant 'all' category)
@@ -177,7 +243,22 @@ export function resetRestaurantMenu(slug: string): void {
 export async function fetchRestaurantMenu(slug: string): Promise<RestaurantMenu> {
   const normalizedSlug = slug.toLowerCase().trim();
 
-  // 1. Fetch from static JSON file
+  // 1. Try Live Backend API First (PostgreSQL + Supabase)
+  try {
+    const res = await apiClient.get<BackendFullMenuResponse>(`/menus/${normalizedSlug}`);
+    if (res && res.data && res.data.tenant) {
+      return mapBackendToRestaurantMenu(res.data);
+    }
+  } catch (err: any) {
+    if (err instanceof ApiError && err.status === 404) {
+      // If server explicitly says 404 restaurant not found, strictly fail with not-found
+      throw new MenuServiceError('not-found', `Menu for ${normalizedSlug} not found`);
+    }
+    // Network error or backend offline: proceed to static/disk fallback
+    console.warn(`[menuService] Backend API not available for ${normalizedSlug}, falling back to static/local:`, err?.message);
+  }
+
+  // 2. Fetch from static JSON file
   let diskMenu: RestaurantMenu | null = null;
   try {
     const response = await fetch(`/menus/${normalizedSlug}.json`);
@@ -198,14 +279,14 @@ export async function fetchRestaurantMenu(slug: string): Promise<RestaurantMenu>
     throw new MenuServiceError('network', (err as Error)?.message || 'Network error fetching menu');
   }
 
-  // 2. Check for locally customized menu data
+  // 3. Check for locally customized menu data
   const stored = getStoredRestaurantMenu(normalizedSlug);
   if (!stored) {
     if (diskMenu) return diskMenu;
     throw new MenuServiceError('not-found', `Menu for ${normalizedSlug} not found`);
   }
 
-  // 3. If stored custom data exists, merge disk menu meta (so updates to JSON files like currency or name are reflected immediately)
+  // 4. Merge stored custom data with disk menu
   if (diskMenu) {
     const mergedMeta: RestaurantMeta = {
       ...diskMenu.meta,
@@ -231,3 +312,155 @@ export async function fetchRestaurantMenu(slug: string): Promise<RestaurantMenu>
 
   return stored;
 }
+
+// ============================================================================
+// 5. Admin Menu & Category CRUD operations (PostgreSQL / Gin Backend)
+// ============================================================================
+
+export async function createAdminItem(item: {
+  categoryId: string;
+  name: string;
+  description?: string;
+  price: number;
+  imageUrl?: string;
+  tags?: string[];
+}): Promise<BackendMenuItem> {
+  const res = await apiClient.post<{ message: string; data: BackendMenuItem }>('/admin/items', {
+    category_id: item.categoryId,
+    name: item.name,
+    description: item.description || '',
+    price: item.price,
+    image_url: item.imageUrl || '',
+    tags: item.tags || [],
+  });
+  return res.data;
+}
+
+export async function updateAdminItem(
+  id: string,
+  item: {
+    categoryId: string;
+    name: string;
+    description?: string;
+    price: number;
+    imageUrl?: string;
+    tags?: string[];
+    isAvailable?: boolean;
+  }
+): Promise<BackendMenuItem> {
+  const res = await apiClient.put<{ message: string; data: BackendMenuItem }>(`/admin/items/${id}`, {
+    category_id: item.categoryId,
+    name: item.name,
+    description: item.description || '',
+    price: item.price,
+    image_url: item.imageUrl || '',
+    tags: item.tags || [],
+    is_available: item.isAvailable !== false,
+  });
+  return res.data;
+}
+
+export async function deleteAdminItem(id: string): Promise<boolean> {
+  await apiClient.delete(`/admin/items/${id}`);
+  return true;
+}
+
+export async function createAdminCategory(name: string, sortOrder: number = 0): Promise<BackendCategory> {
+  const res = await apiClient.post<{ message: string; data: BackendCategory }>('/admin/categories', {
+    name,
+    sort_order: sortOrder,
+  });
+  return res.data;
+}
+
+export async function updateAdminCategory(
+  id: string,
+  name: string,
+  sortOrder: number = 0,
+  isActive: boolean = true
+): Promise<BackendCategory> {
+  const res = await apiClient.put<{ message: string; data: BackendCategory }>(`/admin/categories/${id}`, {
+    name,
+    sort_order: sortOrder,
+    is_active: isActive,
+  });
+  return res.data;
+}
+
+export async function deleteAdminCategory(id: string): Promise<boolean> {
+  await apiClient.delete(`/admin/categories/${id}`);
+  return true;
+}
+
+export async function updateAdminTenantTheme(themeConfig: Record<string, any>): Promise<boolean> {
+  await apiClient.patch('/admin/tenant/theme', { theme_config: themeConfig });
+  return true;
+}
+
+/**
+ * Fetches live restaurant tenant profile from PostgreSQL
+ */
+export async function fetchAdminTenantProfile(): Promise<RestaurantMeta | null> {
+  try {
+    const res = await apiClient.get<{ data: any }>('/admin/tenant');
+    if (res && res.data) {
+      return {
+        name: res.data.name,
+        slug: res.data.slug,
+        currency: res.data.currency || 'ETB',
+        plan: res.data.plan,
+        ...(res.data.theme_config || {}),
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetches all categories directly from the admin categories endpoint
+ */
+export async function fetchAdminCategories(): Promise<BackendCategory[]> {
+  try {
+    const res = await apiClient.get<{ data: BackendCategory[] }>('/admin/categories');
+    return res.data || [];
+  } catch {
+    return [];
+  }
+}
+
+export interface ActiveTenantInfo {
+  id: string;
+  slug: string;
+  name: string;
+  plan: 'standard' | 'vip';
+  currency: string;
+  theme_config?: Record<string, any>;
+  is_active: boolean;
+}
+
+/**
+ * Fetches all active registered restaurants from PostgreSQL backend
+ */
+export async function fetchActiveRestaurants(): Promise<ActiveTenantInfo[]> {
+  try {
+    const res = await apiClient.get<{ data: ActiveTenantInfo[] }>('/restaurants');
+    return res?.data || [];
+  } catch (err) {
+    console.warn('[menuService] Failed to fetch active restaurants:', err);
+    return [];
+  }
+}
+
+/**
+ * Returns the active plan tier ('standard' or 'vip').
+ *
+ * The plan is derived exclusively from the backend API response (PostgreSQL tenants.plan).
+ * There is intentionally no URL or localStorage override — plan spoofing via ?plan=vip
+ * is not possible in production. The backend enforces the real access control.
+ */
+export function getEffectiveTenantPlan(_slug: string, backendPlan?: 'standard' | 'vip'): 'standard' | 'vip' {
+  return backendPlan || 'standard';
+}
+

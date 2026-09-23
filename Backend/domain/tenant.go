@@ -38,6 +38,7 @@ type TenantRepository interface {
 	Create(ctx context.Context, tenant *Tenant) error
 	UpdatePlan(ctx context.Context, id uuid.UUID, plan PlanTier) error
 	UpdateTheme(ctx context.Context, id uuid.UUID, themeConfig map[string]interface{}) (*Tenant, error)
+	ListActive(ctx context.Context) ([]Tenant, error)
 }
 
 // TenantUsecase defines the business logic contract for tenants
@@ -47,4 +48,6 @@ type TenantUsecase interface {
 	UpdatePlan(ctx context.Context, id uuid.UUID, plan PlanTier) error
 	UpdateTheme(ctx context.Context, id uuid.UUID, themeConfig map[string]interface{}) (*Tenant, error)
 	VerifyVIPAccess(ctx context.Context, tenantID uuid.UUID) (bool, error)
+	ListActive(ctx context.Context) ([]Tenant, error)
 }
+

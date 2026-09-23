@@ -26,3 +26,10 @@ UPDATE tenants
 SET theme_config = $2, updated_at = NOW()
 WHERE id = $1
 RETURNING id, slug, name, plan, currency, theme_config, is_active, created_at, updated_at;
+
+-- name: ListActiveTenants :many
+SELECT id, slug, name, plan, currency, theme_config, is_active, created_at, updated_at
+FROM tenants
+WHERE is_active = TRUE
+ORDER BY name ASC;
+

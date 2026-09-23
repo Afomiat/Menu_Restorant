@@ -52,12 +52,14 @@ func main() {
 	menuRepo := repository.NewMenuRepository(queries)
 	tableRepo := repository.NewTableRepository(queries)
 	orderRepo := repository.NewOrderRepository(pool, queries)
+	uploadRepo := repository.NewCloudinaryUploadRepository(cfg)
 
 	// 6. Initialize Usecases (Business Rules Layer)
 	tenantUsecase := usecase.NewTenantUsecase(tenantRepo)
 	menuUsecase := usecase.NewMenuUsecase(tenantRepo, menuRepo)
 	tableUsecase := usecase.NewTableUsecase(tableRepo, cfg.QRSecretKey)
 	orderUsecase := usecase.NewOrderUsecase(orderRepo, tenantRepo, tableRepo, menuRepo, cfg.QRSecretKey)
+	uploadUsecase := usecase.NewUploadUsecase(tenantRepo, uploadRepo)
 
 	// 7. Initialize Delivery Router (Gin HTTP Server)
 	r := router.SetupRouter(router.RouterDependencies{
@@ -66,8 +68,10 @@ func main() {
 		MenuUsecase:   menuUsecase,
 		OrderUsecase:  orderUsecase,
 		TableUsecase:  tableUsecase,
+		UploadUsecase: uploadUsecase,
 		Hub:           hub,
 		Queries:       queries,
+		Pool:          pool,
 	})
 
 	// 8. Start HTTP Server with Graceful Shutdown

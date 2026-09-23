@@ -41,7 +41,7 @@ func (ctrl *TableController) ListTables(c *gin.Context) {
 }
 
 type CreateTableRequest struct {
-	TableNumber string `json:"table_number" binding:"required"`
+	TableNumber string `json:"table_number" binding:"required,max=20"`
 }
 
 // CreateTable handles POST /api/v1/admin/tables
@@ -89,7 +89,7 @@ func (ctrl *TableController) GenerateTableQR(c *gin.Context) {
 	}
 
 	var req struct {
-		TableNumber string `json:"table_number" binding:"required"`
+		TableNumber string `json:"table_number" binding:"required,max=20"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "table_number is required"})

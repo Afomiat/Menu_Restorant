@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import useRestaurantMenu from '../hooks/useRestaurantMenu';
+import { PlanProvider } from '../context/PlanContext';
 import SkeletonLoader from '../components/common/SkeletonLoader';
 import NotFoundPage from './NotFoundPage';
 import ModernMenuPage from '../templates/modern/ModernMenuPage';
@@ -10,8 +12,19 @@ export default function MenuPage() {
   const [searchParams] = useSearchParams();
   const tableNumber = searchParams.get('table');
 
-  const { meta, categories, items, loading, error } = useRestaurantMenu(restaurantName);
+  const { meta, categories, items, loading, error, plan } = useRestaurantMenu(restaurantName);
   const slug = restaurantName?.toLowerCase().trim() ?? 'unknown';
+
+  // Dynamic Browser Tab Title
+  useEffect(() => {
+    if (meta?.name) {
+      document.title = `${meta.name} — Menu`;
+    } else if (restaurantName) {
+      document.title = `${restaurantName} — Menu`;
+    } else {
+      document.title = 'Azai Digital Menu';
+    }
+  }, [meta?.name, restaurantName]);
 
   // Error States
   if (error === 'not-found') {
@@ -83,24 +96,28 @@ export default function MenuPage() {
   // Template Dispatcher
   if (meta.template === 'modern') {
     return (
-      <ModernMenuPage
+      <PlanProvider plan={plan}>
+        <ModernMenuPage
+          meta={meta}
+          categories={categories}
+          items={items}
+          restaurantSlug={slug}
+          tableNumber={tableNumber}
+        />
+      </PlanProvider>
+    );
+  }
+
+  // Default: Classic Template
+  return (
+    <PlanProvider plan={plan}>
+      <ClassicMenuPage
         meta={meta}
         categories={categories}
         items={items}
         restaurantSlug={slug}
         tableNumber={tableNumber}
       />
-    );
-  }
-
-  // Default: Classic Template
-  return (
-    <ClassicMenuPage
-      meta={meta}
-      categories={categories}
-      items={items}
-      restaurantSlug={slug}
-      tableNumber={tableNumber}
-    />
+    </PlanProvider>
   );
 }
