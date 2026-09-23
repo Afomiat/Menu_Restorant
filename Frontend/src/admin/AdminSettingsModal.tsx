@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Settings, RefreshCw, DollarSign, Store, MapPin, Palette, Image as ImageIcon, UploadCloud, Loader2, Trash2 } from 'lucide-react';
+import { X, Settings, RefreshCw, DollarSign, Store, MapPin, Palette, Image as ImageIcon, UploadCloud, Loader2, Trash2, Clock } from 'lucide-react';
 import type { RestaurantMeta } from '../types';
 import AdminConfirmModal from './AdminConfirmModal';
 import { uploadImageToCloudinary } from '../services/uploadService';
@@ -37,6 +37,11 @@ export default function AdminSettingsModal({
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [heroImageUrl, setHeroImageUrl] = useState('');
   const [primaryColor, setPrimaryColor] = useState('#FF5A36');
+  const [logoUrl, setLogoUrl] = useState('');
+  const [openingHours, setOpeningHours] = useState('');
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [logoUploadError, setLogoUploadError] = useState<string | null>(null);
+  const logoFileInputRef = useRef<HTMLInputElement>(null);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [isUploadingHero, setIsUploadingHero] = useState(false);
   const [heroUploadError, setHeroUploadError] = useState<string | null>(null);
@@ -63,11 +68,42 @@ export default function AdminSettingsModal({
       setDeliveryAddress(meta.deliveryAddress || '');
       setHeroImageUrl(meta.heroImageUrl || '');
       setPrimaryColor(meta.colors?.primary || meta.theme?.primary || '#FF5A36');
+      setLogoUrl(meta.logoUrl || '');
+      setOpeningHours(meta.openingHours || '');
     }
     prevOpenRef.current = isOpen;
   }, [isOpen, meta]);
 
   if (!isOpen || !meta) return null;
+
+  // Name and currency live on the tenant record, which the backend does not let owners edit.
+  const isLiveMenu = Boolean(meta.slug);
+  const isUploading = isUploadingHero || isUploadingLogo;
+
+  const handleLogoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLogoUploadError(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setLogoUploadError('Please select a valid image file (PNG, JPG, SVG, WEBP).');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setLogoUploadError('Logo is too large (max 2MB).');
+      return;
+    }
+    setIsUploadingLogo(true);
+    try {
+      setLogoUrl(await uploadImageToCloudinary(file, 'branding'));
+    } catch (err: unknown) {
+      setLogoUploadError(err instanceof Error ? err.message : 'Failed to upload logo.');
+    } finally {
+      setIsUploadingLogo(false);
+      if (logoFileInputRef.current) {
+        logoFileInputRef.current.value = '';
+      }
+    }
+  };
 
   const handleHeroFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setHeroUploadError(null);
@@ -112,6 +148,8 @@ export default function AdminSettingsModal({
       currency: finalCurrency,
       deliveryAddress: deliveryAddress.trim() || undefined,
       heroImageUrl: heroImageUrl.trim() || undefined,
+      logoUrl: logoUrl.trim() || undefined,
+      openingHours: openingHours.trim() || undefined,
       colors: {
         ...meta.colors,
         primary: primaryColor,
@@ -165,6 +203,7 @@ export default function AdminSettingsModal({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Breath, Aura, Luna"
+                disabled={isLiveMenu}
               />
             </div>
 
@@ -190,6 +229,7 @@ export default function AdminSettingsModal({
                 <select
                   className="admin-input-control"
                   style={{ flex: 1 }}
+                  disabled={isLiveMenu}
                   value={isCustomCurrency ? 'CUSTOM' : currency}
                   onChange={(e) => {
                     const val = e.target.value;
@@ -223,7 +263,9 @@ export default function AdminSettingsModal({
                 )}
               </div>
               <p style={{ fontSize: '11.5px', color: 'var(--admin-text-muted)', margin: '5px 0 0 2px' }}>
-                Selected currency will apply everywhere across dishes, cart drawer, and live customer menus.
+                {isLiveMenu
+                  ? 'Restaurant name and currency are managed by the platform administrator.'
+                  : 'Selected currency will apply everywhere across dishes, cart drawer, and live customer menus.'}
               </p>
             </div>
 
@@ -240,6 +282,93 @@ export default function AdminSettingsModal({
                 onChange={(e) => setDeliveryAddress(e.target.value)}
                 placeholder="e.g. 11/2 Diriyah, Riyadh"
               />
+            </div>
+
+            {/* Opening Hours */}
+            <div>
+              <label className="admin-input-label">
+                <Clock size={14} style={{ display: 'inline', marginRight: '5px' }} />
+                Opening Hours
+              </label>
+              <input
+                type="text"
+                className="admin-input-control"
+                value={openingHours}
+                onChange={(e) => setOpeningHours(e.target.value)}
+                placeholder="e.g. Daily 11:00 AM – 10:00 PM"
+              />
+            </div>
+
+            {/* Restaurant Logo */}
+            <div>
+              <label className="admin-input-label">
+                <ImageIcon size={14} style={{ display: 'inline', marginRight: '5px' }} />
+                Restaurant Logo
+              </label>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  className="admin-input-control"
+                  style={{ flex: 1 }}
+                  value={logoUrl}
+                  onChange={(e) => setLogoUrl(e.target.value)}
+                  placeholder="Logo image URL (PNG or SVG)"
+                />
+                <input
+                  ref={logoFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={handleLogoFileUpload}
+                />
+                <button
+                  type="button"
+                  className="admin-sec-pill-btn"
+                  disabled={isUploadingLogo}
+                  onClick={() => logoFileInputRef.current?.click()}
+                  style={{ height: '38px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  {isUploadingLogo ? (
+                    <>
+                      <Loader2 size={14} className="admin-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <UploadCloud size={14} />
+                      Upload
+                    </>
+                  )}
+                </button>
+              </div>
+              {logoUrl && (
+                <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '10px', background: '#f8fafc', padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--admin-border)' }}>
+                  <img
+                    src={logoUrl}
+                    alt="Logo preview"
+                    style={{ height: '40px', maxWidth: '96px', objectFit: 'contain' }}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                  <span style={{ fontSize: '11.5px', color: 'var(--admin-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                    {logoUrl}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setLogoUrl('')}
+                    style={{ background: 'none', border: 'none', color: 'var(--admin-danger)', cursor: 'pointer', padding: '4px' }}
+                    title="Remove logo"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              )}
+              {logoUploadError && (
+                <p style={{ fontSize: '11.5px', color: 'var(--admin-danger)', margin: '4px 0 0 2px' }}>
+                  {logoUploadError}
+                </p>
+              )}
             </div>
 
             {/* Hero Banner Showcase Image (Diagonal Card) */}
@@ -351,7 +480,8 @@ export default function AdminSettingsModal({
               </div>
             </div>
 
-            {/* Reset Data Section */}
+            {/* Reset Data Section (local demo menus only) */}
+            {!isLiveMenu && (
             <div
               style={{
                 marginTop: '10px',
@@ -383,6 +513,7 @@ export default function AdminSettingsModal({
                 <span>Reset</span>
               </button>
             </div>
+            )}
           </div>
 
           <div className="admin-modal-footer">
@@ -396,13 +527,13 @@ export default function AdminSettingsModal({
             <button
               type="submit"
               className="admin-modal-btn admin-modal-btn-save"
-              disabled={isUploadingHero}
+              disabled={isUploading}
               style={{
-                opacity: isUploadingHero ? 0.7 : 1,
-                cursor: isUploadingHero ? 'not-allowed' : 'pointer',
+                opacity: isUploading ? 0.7 : 1,
+                cursor: isUploading ? 'not-allowed' : 'pointer',
               }}
             >
-              {isUploadingHero ? 'Uploading...' : 'Save Settings'}
+              {isUploading ? 'Uploading...' : 'Save Settings'}
             </button>
           </div>
         </form>

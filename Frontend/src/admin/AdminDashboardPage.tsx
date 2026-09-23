@@ -372,10 +372,19 @@ export default function AdminDashboardPage() {
     setMeta(updatedMeta);
 
     if (liveTenantSlug) {
+      // The backend replaces theme_config as a whole, so send every branding field.
+      const { primary, ...colorTokens } = updatedMeta.theme || updatedMeta.colors || { primary: '' };
       const themeToSave = {
-        ...(updatedMeta.theme || updatedMeta.colors || {}),
-        welcomeMessage: updatedMeta.tagline,
+        ...colorTokens,
+        primaryColor: primary || undefined,
+        template: updatedMeta.template,
+        tagline: updatedMeta.tagline || undefined,
+        welcomeMessage: updatedMeta.heroSubtitle || undefined,
         bannerUrl: updatedMeta.heroImageUrl,
+        logoUrl: updatedMeta.logoUrl,
+        address: updatedMeta.deliveryAddress,
+        openingHours: updatedMeta.openingHours,
+        heroBadges: updatedMeta.heroBadges,
       };
       try {
         await updateAdminTenantTheme(themeToSave);
@@ -387,7 +396,7 @@ export default function AdminDashboardPage() {
     }
 
     persistChanges(items, categories, updatedMeta);
-    showToast(`✅ Settings saved (Currency: ${updatedMeta.currency || 'ETB'})`);
+    showToast('✅ Restaurant settings saved');
   };
 
   const handleResetToDefault = () => {
@@ -661,6 +670,7 @@ export default function AdminDashboardPage() {
         onSelectView={(view) => setActiveView(view)}
         activeOrdersCount={activeOrdersCount}
         onOpenTables={() => setIsTablesModalOpen(true)}
+        onOpenSettings={() => setIsSettingsModalOpen(true)}
         onLogout={handleLogout}
         isMobileOpen={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}

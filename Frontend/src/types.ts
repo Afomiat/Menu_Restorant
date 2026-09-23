@@ -47,6 +47,10 @@ export interface RestaurantMeta {
   heroTitle?: string;
   heroSubtitle?: string;
   heroBadges?: string[];
+  /** Restaurant logo shown in the menu header (image URL or /public path). */
+  logoUrl?: string;
+  /** Free-text opening hours, e.g. "Daily 11:00 AM – 10:00 PM". */
+  openingHours?: string;
   plan?: 'standard' | 'vip';
   /** Backend tenant slug. Set only for restaurants loaded from the live API. */
   slug?: string;

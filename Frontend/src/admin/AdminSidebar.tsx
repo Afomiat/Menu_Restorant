@@ -1,4 +1,4 @@
-import { UtensilsCrossed, Sparkles, ChefHat, X, QrCode, LogOut } from 'lucide-react';
+import { UtensilsCrossed, Sparkles, ChefHat, X, QrCode, LogOut, Settings } from 'lucide-react';
 import type { RestaurantMeta } from '../types';
 
 interface AdminSidebarProps {
@@ -9,6 +9,7 @@ interface AdminSidebarProps {
   activeOrdersCount?: number;
   onOpenKitchen?: () => void;
   onOpenTables?: () => void;
+  onOpenSettings?: () => void;
   onLogout?: () => void;
   isMobileOpen?: boolean;
   onCloseMobile?: () => void;
@@ -22,6 +23,7 @@ export default function AdminSidebar({
   activeOrdersCount = 0,
   onOpenKitchen,
   onOpenTables,
+  onOpenSettings,
   onLogout,
   isMobileOpen = false,
   onCloseMobile,
@@ -157,6 +159,20 @@ export default function AdminSidebar({
               <QrCode size={18} />
               <span>Tables & QR Codes</span>
             </button>
+
+            {onOpenSettings && (
+              <button
+                type="button"
+                className="admin-nav-item"
+                onClick={() => {
+                  onOpenSettings();
+                  if (onCloseMobile) onCloseMobile();
+                }}
+              >
+                <Settings size={18} />
+                <span>Restaurant Settings</span>
+              </button>
+            )}
 
             {onLogout && (
               <button

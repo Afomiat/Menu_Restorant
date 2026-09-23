@@ -106,6 +106,13 @@
   gap: 12px;
 }
 
+.modern-brand-logo-img {
+  height: 42px;
+  max-width: 96px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
 .modern-brand-logo {
   width: 42px;
   height: 42px;
@@ -288,11 +295,11 @@
   background: linear-gradient(135deg, #ffffff 0%, #fffbf8 50%, #fefcfb 100%);
   border: 1px solid var(--modern-border);
   border-radius: var(--modern-radius-lg);
-  padding: 24px 20px;
+  padding: 16px 18px;
   box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.05);
   position: relative;
   overflow: hidden;
-  min-height: 200px;
+  min-height: 0;
   display: flex;
   align-items: center;
 }
@@ -301,8 +308,8 @@
   .modern-hero-banner {
     margin-top: 24px;
     margin-bottom: 32px;
-    padding: 34px 40px;
-    min-height: 220px;
+    padding: 26px 40px;
+    min-height: 150px;
   }
 }
 
@@ -377,7 +384,7 @@
 }
 
 .modern-hero-title {
-  font-size: 28px;
+  font-size: 24px;
   line-height: 1.15;
   letter-spacing: -0.8px;
   margin: 0;
@@ -429,8 +436,8 @@
 .modern-hero-badges {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 14px;
+  gap: 6px;
+  margin-top: 10px;
 }
 
 .modern-hero-badge-pill {
@@ -766,18 +773,49 @@
 .modern-arc-items-container {
   position: relative;
   z-index: 2;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  width: 100%;
+  max-width: 100%;
   margin: 0 auto;
-  padding: 0 6px;
 }
 
-@media (min-width: 640px) {
-  .modern-arc-items-container {
-    padding: 0 16px;
-  }
+/* Wheel mode: horizontal drags roll the categories along the arc, vertical scroll stays with the page */
+.modern-arc-fullwidth-section.is-wheel {
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.modern-arc-roll-btn {
+  position: absolute;
+  z-index: 3;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: #ffffff;
+  color: var(--modern-text-dark);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.15s ease;
+}
+
+.modern-arc-roll-btn:active:not(:disabled) {
+  transform: scale(0.9);
+}
+
+.modern-arc-roll-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.modern-arc-roll-left {
+  left: 10px;
+}
+
+.modern-arc-roll-right {
+  right: 10px;
 }
 
 .modern-arc-btn {
@@ -788,15 +826,14 @@
   background: none;
   border: none;
   padding: 0;
-  position: relative;
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  position: absolute;
+  top: 0;
+  transform: translate(-50%, var(--curve-y, 0px));
+  transition:
+    left 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.25s ease;
   user-select: none;
-  flex: 1;
-  max-width: 82px;
-}
-
-.modern-arc-btn:active {
-  transform: translateY(var(--curve-y, 0px)) !important;
 }
 
 .modern-arc-btn:active .modern-arc-disc {

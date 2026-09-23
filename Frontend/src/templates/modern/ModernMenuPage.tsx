@@ -184,7 +184,7 @@ export default function ModernMenuPage({
     }
   };
 
-  const deliveryOrTableLabel = meta.deliveryAddress || `${meta.name}, Main Dining Room`;
+  const deliveryOrTableLabel = meta.deliveryAddress || meta.name;
   const activeCurrency = meta.currency || 'ETB';
 
   // Dynamic Hero Banner variables for each restaurant
@@ -198,10 +198,6 @@ export default function ModernMenuPage({
     ? meta.heroTitle.substring(meta.heroTitle.indexOf('&')).trim()
     : (meta.heroSubtitle || 'Order & Eat.');
 
-  const heroDescription =
-    meta.tagline
-      ? `${meta.tagline}. Select your favorite dishes and order directly to your table.`
-      : 'Browse our curated menu, customize your order, and send dishes directly to the kitchen.';
 
   // Compute theme CSS variables passed from this restaurant's meta
   const themeStyles = useMemo(
@@ -219,9 +215,13 @@ export default function ModernMenuPage({
           <div className="modern-header-inner">
             {/* Restaurant Branding & Table Indicator */}
             <div className="modern-brand-group">
-              <div className="modern-brand-logo" aria-hidden="true">
-                <UtensilsCrossed size={20} />
-              </div>
+              {meta.logoUrl ? (
+                <img className="modern-brand-logo-img" src={meta.logoUrl} alt={`${meta.name} logo`} />
+              ) : (
+                <div className="modern-brand-logo" aria-hidden="true">
+                  <UtensilsCrossed size={20} />
+                </div>
+              )}
               <div className="modern-brand-text">
                 <span className="modern-brand-name">{meta.name}</span>
                 <span className="modern-brand-tagline">
@@ -329,28 +329,25 @@ export default function ModernMenuPage({
               <span className="modern-hero-hungry">{heroMainTitle}</span>
               <span className="modern-hero-order">{heroSubtitleText}</span>
             </h1>
-            <p className="modern-hero-desc">
-              {meta.tagline ? (
+            <div className="modern-hero-badges">
+              {meta.heroBadges && meta.heroBadges.length > 0 ? (
+                meta.heroBadges.map((badge) => (
+                  <span key={badge} className="modern-hero-badge-pill">
+                    <Sparkles size={13} color="var(--modern-primary)" /> {badge}
+                  </span>
+                ))
+              ) : (
                 <>
-                  <span className="modern-hero-tagline">{meta.tagline}.</span>{' '}
-                  <span className="modern-hero-order-span">
-                    Select your favorite dishes and order directly to your table.
+                  {can('ordering') && (
+                    <span className="modern-hero-badge-pill">
+                      <Zap size={13} color="var(--modern-primary)" /> Direct Kitchen Dispatch
+                    </span>
+                  )}
+                  <span className="modern-hero-badge-pill">
+                    <Sparkles size={13} color="var(--modern-primary)" /> Fresh Ingredients
                   </span>
                 </>
-              ) : (
-                <span className="modern-hero-order-span">{heroDescription}</span>
               )}
-            </p>
-            <div className="modern-hero-badges">
-              <span className="modern-hero-badge-pill">
-                <Zap size={13} color="var(--modern-primary)" /> Direct Kitchen Dispatch
-              </span>
-              <span className="modern-hero-badge-pill">
-                <Sparkles size={13} color="var(--modern-primary)" /> Fresh Ingredients
-              </span>
-              <span className="modern-hero-badge-pill">
-                📍 {deliveryOrTableLabel}
-              </span>
             </div>
           </div>
         </section>
@@ -458,7 +455,7 @@ export default function ModernMenuPage({
 
             <div className="modern-footer-details">
               <span>📍 {deliveryOrTableLabel}</span>
-              <span>🕒 Open 11:30 AM — 11:00 PM</span>
+              {meta.openingHours && <span>🕒 {meta.openingHours}</span>}
               <span>⚡ Powered by Azai QR Menu</span>
             </div>
           </div>
