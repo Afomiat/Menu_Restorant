@@ -67,7 +67,7 @@ export function useKitchenWebSocket(options: UseKitchenWebSocketOptions = {}) {
       return;
     }
 
-    const wsUrl = (import.meta.env.VITE_WS_URL as string) || 'ws://localhost:8080/ws/kitchen';
+    const wsUrl = (import.meta.env.VITE_WS_URL as string) || 'wss://menu-restorant-1.onrender.com/ws/kitchen';
     const fullUrl = `${wsUrl}?token=${encodeURIComponent(token)}`;
 
     try {

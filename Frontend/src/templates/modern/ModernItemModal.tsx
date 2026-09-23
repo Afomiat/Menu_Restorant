@@ -106,6 +106,12 @@ export default function ModernItemModal({
                 Vegetarian
               </span>
             )}
+            {item.tags.includes('vegan') && (
+              <span className="modern-modal-tag" style={{ color: '#2b8a3e' }}>
+                <Leaf size={12} style={{ display: 'inline', marginRight: 4 }} />
+                Vegan
+              </span>
+            )}
             {item.tags.includes('gluten-free') && (
               <span className="modern-modal-tag">Gluten-Free</span>
             )}

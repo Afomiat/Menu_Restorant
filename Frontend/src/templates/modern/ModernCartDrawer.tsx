@@ -298,11 +298,11 @@ export default function ModernCartDrawer({
                   {isSubmitting ? (
                     'Sending to Kitchen...'
                   ) : !isTableVerified ? (
-                    <span>Scan Table QR to Order</span>
+                    <span>Send to Kitchen</span>
                   ) : (
                     <>
                       <CheckCircle2 size={18} />
-                      Send Order to Kitchen • {formatPrice(subtotal, currency)}
+                      Send to Kitchen • {formatPrice(subtotal, currency)}
                     </>
                   )}
                 </button>

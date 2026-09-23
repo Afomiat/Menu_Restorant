@@ -609,11 +609,11 @@ export default function ClassicCartDrawer({
                     {isSubmitting ? (
                       <span>Sending to Kitchen...</span>
                     ) : !isTableVerified ? (
-                      <span>Scan Table QR to Order</span>
+                      <span>Send to Kitchen</span>
                     ) : (
                       <>
                         <CheckCircle2 size={18} />
-                        <span>Send Order to Kitchen • {formatPrice(subtotal, currency)}</span>
+                        <span>Send to Kitchen • {formatPrice(subtotal, currency)}</span>
                       </>
                     )}
                   </button>

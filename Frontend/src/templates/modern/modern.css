@@ -1067,6 +1067,37 @@
   }
 }
 
+/* Dietary tag chips on food cards */
+.modern-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.modern-card-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1;
+  padding: 3px 7px;
+  border-radius: var(--modern-radius-full);
+  background-color: #f1f3f6;
+  color: var(--modern-text-muted);
+}
+
+.modern-card-tag.spicy {
+  background-color: #fdecec;
+  color: #e53e3e;
+}
+
+.modern-card-tag.green {
+  background-color: #eaf6ec;
+  color: #2b8a3e;
+}
+
 /* Card Footer: Price & Action */
 .modern-card-footer {
   display: flex;

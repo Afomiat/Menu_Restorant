@@ -1,4 +1,4 @@
-import { Plus, Minus } from 'lucide-react';
+import { Plus, Minus, Flame, Leaf } from 'lucide-react';
 import type { MenuItem } from '../../types';
 import { formatNumber } from '../../utils/currency';
 import { useFeatureGate } from '../../hooks/useFeatureGate';
@@ -91,6 +91,29 @@ export default function ModernFoodGrid({
               <p className="modern-card-subtitle">
                 {item.subtitle || item.description}
               </p>
+              {/* Dietary tags ("Chef's Pick" is already shown as the image badge) */}
+              {item.tags?.some((tag) => tag !== 'chef-pick') && (
+                <div className="modern-card-tags">
+                  {item.tags.includes('spicy') && (
+                    <span className="modern-card-tag spicy">
+                      <Flame size={10} /> Spicy
+                    </span>
+                  )}
+                  {item.tags.includes('vegetarian') && (
+                    <span className="modern-card-tag green">
+                      <Leaf size={10} /> Vegetarian
+                    </span>
+                  )}
+                  {item.tags.includes('vegan') && (
+                    <span className="modern-card-tag green">
+                      <Leaf size={10} /> Vegan
+                    </span>
+                  )}
+                  {item.tags.includes('gluten-free') && (
+                    <span className="modern-card-tag">Gluten-Free</span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Price & Action */}

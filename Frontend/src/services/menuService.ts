@@ -50,6 +50,7 @@ function mapBackendToRestaurantMenu(data: BackendFullMenuResponse['data']): Rest
     heroTitle: tenant.name,
     heroSubtitle: rawTheme.welcomeMessage || '',
     plan: getEffectiveTenantPlan(tenant.slug, tenant.plan),
+    slug: tenant.slug,
   };
 
   const categories: Category[] = (data.categories || []).map((cat) => ({

@@ -48,6 +48,8 @@ export interface RestaurantMeta {
   heroSubtitle?: string;
   heroBadges?: string[];
   plan?: 'standard' | 'vip';
+  /** Backend tenant slug. Set only for restaurants loaded from the live API. */
+  slug?: string;
 }
 
 export type OrderStatus =

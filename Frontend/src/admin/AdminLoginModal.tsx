@@ -6,9 +6,11 @@ interface AdminLoginModalProps {
   isOpen: boolean;
   onSuccess: (token: string) => void;
   onClose?: () => void;
+  /** Explains why the staff member has to sign in again (e.g. signed in to another restaurant). */
+  notice?: string | null;
 }
 
-export default function AdminLoginModal({ isOpen, onSuccess, onClose }: AdminLoginModalProps) {
+export default function AdminLoginModal({ isOpen, onSuccess, onClose, notice }: AdminLoginModalProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -122,6 +124,27 @@ export default function AdminLoginModal({ isOpen, onSuccess, onClose }: AdminLog
             >
               <AlertCircle size={16} style={{ flexShrink: 0 }} />
               <span>{error}</span>
+            </div>
+          )}
+
+          {notice && !error && (
+            <div
+              style={{
+                backgroundColor: '#fef3c7',
+                border: '1px solid #fde68a',
+                borderRadius: '10px',
+                padding: '10px 12px',
+                color: '#92400e',
+                fontSize: '12px',
+                fontWeight: 600,
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <AlertCircle size={16} style={{ flexShrink: 0 }} />
+              <span>{notice}</span>
             </div>
           )}
 

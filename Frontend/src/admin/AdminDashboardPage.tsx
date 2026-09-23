@@ -13,6 +13,7 @@ import {
   updateAdminCategory,
   deleteAdminCategory,
   updateAdminTenantTheme,
+  fetchAdminTenantProfile,
 } from '../services/menuService';
 import {
   saveRestaurantOrders,
@@ -26,7 +27,7 @@ import {
   cancelAllActiveOrders,
   clearCompletedOrders,
 } from '../services/orderService';
-import { ensureStaffSession, getAdminToken, clearAdminToken } from '../services/apiClient';
+import { getAdminToken, clearAdminToken } from '../services/apiClient';
 import { useKitchenWebSocket } from '../hooks/useKitchenWebSocket';
 import type { MenuItem, Category, RestaurantMeta, RestaurantMenu, CartItem, OrderStatus } from '../types';
 import { matchesSearchQuery } from '../utils/search';
@@ -199,12 +200,34 @@ export default function AdminDashboardPage() {
     return () => window.removeEventListener('azai:auth:unauthorized', handleUnauthorized);
   }, []);
 
+  // The staff token is stored per browser, not per restaurant. Make sure it belongs to the
+  // restaurant in the URL; otherwise every edit would be sent on behalf of another tenant.
+  const liveTenantSlug = initialMeta?.slug?.toLowerCase();
+  const [loginNotice, setLoginNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!adminToken || !liveTenantSlug) return;
+
+    let cancelled = false;
+    fetchAdminTenantProfile().then((profile) => {
+      if (cancelled) return;
+      const profileSlug = profile?.slug?.toLowerCase();
+      if (profileSlug && profileSlug !== liveTenantSlug) {
+        clearAdminToken();
+        setAdminToken(null);
+        setLoginNotice(
+          `You were signed in to "${profile?.name || profileSlug}". Sign in with a staff account for this restaurant to manage its menu.`
+        );
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [adminToken, liveTenantSlug]);
+
   // Authoritatively fetch active kitchen orders from PostgreSQL backend
   useEffect(() => {
     if (!adminToken) {
-      ensureStaffSession().then((token) => {
-        if (token) setAdminToken(token);
-      });
       return;
     }
 
@@ -344,19 +367,27 @@ export default function AdminDashboardPage() {
     saveRestaurantMenu(slug, currentMenu);
   };
 
-  const handleSaveSettings = (updatedMeta: RestaurantMeta) => {
+  const handleSaveSettings = async (updatedMeta: RestaurantMeta) => {
+    const previousMeta = meta;
     setMeta(updatedMeta);
+
+    if (liveTenantSlug) {
+      const themeToSave = {
+        ...(updatedMeta.theme || updatedMeta.colors || {}),
+        welcomeMessage: updatedMeta.tagline,
+        bannerUrl: updatedMeta.heroImageUrl,
+      };
+      try {
+        await updateAdminTenantTheme(themeToSave);
+      } catch (err) {
+        setMeta(previousMeta);
+        showToast(`⚠️ Couldn't save settings: ${(err as Error)?.message || 'the server rejected the change'}`);
+        return;
+      }
+    }
+
     persistChanges(items, categories, updatedMeta);
     showToast(`✅ Settings saved (Currency: ${updatedMeta.currency || 'ETB'})`);
-
-    const themeToSave = {
-      ...(updatedMeta.theme || updatedMeta.colors || {}),
-      welcomeMessage: updatedMeta.tagline,
-      bannerUrl: updatedMeta.heroImageUrl,
-    };
-    updateAdminTenantTheme(themeToSave).catch((err) =>
-      console.warn('Failed to sync theme with backend:', err)
-    );
   };
 
   const handleResetToDefault = () => {
@@ -418,158 +449,196 @@ export default function AdminDashboardPage() {
 
   // ── Action Handlers with Automatic Real-Time Persistence ────────────────────
 
+  // Applies a change on screen right away, then confirms it with the backend for live
+  // (database) restaurants. Success is only reported once the backend accepts the change;
+  // on failure the previous state is restored and the backend's error is shown.
+  // Local demo menus (static JSON) have no backend and are persisted to this browser only.
+  // A request may resolve with `partialError` when the backend accepted only part of a
+  // batch; the confirmed part is kept and the error is shown instead of the success message.
+  const commitChange = async (
+    next: { items?: MenuItem[]; categories?: Category[] },
+    request: () => Promise<{ items?: MenuItem[]; categories?: Category[]; partialError?: string } | void>,
+    successMessage: string,
+    failureMessage: string
+  ): Promise<boolean> => {
+    const previousItems = items;
+    const previousCategories = categories;
+    let finalItems = next.items ?? items;
+    let finalCategories = next.categories ?? categories;
+    let partialError: string | undefined;
+    setItems(finalItems);
+    setCategories(finalCategories);
+
+    if (liveTenantSlug) {
+      try {
+        const confirmed = await request();
+        if (confirmed?.items) finalItems = confirmed.items;
+        if (confirmed?.categories) finalCategories = confirmed.categories;
+        partialError = confirmed?.partialError;
+      } catch (err) {
+        setItems(previousItems);
+        setCategories(previousCategories);
+        showToast(`⚠️ ${failureMessage}: ${(err as Error)?.message || 'the server rejected the change'}`);
+        return false;
+      }
+      setItems(finalItems);
+      setCategories(finalCategories);
+    }
+
+    persistChanges(finalItems, finalCategories);
+    if (partialError) {
+      showToast(`⚠️ ${failureMessage}: ${partialError}`);
+      return false;
+    }
+    showToast(successMessage);
+    return true;
+  };
+
+  const toBackendItem = (item: MenuItem) => ({
+    categoryId: item.categoryId,
+    name: item.name,
+    description: item.description,
+    price: item.price,
+    imageUrl: item.imageUrl,
+    tags: item.tags,
+    isAvailable: item.available !== false,
+  });
+
+  const setSoldOutOnBackend = async (itemId: string, isSoldOut: boolean) => {
+    if (!(await toggleAdminItemSoldOut(itemId, isSoldOut))) {
+      throw new Error('the server rejected the change');
+    }
+  };
+
   const handleUpdatePrice = (itemId: string, newPrice: number) => {
     const updated = items.map((it) => (it.id === itemId ? { ...it, price: newPrice } : it));
-    setItems(updated);
-    persistChanges(updated);
-    showToast(`Updated price to ${newPrice} ${activeCurrency}`);
-
     const it = updated.find((x) => x.id === itemId);
-    if (it && itemId && itemId.length > 20) {
-      updateAdminItem(itemId, {
-        categoryId: it.categoryId,
-        name: it.name,
-        description: it.description,
-        price: newPrice,
-        imageUrl: it.imageUrl,
-        tags: it.tags,
-        isAvailable: it.available !== false,
-      }).catch((err) => console.warn('Failed to update price on backend:', err));
-    }
+    if (!it) return;
+    commitChange(
+      { items: updated },
+      () => updateAdminItem(itemId, toBackendItem(it)).then(() => undefined),
+      `Updated price to ${newPrice} ${activeCurrency}`,
+      `Couldn't update the price of "${it.name}"`
+    );
   };
 
   const handleToggleStock = (itemId: string) => {
     const updated = items.map((it) =>
       it.id === itemId ? { ...it, available: it.available === false ? true : false } : it
     );
-    setItems(updated);
-    persistChanges(updated);
     const toggled = updated.find((it) => it.id === itemId);
-    showToast(toggled?.available ? `"${toggled.name}" is now In Stock` : `"${toggled?.name}" marked as Sold Out`);
-
-    if (itemId && itemId.length > 20 && toggled) {
-      toggleAdminItemSoldOut(itemId, !toggled.available).catch(() => {});
-    }
+    if (!toggled) return;
+    commitChange(
+      { items: updated },
+      () => setSoldOutOnBackend(itemId, !toggled.available),
+      toggled.available ? `"${toggled.name}" is now In Stock` : `"${toggled.name}" marked as Sold Out`,
+      `Couldn't change stock for "${toggled.name}"`
+    );
   };
 
   const handleDeleteItem = (itemId: string) => {
-    const updated = items.filter((it) => it.id !== itemId);
-    setItems(updated);
-    persistChanges(updated);
-    showToast('Dish removed from menu');
-
-    if (itemId && itemId.length > 20) {
-      deleteAdminItem(itemId).catch((err) => console.warn('Failed to delete item on backend:', err));
-    }
+    const removed = items.find((it) => it.id === itemId);
+    commitChange(
+      { items: items.filter((it) => it.id !== itemId) },
+      () => deleteAdminItem(itemId).then(() => undefined),
+      'Dish removed from menu',
+      `Couldn't remove "${removed?.name || 'dish'}"`
+    );
   };
 
   const handleSaveItem = (savedItem: MenuItem) => {
-    let updated: MenuItem[];
     const exists = items.some((it) => it.id === savedItem.id);
     if (exists) {
-      updated = items.map((it) => (it.id === savedItem.id ? savedItem : it));
-      if (savedItem.id && savedItem.id.length > 20) {
-        updateAdminItem(savedItem.id, {
-          categoryId: savedItem.categoryId,
-          name: savedItem.name,
-          description: savedItem.description,
-          price: savedItem.price,
-          imageUrl: savedItem.imageUrl,
-          tags: savedItem.tags,
-          isAvailable: savedItem.available !== false,
-        }).catch((err) => console.warn('Failed to update item on backend:', err));
-      }
-    } else {
-      updated = [savedItem, ...items];
-      createAdminItem({
-        categoryId: savedItem.categoryId,
-        name: savedItem.name,
-        description: savedItem.description,
-        price: savedItem.price,
-        imageUrl: savedItem.imageUrl,
-        tags: savedItem.tags,
-      })
-        .then((created) => {
-          if (created?.id) {
-            setItems((prev) => prev.map((it) => (it.id === savedItem.id ? { ...it, id: created.id } : it)));
-          }
-        })
-        .catch((err) => console.warn('Failed to create item on backend:', err));
+      commitChange(
+        { items: items.map((it) => (it.id === savedItem.id ? savedItem : it)) },
+        () => updateAdminItem(savedItem.id, toBackendItem(savedItem)).then(() => undefined),
+        `Saved "${savedItem.name}"`,
+        `Couldn't save "${savedItem.name}"`
+      );
+      return;
     }
-    setItems(updated);
-    persistChanges(updated);
-    showToast(`Saved "${savedItem.name}"`);
+
+    const withNewItem = [savedItem, ...items];
+    commitChange(
+      { items: withNewItem },
+      async () => {
+        const created = await createAdminItem(toBackendItem(savedItem));
+        if (!created?.id) throw new Error('the server did not return the new dish');
+        // Swap the temporary client id for the database id so later edits reach the backend
+        return { items: withNewItem.map((it) => (it.id === savedItem.id ? { ...it, id: created.id } : it)) };
+      },
+      `Added "${savedItem.name}"`,
+      `Couldn't add "${savedItem.name}"`
+    );
   };
 
   const handleUpdateCategories = (newCategories: Category[]) => {
-    setCategories(newCategories);
-    persistChanges(items, newCategories);
-    showToast('Categories updated');
-
     const existingCatIds = new Set(categories.map((c) => c.id));
-    newCategories.forEach((nc, idx) => {
-      if (!existingCatIds.has(nc.id)) {
-        createAdminCategory(nc.name, idx)
-          .then((created) => {
-            if (created?.id) {
-              setCategories((prev) => prev.map((c) => (c.id === nc.id ? { ...c, id: created.id } : c)));
-            }
+    commitChange(
+      { categories: newCategories },
+      async () => {
+        const confirmed = await Promise.all(
+          newCategories.map(async (nc, idx) => {
+            if (existingCatIds.has(nc.id)) return nc;
+            const created = await createAdminCategory(nc.name, idx);
+            if (!created?.id) throw new Error(`the server did not return category "${nc.name}"`);
+            return { ...nc, id: created.id };
           })
-          .catch((err) => console.warn('Failed to create category on backend:', err));
-      }
-    });
+        );
+        return { categories: confirmed };
+      },
+      'Categories updated',
+      "Couldn't update categories"
+    );
   };
 
   const handleRenameCategory = (categoryId: string, newName: string) => {
-    const updated = categories.map((cat) =>
-      cat.id === categoryId ? { ...cat, name: newName } : cat
+    const category = categories.find((cat) => cat.id === categoryId);
+    commitChange(
+      { categories: categories.map((cat) => (cat.id === categoryId ? { ...cat, name: newName } : cat)) },
+      () => updateAdminCategory(categoryId, newName, category?.sortOrder ?? 0).then(() => undefined),
+      `Renamed category to "${newName}"`,
+      `Couldn't rename category "${category?.name || ''}"`
     );
-    setCategories(updated);
-    persistChanges(items, updated);
-    showToast(`Renamed category to "${newName}"`);
-
-    if (categoryId && categoryId.length > 20) {
-      updateAdminCategory(categoryId, newName).catch((err) =>
-        console.warn('Failed to update category on backend:', err)
-      );
-    }
   };
 
   const confirmDeleteCategory = () => {
     if (!categoryToDelete) return;
-    const catId = categoryToDelete.id;
-    const updated = categories.filter((c) => c.id !== catId);
-    setCategories(updated);
-    if (selectedCategory === catId) {
-      setSelectedCategory('all');
-    }
-    persistChanges(items, updated);
-    showToast(`Category "${categoryToDelete.name}" deleted`);
+    const deleting = categoryToDelete;
     setCategoryToDelete(null);
-
-    if (catId && catId.length > 20) {
-      deleteAdminCategory(catId).catch((err) =>
-        console.warn('Failed to delete category on backend:', err)
-      );
-    }
+    commitChange(
+      { categories: categories.filter((c) => c.id !== deleting.id) },
+      () => deleteAdminCategory(deleting.id).then(() => undefined),
+      `Category "${deleting.name}" deleted`,
+      `Couldn't delete category "${deleting.name}"`
+    ).then((ok) => {
+      if (ok && selectedCategory === deleting.id) {
+        setSelectedCategory('all');
+      }
+    });
   };
 
   const handleSaveSoldOut = (soldOutIds: Set<string>) => {
-    const updated = items.map((it) => ({
-      ...it,
-      available: !soldOutIds.has(it.id),
-    }));
-    setItems(updated);
-    persistChanges(updated);
-    showToast(`✅ Updated sold out items (${soldOutIds.size} sold out)`);
-
-    // Sync sold-out status with backend
-    items.forEach((it) => {
-      const isSoldOut = soldOutIds.has(it.id);
-      if (it.available === isSoldOut && it.id.length > 20) {
-        toggleAdminItemSoldOut(it.id, isSoldOut).catch(() => {});
-      }
-    });
+    const changed = items.filter((it) => (it.available === false) !== soldOutIds.has(it.id));
+    commitChange(
+      { items: items.map((it) => ({ ...it, available: !soldOutIds.has(it.id) })) },
+      async () => {
+        const results = await Promise.allSettled(
+          changed.map((it) => setSoldOutOnBackend(it.id, soldOutIds.has(it.id)))
+        );
+        const failed = results.filter((r) => r.status === 'rejected').length;
+        if (failed === 0) return;
+        if (failed === changed.length) throw new Error('the server rejected the change');
+        // Keep the dishes the backend accepted; the rest stay as they were
+        const accepted = new Set(changed.filter((_, i) => results[i].status === 'fulfilled').map((it) => it.id));
+        return {
+          items: items.map((it) => (accepted.has(it.id) ? { ...it, available: !soldOutIds.has(it.id) } : it)),
+          partialError: `${failed} of ${changed.length} dishes were not updated`,
+        };
+      },
+      `✅ Updated sold out items (${soldOutIds.size} sold out)`,
+      "Couldn't update sold out items"
+    );
   };
 
   const itemsInDeletingCat = categoryToDelete
@@ -1090,7 +1159,9 @@ export default function AdminDashboardPage() {
       {/* Staff Production Login Modal */}
       <AdminLoginModal
         isOpen={!adminToken}
+        notice={loginNotice}
         onSuccess={(token) => {
+          setLoginNotice(null);
           setAdminToken(token);
           showToast('Signed in successfully');
         }}

@@ -1,4 +1,4 @@
-const BASE_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:8080/api/v1';
+const BASE_URL = (import.meta.env.VITE_API_URL as string) || 'https://menu-restorant-1.onrender.com/api/v1';
 
 export class ApiError extends Error {
   status: number;
@@ -83,19 +83,10 @@ export async function loginStaff(email: string, password: string): Promise<{ tok
   return res;
 }
 
+// Returns the stored staff token. Staff must sign in explicitly: an automatic login
+// would bind the session to a fixed restaurant regardless of which admin page is open.
 export async function ensureStaffSession(): Promise<string | null> {
-  const token = getAdminToken();
-  if (token) return token;
-  // Automatically authenticate with seed staff credentials only in development mode
-  if (import.meta.env.DEV) {
-    try {
-      const res = await loginStaff('owner@azai.com', 'Admin123!');
-      return res.token;
-    } catch {
-      return null;
-    }
-  }
-  return null;
+  return getAdminToken();
 }
 
 

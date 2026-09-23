@@ -363,6 +363,25 @@ export default function ClassicItemModal({
                 🌱 Vegetarian
               </span>
             )}
+
+            {item.tags?.includes('vegan') && (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '5px 12px',
+                  borderRadius: '999px',
+                  backgroundColor: 'rgba(70, 160, 90, 0.15)',
+                  border: '1px solid rgba(70, 160, 90, 0.3)',
+                  color: '#70d080',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                }}
+              >
+                🌿 Vegan
+              </span>
+            )}
           </div>
 
           {/* Description Paragraph */}
