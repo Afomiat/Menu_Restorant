@@ -887,7 +887,8 @@
 .modern-arc-disc-img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  /* Fill the circle; rectangular dish photos are cropped instead of letterboxed */
+  object-fit: cover;
   border-radius: 50%;
   transition: transform 0.25s ease;
 }
