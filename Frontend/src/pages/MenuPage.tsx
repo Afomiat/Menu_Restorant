@@ -20,7 +20,12 @@ export default function MenuPage() {
     if (meta?.name) {
       document.title = `${meta.name} — Menu`;
     } else if (restaurantName) {
-      document.title = `${restaurantName} — Menu`;
+      // Until the menu loads, show the slug as a readable name ("little-china" -> "Little China")
+      const readable = restaurantName
+        .split(/[-_\s]+/)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(' ');
+      document.title = `${readable} — Menu`;
     } else {
       document.title = 'Azai Digital Menu';
     }

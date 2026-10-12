@@ -113,9 +113,17 @@
       // Dynamically set restaurant title from URL slug instantly without duplicate network requests
       (function() {
         var path = window.location.pathname.replace(/^\/+|\/+$/g, '');
-        if (path) {
-          var slug = path.split('/')[0].toLowerCase().trim();
-          var fallback = slug.charAt(0).toUpperCase() + slug.slice(1);
+        // QR links are /m/<slug> and some admin links are /admin/<slug>: skip those prefixes
+        var segments = path ? path.split('/') : [];
+        if (segments.length > 1 && (segments[0] === 'm' || segments[0] === 'admin')) {
+          segments.shift();
+        }
+        if (segments.length && segments[0]) {
+          var slug = decodeURIComponent(segments[0]).toLowerCase().trim();
+          // "little-china" -> "Little China"
+          var fallback = slug.split(/[-_\s]+/).map(function (w) {
+            return w.charAt(0).toUpperCase() + w.slice(1);
+          }).join(' ');
           var titleEl = document.getElementById('loader-title');
           if (titleEl) {
             titleEl.textContent = fallback;
