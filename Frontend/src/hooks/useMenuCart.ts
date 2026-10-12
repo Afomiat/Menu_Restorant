@@ -77,23 +77,17 @@ export default function useMenuCart({
     const queryTable = sp.get('table') || tableNumber || '';
     const queryToken = sp.get('token') || tableToken || '';
 
-    // If both queryTable and queryToken are present in URL, store as authoritative
+    // If both queryTable and queryToken are present in URL, store as authoritative.
+    // The token stays in the address bar on purpose: many Android QR scanners open the link in an
+    // in-app browser first, and "Open in browser" hands over the *current* URL. Stripping the token
+    // there left Chrome without it, so customers who had scanned were told to scan again.
+    // The token is printed on the table's QR card anyway, so hiding it adds no real protection.
     if (queryTable && queryToken) {
       const session = { tableNumber: queryTable, tableToken: queryToken };
       try {
         sessionStorage.setItem(tableSessionKey, JSON.stringify(session));
         localStorage.setItem(tableSessionKey, JSON.stringify(session));
       } catch {}
-
-      // Sanitize URL bar: strip the sensitive raw HMAC token so it cannot be leaked via bookmarks/sharing
-      if (typeof window !== 'undefined' && window.history?.replaceState) {
-        try {
-          const url = new URL(window.location.href);
-          url.searchParams.delete('token');
-          window.history.replaceState({}, document.title, url.pathname + url.search);
-        } catch {}
-      }
-
       return session;
     }
 

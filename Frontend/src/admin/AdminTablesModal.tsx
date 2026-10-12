@@ -54,8 +54,11 @@ export default function AdminTablesModal({
     setCopied(false);
     try {
       const res = await generateAdminTableQR(table.table_number);
-      const fullUrl = `${window.location.origin}${res.qr_url}`;
-      setQrUrl(fullUrl);
+      // The backend returns the table number unescaped (e.g. "table=Table 1"). Rebuild the query so
+      // spaces and symbols are percent-encoded: many Android scanners cut a link at the first space,
+      // which drops the token and leaves the customer unable to order.
+      const [path, query = ''] = res.qr_url.split('?');
+      setQrUrl(`${window.location.origin}${path}?${new URLSearchParams(query).toString()}`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to generate QR';
       console.warn(msg);
