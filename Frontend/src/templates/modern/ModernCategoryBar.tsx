@@ -134,11 +134,16 @@ export default function ModernCategoryBar({
   const R_mid = (R_outer + R_inner) / 2;
   const trackWidth = Math.min(W - (isMobile ? 16 : 32), isMobile ? 480 : 680);
   const middleIndex = (totalCategories - 1) / 2;
-  // In wheel mode keep the outermost slots clear of the edge arrows
-  const maxDx = Math.min(R_mid * 0.78, (trackWidth / 2) * 0.92) * (isWheel ? 0.8 : 1);
+  const btnWidth = Math.min(82, Math.floor(trackWidth / Math.min(totalCategories, visibleSlots)));
+  // Widest the arc may spread: keeps the outermost categories clear of the screen edges
+  // (and of the roll arrows in wheel mode)
+  const arcMaxDx = Math.min(R_mid * 0.78, (trackWidth / 2) * 0.92) * 0.8;
+  // With few categories, space them one category-width apart around the centre instead of
+  // stretching them across the whole arc (which pushed the outer ones against the screen edges)
+  const naturalSpacing = btnWidth + (isMobile ? 8 : 18);
+  const maxDx = isWheel ? arcMaxDx : Math.min(arcMaxDx, middleIndex * naturalSpacing);
   const halfSpan = isWheel ? (visibleSlots - 1) / 2 : middleIndex;
   const slotPx = halfSpan > 0 ? maxDx / halfSpan : maxDx;
-  const btnWidth = Math.min(82, Math.floor(trackWidth / Math.min(totalCategories, visibleSlots)));
   const curveAt = (dx: number) => Math.round(R_mid - Math.sqrt(Math.max(0, R_mid * R_mid - dx * dx)));
   const trackHeight = curveAt(maxDx) + (isMobile ? 104 : 118);
 
