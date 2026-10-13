@@ -15,19 +15,22 @@
         #initial-loader-overlay {
           position: fixed;
           top: 0; left: 0; right: 0; bottom: 0;
-          background-color: #121316;
+          /* Brand colours are filled in per restaurant by the script below */
+          background-color: var(--splash-bg, #121316);
           z-index: 99999;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          transition: opacity 0.5s ease-in-out, visibility 0.5s;
+          transition: opacity 0.5s ease-in-out, visibility 0.5s, background-color 0.3s ease;
         }
         .loader-content {
           position: relative;
           display: flex;
           align-items: center;
           justify-content: center;
+          /* Centre name + chef hat together (the hat hangs ~60px past the end of the name) */
+          transform: translateX(-30px);
         }
         
         .wind-text {
@@ -44,9 +47,12 @@
           font-style: italic;
           font-size: 64px;
           letter-spacing: 6px;
-          color: #c9a876;
+          color: var(--splash-accent, #c9a876);
           margin-left: 6px;
           line-height: 1.1;
+          /* One line, so the chef hat lands next to the name instead of at the screen edge */
+          white-space: nowrap;
+          transition: color 0.3s ease;
         }
 
         .aura-subtitle {
@@ -63,8 +69,9 @@
 
         .wind-hat {
           position: absolute;
-          top: -45px;
-          right: -35px;
+          /* Perch just past the end of the name, slightly raised */
+          top: -42px;
+          right: -76px;
           width: 90px;
           height: 90px;
           animation: windFlyHat 3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
@@ -80,6 +87,7 @@
           mask-image: radial-gradient(circle, black 40%, transparent 65%);
           -webkit-mask-image: radial-gradient(circle, black 40%, transparent 65%);
           filter: drop-shadow(0 0 10px rgba(201, 168, 118, 0.2));
+          filter: drop-shadow(0 0 10px color-mix(in srgb, var(--splash-accent, #c9a876) 25%, transparent));
         }
 
         @keyframes windFlyText {
@@ -110,25 +118,56 @@
     </div>
     
     <script>
-      // Dynamically set restaurant title from URL slug instantly without duplicate network requests
+      // Show the restaurant's own name and colours on the splash.
+      // Colours come from (1) the last visit, cached by the app, then (2) the menu request below,
+      // which the app reuses (window.__azaiMenuPrefetch) so the menu is not fetched twice.
       (function() {
+        var overlay = document.getElementById('initial-loader-overlay');
+        var titleEl = document.getElementById('loader-title');
         var path = window.location.pathname.replace(/^\/+|\/+$/g, '');
         // QR links are /m/<slug> and some admin links are /admin/<slug>: skip those prefixes
         var segments = path ? path.split('/') : [];
         if (segments.length > 1 && (segments[0] === 'm' || segments[0] === 'admin')) {
           segments.shift();
         }
-        if (segments.length && segments[0]) {
-          var slug = decodeURIComponent(segments[0]).toLowerCase().trim();
-          // "little-china" -> "Little China"
-          var fallback = slug.split(/[-_\s]+/).map(function (w) {
-            return w.charAt(0).toUpperCase() + w.slice(1);
-          }).join(' ');
-          var titleEl = document.getElementById('loader-title');
-          if (titleEl) {
-            titleEl.textContent = fallback;
-            document.title = fallback + ' — Menu';
-          }
+        if (!segments.length || !segments[0] || !titleEl) return;
+        var slug = decodeURIComponent(segments[0]).toLowerCase().trim();
+
+        function setName(name) {
+          titleEl.textContent = name;
+          document.title = name + ' — Menu';
+          // Shrink long names so name + chef hat fit on one line within the screen
+          var chars = Math.max(name.length, 4);
+          titleEl.style.fontSize = 'min(64px, ' + (56 / (chars * 0.62)).toFixed(2) + 'vw)';
+        }
+        function applyBrand(brand) {
+          if (!brand) return;
+          if (brand.name) setName(brand.name);
+          if (brand.primary) overlay.style.setProperty('--splash-accent', brand.primary);
+          if (brand.darkBar) overlay.style.setProperty('--splash-bg', brand.darkBar);
+        }
+
+        // "little-china" -> "Little China" until the real name is known
+        setName(slug.split(/[-_\s]+/).map(function (w) {
+          return w.charAt(0).toUpperCase() + w.slice(1);
+        }).join(' '));
+
+        try {
+          applyBrand(JSON.parse(localStorage.getItem('azai:brand:' + slug) || 'null'));
+        } catch (e) {}
+
+        var apiUrl = '%VITE_API_URL%';
+        if (window.fetch && apiUrl.charAt(0) !== '%') {
+          var request = fetch(apiUrl + '/menus/' + encodeURIComponent(slug))
+            .then(function (res) { return res.ok ? res.json() : null; })
+            .catch(function () { return null; });
+          window.__azaiMenuPrefetch = { slug: slug, promise: request };
+          request.then(function (body) {
+            var tenant = body && body.data && body.data.tenant;
+            if (!tenant) return;
+            var theme = tenant.theme_config || {};
+            applyBrand({ name: tenant.name, primary: theme.primaryColor || theme.primary, darkBar: theme.darkBar });
+          });
         }
       })();
 

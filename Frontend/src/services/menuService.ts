@@ -245,14 +245,44 @@ export function resetRestaurantMenu(slug: string): void {
   );
 }
 
+type MenuPrefetch = { slug: string; promise: Promise<BackendFullMenuResponse | null> };
+
+/**
+ * index.html starts the menu request while the splash screen plays (to colour it with the
+ * restaurant's brand). Reuse that response once instead of fetching the same menu again.
+ */
+async function takePrefetchedMenu(slug: string): Promise<BackendFullMenuResponse | null> {
+  const w = window as typeof window & { __azaiMenuPrefetch?: MenuPrefetch };
+  const prefetch = w.__azaiMenuPrefetch;
+  if (!prefetch || prefetch.slug !== slug) return null;
+  delete w.__azaiMenuPrefetch;
+  return prefetch.promise;
+}
+
+/** Remember the brand so the splash screen shows it instantly on the next visit. */
+function cacheBrandForSplash(slug: string, meta: RestaurantMeta): void {
+  try {
+    localStorage.setItem(
+      `azai:brand:${slug}`,
+      JSON.stringify({ name: meta.name, primary: meta.theme?.primary, darkBar: meta.theme?.darkBar })
+    );
+  } catch {
+    // Storage may be unavailable (private mode); the splash then waits for the live request
+  }
+}
+
 export async function fetchRestaurantMenu(slug: string): Promise<RestaurantMenu> {
   const normalizedSlug = slug.toLowerCase().trim();
 
   // 1. Try Live Backend API First (PostgreSQL + Supabase)
   try {
-    const res = await apiClient.get<BackendFullMenuResponse>(`/menus/${normalizedSlug}`);
+    const res =
+      (await takePrefetchedMenu(normalizedSlug)) ??
+      (await apiClient.get<BackendFullMenuResponse>(`/menus/${normalizedSlug}`));
     if (res && res.data && res.data.tenant) {
-      return mapBackendToRestaurantMenu(res.data);
+      const menu = mapBackendToRestaurantMenu(res.data);
+      cacheBrandForSplash(normalizedSlug, menu.meta);
+      return menu;
     }
   } catch (err: any) {
     if (err instanceof ApiError && err.status === 404) {
