@@ -759,41 +759,6 @@ export default function AdminDashboardPage() {
 
               {/* Right Action Tools */}
               <div className="admin-top-tools">
-                {/* Live Kitchen Dispatch Trigger Button */}
-                <button
-                  type="button"
-                  className="admin-sec-pill-btn"
-                  onClick={() => setActiveView('kitchen')}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '7px',
-                    backgroundColor: activeOrdersCount > 0 ? 'var(--admin-primary)' : '#ffffff',
-                    color: activeOrdersCount > 0 ? '#ffffff' : 'var(--admin-text-dark)',
-                    borderColor: activeOrdersCount > 0 ? 'var(--admin-primary)' : 'var(--admin-border)',
-                    fontWeight: 700,
-                    fontSize: '13px',
-                  }}
-                  title="Open Live Kitchen Dispatch"
-                >
-                  <ChefHat size={16} />
-                  <span>Kitchen</span>
-                  {activeOrdersCount > 0 && (
-                    <span
-                      style={{
-                        backgroundColor: '#ffffff',
-                        color: 'var(--admin-primary)',
-                        fontSize: '11px',
-                        fontWeight: 800,
-                        padding: '1px 6px',
-                        borderRadius: '999px',
-                      }}
-                    >
-                      {activeOrdersCount}
-                    </span>
-                  )}
-                </button>
-
                 {/* + Add Dish (GoMeal Style Primary Button) */}
                 <button
                   type="button"
