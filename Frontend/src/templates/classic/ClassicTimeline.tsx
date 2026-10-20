@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { MenuItem } from '../../types';
 import { formatPrice } from '../../utils/currency';
+import { sizedImageUrl } from '../../utils/imageUrl';
 
 interface ClassicTimelineProps {
   items: MenuItem[];
@@ -393,7 +394,7 @@ function MobileCard({ item, idx, currency = 'ETB', onItemSelect }: { item: MenuI
           }}
         >
           <img
-            src={item.imageUrl}
+            src={sizedImageUrl(item.imageUrl, 220)}
             alt={item.name}
             loading={idx === 0 ? 'eager' : 'lazy'}
             onError={(e) => {
@@ -754,7 +755,7 @@ function DesktopCard({ item, idx, currency = 'ETB', onItemSelect }: { item: Menu
         }}
       >
         <img
-          src={item.imageUrl}
+          src={sizedImageUrl(item.imageUrl, 220)}
           alt={item.name}
           loading={idx === 0 ? 'eager' : 'lazy'}
           onError={(e) => {

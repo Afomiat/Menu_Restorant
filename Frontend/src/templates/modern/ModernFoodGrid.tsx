@@ -2,6 +2,7 @@ import { Plus, Minus, Flame, Leaf } from 'lucide-react';
 import type { MenuItem } from '../../types';
 import { formatNumber } from '../../utils/currency';
 import { useFeatureGate } from '../../hooks/useFeatureGate';
+import { sizedImageUrl } from '../../utils/imageUrl';
 
 interface ModernFoodGridProps {
   items: MenuItem[];
@@ -64,7 +65,7 @@ export default function ModernFoodGrid({
             {/* Image Container */}
             <div className="modern-card-image-wrap">
               <img
-                src={item.imageUrl}
+                src={sizedImageUrl(item.imageUrl, 220)}
                 alt={item.name}
                 className="modern-card-image"
                 loading="lazy"

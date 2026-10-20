@@ -1,0 +1,8 @@
+# Built app files carry a content hash in their name, so every deploy gets new names:
+# phones can keep them for a year and still never run an old version.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Pictures and logos rarely change; phones keep them for a day.
+/images/*
+  Cache-Control: public, max-age=86400

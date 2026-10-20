@@ -316,7 +316,8 @@ export default function ModernMenuPage({
               src={heroImageSrc}
               alt={meta.name || 'Hero showcase'}
               className="modern-hero-cut-image"
-              loading="lazy"
+              // First thing on screen: load it right away instead of waiting for the lazy loader
+              fetchPriority="high"
               onError={(e) => {
                 (e.target as HTMLImageElement).src = '/images/burger_classic.jpg';
               }}

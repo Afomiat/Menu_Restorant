@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { RestaurantMeta, Category, MenuItem } from '../types';
-import { fetchRestaurantMenu, MenuServiceError } from '../services/menuService';
+import { fetchRestaurantMenu, forgetSavedMenu, getSavedMenu, MenuServiceError } from '../services/menuService';
 
 interface UseRestaurantMenuResult {
   meta: RestaurantMeta | null;
@@ -27,23 +27,36 @@ export default function useRestaurantMenu(restaurantName: string | undefined): U
       return;
     }
 
+    // On the first load, show the menu saved from this phone's last visit straight away;
+    // the live request below then replaces it with current prices and sold-out marks.
+    let showingSavedMenu = false;
     if (!isBackgroundUpdate) {
-      setLoading(true);
+      const saved = getSavedMenu(normalizedSlug);
+      if (saved) {
+        setMeta(saved.meta);
+        setCategories(saved.categories);
+        setItems(saved.items);
+        showingSavedMenu = true;
+      }
+      setLoading(!saved);
+      setError(null);
     }
-    setError(null);
 
     try {
       const data = await fetchRestaurantMenu(normalizedSlug);
       setMeta(data.meta);
       setCategories(data.categories);
       setItems(data.items);
+      setError(null);
       setLoading(false);
     } catch (err) {
       if (err instanceof MenuServiceError && err.code === 'not-found') {
+        forgetSavedMenu(normalizedSlug);
         setError('not-found');
-      } else {
+      } else if (!isBackgroundUpdate && !showingSavedMenu) {
         setError('network');
       }
+      // Otherwise a refresh failed on a weak signal: keep the menu that is already on screen
       setLoading(false);
     }
   }, [normalizedSlug]);

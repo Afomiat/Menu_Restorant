@@ -271,6 +271,37 @@ function cacheBrandForSplash(slug: string, meta: RestaurantMeta): void {
   }
 }
 
+const SAVED_MENU_PREFIX = 'azai:menu:';
+
+/**
+ * The last menu this phone loaded from the backend. Showing it straight away makes repeat visits
+ * open instantly on a slow connection while the live menu loads in the background.
+ */
+export function getSavedMenu(slug: string): RestaurantMenu | null {
+  try {
+    const raw = localStorage.getItem(`${SAVED_MENU_PREFIX}${slug.toLowerCase().trim()}`);
+    return raw ? (JSON.parse(raw) as RestaurantMenu) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveMenuForNextVisit(slug: string, menu: RestaurantMenu): void {
+  try {
+    localStorage.setItem(`${SAVED_MENU_PREFIX}${slug}`, JSON.stringify(menu));
+  } catch {
+    // Storage may be full or unavailable (private mode); the next visit then just waits for the backend
+  }
+}
+
+export function forgetSavedMenu(slug: string): void {
+  try {
+    localStorage.removeItem(`${SAVED_MENU_PREFIX}${slug.toLowerCase().trim()}`);
+  } catch {
+    // Nothing saved to remove
+  }
+}
+
 export async function fetchRestaurantMenu(slug: string): Promise<RestaurantMenu> {
   const normalizedSlug = slug.toLowerCase().trim();
 
@@ -282,6 +313,7 @@ export async function fetchRestaurantMenu(slug: string): Promise<RestaurantMenu>
     if (res && res.data && res.data.tenant) {
       const menu = mapBackendToRestaurantMenu(res.data);
       cacheBrandForSplash(normalizedSlug, menu.meta);
+      saveMenuForNextVisit(normalizedSlug, menu);
       return menu;
     }
   } catch (err: any) {

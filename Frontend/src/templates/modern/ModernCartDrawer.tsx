@@ -2,6 +2,7 @@ import { X, Plus, Minus, Trash2, CheckCircle2, ChefHat, ShoppingBag, RotateCcw }
 import type { CartItem } from '../../types';
 import { formatPrice } from '../../utils/currency';
 import { useCartDrawerLogic } from '../../hooks/useCartDrawerLogic';
+import { sizedImageUrl } from '../../utils/imageUrl';
 
 interface ModernCartDrawerProps {
   cart: CartItem[];
@@ -135,7 +136,7 @@ export default function ModernCartDrawer({
                   return (
                     <div key={`${cartItem.item.id}-${cartItem.variant}-${idx}`} className="modern-cart-item-card">
                       <img
-                        src={cartItem.item.imageUrl}
+                        src={sizedImageUrl(cartItem.item.imageUrl, 64)}
                         alt={cartItem.item.name}
                         className="modern-cart-item-img"
                       />
@@ -370,7 +371,7 @@ export default function ModernCartDrawer({
                         }}
                       >
                         <img
-                          src={order.item.imageUrl}
+                          src={sizedImageUrl(order.item.imageUrl, 64)}
                           alt={order.item.name}
                           className="modern-cart-item-img"
                         />

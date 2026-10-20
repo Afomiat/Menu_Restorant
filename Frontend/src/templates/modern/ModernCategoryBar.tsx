@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Category, MenuItem } from '../../types';
+import { sizedImageUrl } from '../../utils/imageUrl';
 
 interface ModernCategoryBarProps {
   categories: Category[];
@@ -276,7 +277,7 @@ export default function ModernCategoryBar({
               {/* Pure White Circular Disc */}
               <div className="modern-arc-disc">
                 <img
-                  src={iconSrc}
+                  src={sizedImageUrl(iconSrc, 90)}
                   alt={cat.name}
                   className="modern-arc-disc-img"
                   loading="lazy"
