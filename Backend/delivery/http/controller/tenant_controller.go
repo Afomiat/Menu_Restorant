@@ -7,14 +7,16 @@ import (
 
 	"menu-backend/delivery/http/middleware"
 	"menu-backend/domain"
+	"menu-backend/internal/ws"
 )
 
 type TenantController struct {
 	tenantUsecase domain.TenantUsecase
+	hub           *ws.Hub
 }
 
-func NewTenantController(tenantUsecase domain.TenantUsecase) *TenantController {
-	return &TenantController{tenantUsecase: tenantUsecase}
+func NewTenantController(tenantUsecase domain.TenantUsecase, hub *ws.Hub) *TenantController {
+	return &TenantController{tenantUsecase: tenantUsecase, hub: hub}
 }
 
 // GetTenantProfile handles GET /api/v1/admin/tenant
@@ -62,6 +64,11 @@ func (ctrl *TenantController) UpdateTheme(c *gin.Context) {
 		return
 	}
 
+	// Open menu pages pick up the new branding without reloading
+	if ctrl.hub != nil {
+		ctrl.hub.BroadcastMenuUpdate(tenantID)
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "restaurant theme updated successfully",
 		"data":    tenant,
@@ -96,6 +103,11 @@ func (ctrl *TenantController) UpdatePlan(c *gin.Context) {
 	if err := ctrl.tenantUsecase.UpdatePlan(c.Request.Context(), tenantID, planTier); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update plan"})
 		return
+	}
+
+	// Open menu pages switch ordering on or off without reloading
+	if ctrl.hub != nil {
+		ctrl.hub.BroadcastMenuUpdate(tenantID)
 	}
 
 	c.JSON(http.StatusOK, gin.H{

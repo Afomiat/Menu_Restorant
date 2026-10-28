@@ -12,7 +12,12 @@ type TenantMessage struct {
 	TenantID uuid.UUID   `json:"tenant_id"`
 	Event    string      `json:"event"`
 	Data     interface{} `json:"data"`
+	// public messages also reach customers' menu pages; all others go to staff screens only
+	public bool
 }
+
+// maxGuestsPerRestaurant caps how many customer menu pages one restaurant room holds
+const maxGuestsPerRestaurant = 1000
 
 type Hub struct {
 	// Rooms separated by tenantID -> set of connected client tablets
@@ -40,9 +45,16 @@ func (h *Hub) Run() {
 			if _, exists := h.rooms[client.tenantID]; !exists {
 				h.rooms[client.tenantID] = make(map[*Client]bool)
 			}
+			if client.guest && countGuests(h.rooms[client.tenantID]) >= maxGuestsPerRestaurant {
+				h.mu.Unlock()
+				close(client.send) // the write pump closes the connection
+				continue
+			}
 			h.rooms[client.tenantID][client] = true
 			h.mu.Unlock()
-			log.Printf("🔌 Kitchen tablet connected for restaurant %s (active in room: %d)", client.tenantID, len(h.rooms[client.tenantID]))
+			if !client.guest {
+				log.Printf("🔌 Kitchen tablet connected for restaurant %s", client.tenantID)
+			}
 
 		case client := <-h.unregister:
 			h.mu.Lock()
@@ -56,7 +68,9 @@ func (h *Hub) Run() {
 				}
 			}
 			h.mu.Unlock()
-			log.Printf("🔌 Kitchen tablet disconnected for restaurant %s", client.tenantID)
+			if !client.guest {
+				log.Printf("🔌 Kitchen tablet disconnected for restaurant %s", client.tenantID)
+			}
 
 		case msg := <-h.broadcast:
 			h.mu.Lock()
@@ -65,6 +79,9 @@ func (h *Hub) Run() {
 				payload, err := json.Marshal(msg)
 				if err == nil {
 					for client := range clients {
+						if client.guest && !msg.public {
+							continue
+						}
 						select {
 						case client.send <- payload:
 						default:
@@ -89,4 +106,24 @@ func (h *Hub) BroadcastToTenant(tenantID uuid.UUID, event string, data interface
 		Event:    event,
 		Data:     data,
 	}
+}
+
+// BroadcastMenuUpdate tells every open screen of the restaurant, customers' menu pages included,
+// that its menu changed (prices, dishes, categories, sold-out marks, branding) so they reload it
+func (h *Hub) BroadcastMenuUpdate(tenantID uuid.UUID) {
+	h.broadcast <- TenantMessage{
+		TenantID: tenantID,
+		Event:    "menu:updated",
+		public:   true,
+	}
+}
+
+func countGuests(clients map[*Client]bool) int {
+	count := 0
+	for client := range clients {
+		if client.guest {
+			count++
+		}
+	}
+	return count
 }

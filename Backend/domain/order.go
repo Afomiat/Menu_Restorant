@@ -94,5 +94,6 @@ type OrderUsecase interface {
 	GetActiveKitchenOrders(ctx context.Context, tenantID uuid.UUID) ([]Order, error)
 	BulkCancelTableOrders(ctx context.Context, tenantID uuid.UUID, tableNumber string) error
 	BulkCancelAllActive(ctx context.Context, tenantID uuid.UUID) error
-
+	// ForgetMenuItem drops the remembered price and stock of an item after staff change it
+	ForgetMenuItem(itemID uuid.UUID)
 }

@@ -12,14 +12,27 @@ import (
 )
 
 type MenuController struct {
-	menuUsecase domain.MenuUsecase
+	menuUsecase  domain.MenuUsecase
+	orderUsecase domain.OrderUsecase
 	hub          *ws.Hub
 }
 
-func NewMenuController(menuUsecase domain.MenuUsecase, hub *ws.Hub) *MenuController {
+func NewMenuController(menuUsecase domain.MenuUsecase, orderUsecase domain.OrderUsecase, hub *ws.Hub) *MenuController {
 	return &MenuController{
-		menuUsecase: menuUsecase,
+		menuUsecase:  menuUsecase,
+		orderUsecase: orderUsecase,
 		hub:          hub,
+	}
+}
+
+// menuChanged pushes a menu change to every open menu page of the restaurant. When an item
+// changed, new orders also stop using the price and stock remembered for it and read them fresh.
+func (ctrl *MenuController) menuChanged(tenantID, itemID uuid.UUID) {
+	if itemID != uuid.Nil && ctrl.orderUsecase != nil {
+		ctrl.orderUsecase.ForgetMenuItem(itemID)
+	}
+	if ctrl.hub != nil {
+		ctrl.hub.BroadcastMenuUpdate(tenantID)
 	}
 }
 
@@ -79,6 +92,7 @@ func (ctrl *MenuController) ToggleSoldOut(c *gin.Context) {
 			"is_sold_out": req.IsSoldOut,
 		})
 	}
+	ctrl.menuChanged(tenantID, itemID)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":     "item availability updated successfully",
@@ -135,6 +149,8 @@ func (ctrl *MenuController) CreateCategory(c *gin.Context) {
 		return
 	}
 
+	ctrl.menuChanged(tenantID, uuid.Nil)
+
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "category created successfully",
 		"data":    cat,
@@ -185,6 +201,8 @@ func (ctrl *MenuController) UpdateCategory(c *gin.Context) {
 		return
 	}
 
+	ctrl.menuChanged(tenantID, uuid.Nil)
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "category updated successfully",
 		"data":    cat,
@@ -210,6 +228,8 @@ func (ctrl *MenuController) DeleteCategory(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	ctrl.menuChanged(tenantID, uuid.Nil)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "category deleted successfully",
@@ -253,6 +273,8 @@ func (ctrl *MenuController) CreateItem(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	ctrl.menuChanged(tenantID, item.ID)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "item created successfully",
@@ -307,6 +329,8 @@ func (ctrl *MenuController) UpdateItem(c *gin.Context) {
 		return
 	}
 
+	ctrl.menuChanged(tenantID, itemID)
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "item updated successfully",
 		"data":    item,
@@ -332,6 +356,8 @@ func (ctrl *MenuController) DeleteItem(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	ctrl.menuChanged(tenantID, itemID)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "item deleted successfully",

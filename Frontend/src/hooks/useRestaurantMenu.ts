@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { RestaurantMeta, Category, MenuItem } from '../types';
 import { fetchRestaurantMenu, forgetSavedMenu, getSavedMenu, MenuServiceError } from '../services/menuService';
+import { useLiveMenuUpdates } from './useLiveMenuUpdates';
 
 interface UseRestaurantMenuResult {
   meta: RestaurantMeta | null;
@@ -104,6 +105,9 @@ export default function useRestaurantMenu(restaurantName: string | undefined): U
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [normalizedSlug, loadMenu]);
+
+  // 4. Live updates pushed by the backend the moment staff change the menu (live menus only)
+  useLiveMenuUpdates(meta?.slug ?? null, () => loadMenu(true));
 
   return { meta, categories, items, loading, error, plan: meta?.plan || 'standard' };
 }

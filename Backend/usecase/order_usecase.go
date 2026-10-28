@@ -282,6 +282,14 @@ func (u *orderUsecase) BulkCancelTableOrders(ctx context.Context, tenantID uuid.
 	return u.orderRepo.BulkCancelTableOrders(ctx, tenantID, tableNumber)
 }
 
+// ForgetMenuItem drops the remembered copy of a menu item so the next order reads its current
+// price and stock from the database instead of one up to two minutes old.
+func (u *orderUsecase) ForgetMenuItem(itemID uuid.UUID) {
+	u.cacheMu.Lock()
+	delete(u.itemCache, itemID)
+	u.cacheMu.Unlock()
+}
+
 func (u *orderUsecase) BulkCancelAllActive(ctx context.Context, tenantID uuid.UUID) error {
 	return u.orderRepo.BulkCancelAllActive(ctx, tenantID)
 }

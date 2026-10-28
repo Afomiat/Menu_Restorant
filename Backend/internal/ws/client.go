@@ -19,6 +19,8 @@ type Client struct {
 	conn     *websocket.Conn
 	tenantID uuid.UUID
 	send     chan []byte
+	// guest clients are customers' menu pages: they receive public events only
+	guest bool
 }
 
 func (c *Client) ReadPump() {

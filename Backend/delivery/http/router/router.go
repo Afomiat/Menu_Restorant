@@ -71,6 +71,10 @@ func SetupRouter(deps RouterDependencies) *gin.Engine {
 	// Real-time Kitchen Display System WebSocket endpoint (STRICTLY VIP PLAN ONLY)
 	if deps.Hub != nil {
 		r.GET("/ws/kitchen", ws.ServeWS(deps.Hub, deps.TenantUsecase, deps.Config.JWTSecret))
+
+		// Live menu updates for customers' menu pages (all plans, no login, receives public events only)
+		menuSocketLimiter := middleware.NewRateLimiter(30, 1*time.Minute) // 30 connections per min per IP
+		r.GET("/ws/menu/:slug", menuSocketLimiter.Limit(), ws.ServeMenuWS(deps.Hub, deps.TenantUsecase))
 	}
 
 	// Initialize In-Memory Rate Limiters (Automatic Stale Memory Eviction)
@@ -79,10 +83,10 @@ func SetupRouter(deps RouterDependencies) *gin.Engine {
 	uploadLimiter := middleware.NewRateLimiter(30, 1*time.Minute) // 30 signature requests per min
 
 	// Initialize Controllers
-	menuCtrl := controller.NewMenuController(deps.MenuUsecase, deps.Hub)
+	menuCtrl := controller.NewMenuController(deps.MenuUsecase, deps.OrderUsecase, deps.Hub)
 	tableCtrl := controller.NewTableController(deps.TableUsecase, deps.TenantUsecase)
 	orderCtrl := controller.NewOrderController(deps.OrderUsecase, deps.Hub)
-	tenantCtrl := controller.NewTenantController(deps.TenantUsecase)
+	tenantCtrl := controller.NewTenantController(deps.TenantUsecase, deps.Hub)
 	authCtrl := controller.NewAuthController(deps.Queries, deps.Config.JWTSecret)
 	uploadCtrl := controller.NewUploadController(deps.UploadUsecase)
 

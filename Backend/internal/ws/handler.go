@@ -48,16 +48,44 @@ func ServeWS(hub *Hub, tenantUsecase domain.TenantUsecase, jwtSecret string) gin
 			return
 		}
 
-		client := &Client{
+		startClient(&Client{
 			hub:      hub,
 			conn:     conn,
 			tenantID: claims.TenantID,
 			send:     make(chan []byte, 256),
+		})
+	}
+}
+
+// ServeMenuWS connects a customer's menu page to its restaurant's room so it hears about menu
+// changes without reloading. It needs no login (both Standard and VIP menus use it) and the
+// connection only ever receives public events such as "menu:updated", never orders.
+func ServeMenuWS(hub *Hub, tenantUsecase domain.TenantUsecase) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tenant, err := tenantUsecase.GetTenantBySlug(c.Request.Context(), c.Param("slug"))
+		if err != nil || tenant == nil || !tenant.IsActive {
+			c.JSON(http.StatusNotFound, gin.H{"error": "restaurant not found"})
+			return
 		}
 
-		client.hub.register <- client
+		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+		if err != nil {
+			return
+		}
 
-		go client.WritePump()
-		go client.ReadPump()
+		startClient(&Client{
+			hub:      hub,
+			conn:     conn,
+			tenantID: tenant.ID,
+			send:     make(chan []byte, 16),
+			guest:    true,
+		})
 	}
+}
+
+func startClient(client *Client) {
+	client.hub.register <- client
+
+	go client.WritePump()
+	go client.ReadPump()
 }
