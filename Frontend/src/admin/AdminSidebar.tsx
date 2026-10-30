@@ -1,5 +1,13 @@
-import { UtensilsCrossed, Sparkles, ChefHat, X, QrCode, LogOut, Settings } from 'lucide-react';
+import { UtensilsCrossed, Sparkles, ChefHat, X, QrCode, LogOut, Settings, LayoutGrid, Rows3 } from 'lucide-react';
 import type { RestaurantMeta } from '../types';
+
+type MenuDesign = NonNullable<RestaurantMeta['template']>;
+
+// The two customer menu designs a restaurant can switch between
+const MENU_DESIGNS: { id: MenuDesign; label: string; Icon: typeof LayoutGrid }[] = [
+  { id: 'modern', label: 'Modern', Icon: LayoutGrid },
+  { id: 'classic', label: 'Classic', Icon: Rows3 },
+];
 
 interface AdminSidebarProps {
   meta: RestaurantMeta;
@@ -11,6 +19,7 @@ interface AdminSidebarProps {
   onOpenTables?: () => void;
   onOpenSettings?: () => void;
   onLogout?: () => void;
+  onChangeDesign?: (design: MenuDesign) => void;
   isMobileOpen?: boolean;
   onCloseMobile?: () => void;
 }
@@ -25,10 +34,13 @@ export default function AdminSidebar({
   onOpenTables,
   onOpenSettings,
   onLogout,
+  onChangeDesign,
   isMobileOpen = false,
   onCloseMobile,
 }: AdminSidebarProps) {
   const displayName = meta.name || 'Azai';
+  // Same rule the customer menu uses: anything but 'modern' shows the classic design
+  const currentDesign: MenuDesign = meta.template === 'modern' ? 'modern' : 'classic';
 
   const handleMenuClick = () => {
     if (onSelectView) {
@@ -201,6 +213,26 @@ export default function AdminSidebar({
           <div className="admin-sidebar-banner-desc">
             Managing <strong>/{slug}</strong> menu in real-time. Changes are automatically saved.
           </div>
+          {onChangeDesign && (
+            <>
+              <div className="admin-design-switch-label">Menu design</div>
+              <div className="admin-design-switch" role="radiogroup" aria-label="Menu design">
+                {MENU_DESIGNS.map(({ id, label, Icon }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="radio"
+                    aria-checked={currentDesign === id}
+                    className={`admin-design-option ${currentDesign === id ? 'active' : ''}`}
+                    onClick={() => onChangeDesign(id)}
+                  >
+                    <Icon size={14} />
+                    <span>{label}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
           <a
             href={`/${slug}`}
             target="_blank"

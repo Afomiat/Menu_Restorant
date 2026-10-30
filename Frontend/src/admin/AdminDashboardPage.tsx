@@ -367,7 +367,7 @@ export default function AdminDashboardPage() {
     saveRestaurantMenu(slug, currentMenu);
   };
 
-  const handleSaveSettings = async (updatedMeta: RestaurantMeta) => {
+  const handleSaveSettings = async (updatedMeta: RestaurantMeta, successMessage = '✅ Restaurant settings saved') => {
     const previousMeta = meta;
     setMeta(updatedMeta);
 
@@ -396,7 +396,17 @@ export default function AdminDashboardPage() {
     }
 
     persistChanges(items, categories, updatedMeta);
-    showToast('✅ Restaurant settings saved');
+    showToast(successMessage);
+  };
+
+  // Saves straight away: open customer menus switch design on the menu update that follows
+  const handleChangeDesign = (template: 'classic' | 'modern') => {
+    const currentDesign = meta?.template === 'modern' ? 'modern' : 'classic';
+    if (!meta || currentDesign === template) return;
+    handleSaveSettings(
+      { ...meta, template },
+      `✅ Menu design switched to ${template === 'modern' ? 'Modern' : 'Classic'}`
+    );
   };
 
   const handleResetToDefault = () => {
@@ -672,6 +682,7 @@ export default function AdminDashboardPage() {
         onOpenTables={() => setIsTablesModalOpen(true)}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
         onLogout={handleLogout}
+        onChangeDesign={handleChangeDesign}
         isMobileOpen={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
