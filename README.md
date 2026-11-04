@@ -33,7 +33,7 @@ Staff logins, all with password `password123`:
 
 | Login | Role |
 |---|---|
-| `superadmin@azai.local` | Azai team (all restaurants, plans) |
+| `superadmin@azai.local` | Azai team: only the `/api/v1/superadmin` endpoints (plans); not linked to a restaurant, so it cannot open a restaurant dashboard |
 | `owner@basic.azai.local` | Owner of Demo Basic Cafe |
 | `owner@plus.azai.local`, `kitchen@plus.azai.local`, `waiter@plus.azai.local` | Demo Plus Bistro |
 | `owner@pro.azai.local`, `kitchen@pro.azai.local`, `waiter@pro.azai.local` | Demo Pro Restaurant |

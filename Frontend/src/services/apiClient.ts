@@ -69,11 +69,20 @@ export function getStoredStaff(): StaffUser | null {
   }
 }
 
+const NO_TENANT_ID = '00000000-0000-0000-0000-000000000000';
+
+export const NO_RESTAURANT_LOGIN_MESSAGE =
+  'This account is not linked to a restaurant, so it cannot open a restaurant dashboard. Sign in with a staff account of this restaurant.';
+
 export async function loginStaff(email: string, password: string): Promise<{ token: string; user: StaffUser }> {
   const res = await apiClient.post<{ token: string; user: StaffUser }>('/auth/login', {
     email,
     password,
   });
+  // Azai team accounts have no restaurant; the dashboard would reject every request and ask to sign in again
+  if (res?.user && (!res.user.tenant_id || res.user.tenant_id === NO_TENANT_ID)) {
+    throw new Error(NO_RESTAURANT_LOGIN_MESSAGE);
+  }
   if (res?.token) {
     setAdminToken(res.token);
     if (res.user) {
