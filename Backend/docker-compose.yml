@@ -1,0 +1,21 @@
+# Local development database only (make db-up). Production uses Supabase.
+name: azai-menu
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: azai
+      POSTGRES_PASSWORD: azai
+      POSTGRES_DB: azai
+    ports:
+      - "5433:5432"
+    volumes:
+      - azai-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U azai -d azai"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  azai-db:

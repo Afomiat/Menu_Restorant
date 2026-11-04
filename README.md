@@ -1,4 +1,49 @@
-# React + TypeScript + Vite
+# Azai Menu
+
+## Local development
+
+Runs everything on your machine with a local database in Docker, so Supabase and Render are not touched.
+
+1. Create `Backend/.env.local` (not committed; it overrides `Backend/.env`):
+
+   ```
+   DB_URL=postgres://azai:azai@localhost:5433/azai?sslmode=disable
+   ENVIRONMENT=development
+   FRONTEND_URL=http://localhost:5173
+   ```
+
+2. Create `Frontend/.env.local` (not committed; it overrides `Frontend/.env`):
+
+   ```
+   VITE_API_URL=http://localhost:8080/api/v1
+   VITE_WS_URL=ws://localhost:8080/ws/kitchen
+   ```
+
+3. In `Backend/`, build the database with sample data, then start the API:
+
+   ```
+   make db-reset
+   make run
+   ```
+
+4. In `Frontend/`: `npm run dev`, then open http://localhost:5173
+
+Sample restaurants, one per plan: `demo-basic`, `demo-plus`, `demo-pro` (admin at `/<slug>/admin`).
+Staff logins, all with password `password123`:
+
+| Login | Role |
+|---|---|
+| `superadmin@azai.local` | Azai team (all restaurants, plans) |
+| `owner@basic.azai.local` | Owner of Demo Basic Cafe |
+| `owner@plus.azai.local`, `kitchen@plus.azai.local`, `waiter@plus.azai.local` | Demo Plus Bistro |
+| `owner@pro.azai.local`, `kitchen@pro.azai.local`, `waiter@pro.azai.local` | Demo Pro Restaurant |
+
+Other commands in `Backend/`: `make db-up` / `make db-down` start and stop the database (data is kept),
+`make seed` reloads the sample data, `make migrate-up` applies new migrations.
+
+Remove the two `.env.local` files to go back to Supabase and Render.
+
+---
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
