@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"errors"
 
 	"github.com/google/uuid"
 
@@ -28,8 +27,8 @@ func (u *tenantUsecase) GetTenantByID(ctx context.Context, id uuid.UUID) (*domai
 }
 
 func (u *tenantUsecase) UpdatePlan(ctx context.Context, id uuid.UUID, plan domain.PlanTier) error {
-	if plan != domain.PlanStandard && plan != domain.PlanVIP {
-		return errors.New("invalid plan tier; allowed: standard, vip")
+	if !plan.IsValid() {
+		return domain.ErrInvalidPlan
 	}
 	return u.tenantRepo.UpdatePlan(ctx, id, plan)
 }
@@ -38,12 +37,12 @@ func (u *tenantUsecase) UpdateTheme(ctx context.Context, id uuid.UUID, themeConf
 	return u.tenantRepo.UpdateTheme(ctx, id, themeConfig)
 }
 
-func (u *tenantUsecase) VerifyVIPAccess(ctx context.Context, tenantID uuid.UUID) (bool, error) {
+func (u *tenantUsecase) VerifyPlanAccess(ctx context.Context, tenantID uuid.UUID, min domain.PlanTier) (bool, error) {
 	tenant, err := u.tenantRepo.GetByID(ctx, tenantID)
 	if err != nil {
 		return false, err
 	}
-	return tenant.HasVIPFeatures(), nil
+	return tenant.HasPlan(min), nil
 }
 
 func (u *tenantUsecase) ListActive(ctx context.Context) ([]domain.Tenant, error) {

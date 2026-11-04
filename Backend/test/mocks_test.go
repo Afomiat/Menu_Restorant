@@ -156,7 +156,7 @@ func (m *mockOrderRepo) BulkCancelAllActive(_ context.Context, _ uuid.UUID) erro
 
 type mockTenantUsecase struct {
 	tenant *domain.Tenant
-	hasVIP bool
+	hasPlan bool
 	err    error
 }
 
@@ -172,8 +172,8 @@ func (m *mockTenantUsecase) UpdatePlan(ctx context.Context, id uuid.UUID, plan d
 func (m *mockTenantUsecase) UpdateTheme(ctx context.Context, id uuid.UUID, themeConfig map[string]interface{}) (*domain.Tenant, error) {
 	return m.tenant, m.err
 }
-func (m *mockTenantUsecase) VerifyVIPAccess(ctx context.Context, tenantID uuid.UUID) (bool, error) {
-	return m.hasVIP, m.err
+func (m *mockTenantUsecase) VerifyPlanAccess(ctx context.Context, tenantID uuid.UUID, min domain.PlanTier) (bool, error) {
+	return m.hasPlan, m.err
 }
 func (m *mockTenantUsecase) ListActive(ctx context.Context) ([]domain.Tenant, error) {
 	if m.tenant != nil {

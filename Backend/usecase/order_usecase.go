@@ -91,8 +91,8 @@ func (u *orderUsecase) PlaceOrder(ctx context.Context, input domain.CreateOrderI
 		u.cacheMu.Unlock()
 	}
 
-	if !tenant.HasVIPFeatures() {
-		return nil, errors.New("digital ordering is disabled; this restaurant requires a VIP plan upgrade")
+	if !tenant.HasPlan(domain.PlanPlus) {
+		return nil, errors.New("digital ordering is disabled; this restaurant requires a Plus plan upgrade")
 	}
 
 	// 2. SECURITY CHECK: Verify cryptographic HMAC signature for table orders

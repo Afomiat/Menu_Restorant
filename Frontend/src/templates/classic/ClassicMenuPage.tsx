@@ -278,7 +278,7 @@ export default function ClassicMenuPage({
         }}
       />
 
-      {/* Bottom Cart Drawer (VIP Only) */}
+      {/* Bottom Cart Drawer (Plus and Pro) */}
       {can('ordering') && (
         <ClassicCartDrawer
           cart={cart}

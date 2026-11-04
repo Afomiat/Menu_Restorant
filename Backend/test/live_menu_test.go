@@ -86,7 +86,7 @@ func newLiveMenuEnv(t *testing.T) *liveMenuEnv {
 		ID:       uuid.New(),
 		Slug:     "live-bistro",
 		Name:     "Live Bistro",
-		Plan:     domain.PlanVIP,
+		Plan:     domain.PlanPlus,
 		IsActive: true,
 	}
 	category := domain.Category{ID: uuid.New(), TenantID: tenant.ID, Name: "Burgers", IsActive: true}
@@ -256,7 +256,7 @@ func TestLiveMenu_EveryStaffChangeReachesOpenMenus(t *testing.T) {
 		{
 			name: "plan changed", role: "super_admin", method: http.MethodPatch,
 			path: func(e *liveMenuEnv) string { return "/api/v1/admin/tenant/plan" },
-			body: func(e *liveMenuEnv) interface{} { return map[string]interface{}{"plan": "standard"} },
+			body: func(e *liveMenuEnv) interface{} { return map[string]interface{}{"plan": "basic"} },
 		},
 	}
 

@@ -51,10 +51,13 @@ export interface RestaurantMeta {
   logoUrl?: string;
   /** Free-text opening hours, e.g. "Daily 11:00 AM – 10:00 PM". */
   openingHours?: string;
-  plan?: 'standard' | 'vip';
+  plan?: PlanTier;
   /** Backend tenant slug. Set only for restaurants loaded from the live API. */
   slug?: string;
 }
+
+/** Plan tiers from lowest to highest: each plan includes everything below it. */
+export type PlanTier = 'basic' | 'plus' | 'pro';
 
 export type OrderStatus =
   | 'not_started'
@@ -81,14 +84,14 @@ export interface RestaurantMenu {
   meta: RestaurantMeta;
   categories: Category[];
   items: MenuItem[];
-  plan?: 'standard' | 'vip';
+  plan?: PlanTier;
 }
 
 export interface BackendTenant {
   id: string;
   slug: string;
   name: string;
-  plan: 'standard' | 'vip';
+  plan: PlanTier;
   currency: string;
   theme_config: Record<string, any>;
   is_active: boolean;

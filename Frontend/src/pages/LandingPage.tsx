@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchActiveRestaurants, type ActiveTenantInfo } from '../services/menuService';
+import { PLAN_INFO } from '../utils/plan';
 
 export default function LandingPage() {
   const [activeRestaurants, setActiveRestaurants] = useState<ActiveTenantInfo[]>([]);
@@ -33,7 +34,7 @@ export default function LandingPage() {
             id: '11e9c86e-58ee-48ed-a251-b76211f8ea24',
             slug: 'azai-burger',
             name: 'Azai Burger & Bistro',
-            plan: 'vip',
+            plan: 'plus',
             currency: 'ETB',
             is_active: true,
           },
@@ -270,14 +271,14 @@ export default function LandingPage() {
                         fontSize: '11px',
                         padding: '2px 8px',
                         borderRadius: '999px',
-                        backgroundColor: tenant.plan === 'vip' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.2)',
-                        color: tenant.plan === 'vip' ? '#f87171' : '#60a5fa',
+                        backgroundColor: `${PLAN_INFO[tenant.plan].color}33`,
+                        color: PLAN_INFO[tenant.plan].color,
                         fontWeight: 700,
                         textTransform: 'uppercase',
                         letterSpacing: '0.5px',
                       }}
                     >
-                      {tenant.plan.toUpperCase()} TIER
+                      {PLAN_INFO[tenant.plan].label} PLAN
                     </span>
                   </div>
                   <span style={{ fontSize: '12px', color: '#6b7280' }}>

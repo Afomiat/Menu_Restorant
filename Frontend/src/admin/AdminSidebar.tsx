@@ -1,5 +1,6 @@
 import { UtensilsCrossed, Sparkles, ChefHat, X, QrCode, LogOut, Settings, LayoutGrid, Rows3 } from 'lucide-react';
 import type { RestaurantMeta } from '../types';
+import { PLAN_INFO, hasPlan } from '../utils/plan';
 
 type MenuDesign = NonNullable<RestaurantMeta['template']>;
 
@@ -91,11 +92,11 @@ export default function AdminSidebar({
                   fontWeight: 800,
                   textTransform: 'uppercase',
                   letterSpacing: '0.6px',
-                  color: meta?.plan === 'vip' ? '#f59e0b' : '#3b82f6',
+                  color: PLAN_INFO[meta?.plan ?? 'basic'].color,
                   marginTop: '1px',
                 }}
               >
-                {meta?.plan === 'vip' ? '👑 VIP Tier' : '⚡ Standard Tier'}
+                {PLAN_INFO[meta?.plan ?? 'basic'].icon} {PLAN_INFO[meta?.plan ?? 'basic'].label} Plan
               </span>
             </div>
 
@@ -129,7 +130,7 @@ export default function AdminSidebar({
               <ChefHat size={18} />
               <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                 <span>Kitchen Orders</span>
-                {meta?.plan === 'standard' ? (
+                {meta?.plan && !hasPlan(meta.plan, 'plus') ? (
                   <span
                     style={{
                       fontSize: '10px',
@@ -140,7 +141,7 @@ export default function AdminSidebar({
                       color: '#d97706',
                     }}
                   >
-                    VIP
+                    PLUS
                   </span>
                 ) : activeOrdersCount > 0 ? (
                   <span

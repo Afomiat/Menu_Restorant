@@ -1,12 +1,12 @@
 import { usePlanContext, type PlanFeatures } from '../context/PlanContext';
+import type { PlanTier } from '../types';
+import { hasPlan } from '../utils/plan';
 
 export interface FeatureGateResult {
   /** The current plan tier from the backend. */
-  plan: 'standard' | 'vip';
-  /** True when the tenant is on the VIP plan. */
-  isVIP: boolean;
-  /** True when the tenant is on the Standard plan. */
-  isStandard: boolean;
+  plan: PlanTier;
+  /** True when the tenant's plan includes the features of `min`, e.g. hasPlan('plus') is true on Plus and Pro. */
+  hasPlan: (min: PlanTier) => boolean;
   /** The full feature set for the current plan. */
   features: PlanFeatures;
   /**
@@ -22,7 +22,7 @@ export interface FeatureGateResult {
  * Must be used inside a <PlanProvider> (which is set at the menu/admin page level).
  *
  * @example
- * const { can, isVIP } = useFeatureGate();
+ * const { can, hasPlan } = useFeatureGate();
  * if (can('ordering')) { ... }
  */
 export function useFeatureGate(): FeatureGateResult {
@@ -30,8 +30,7 @@ export function useFeatureGate(): FeatureGateResult {
 
   return {
     plan,
-    isVIP: plan === 'vip',
-    isStandard: plan === 'standard',
+    hasPlan: (min) => hasPlan(plan, min),
     features,
     can: (feature) => features[feature],
   };

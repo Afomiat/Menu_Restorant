@@ -464,7 +464,7 @@ export default function ClassicItemModal({
           )}
         </div>
 
-        {/* Sticky Bottom Action Bar (VIP Only) */}
+        {/* Sticky Bottom Action Bar (Plus and Pro) */}
         {can('ordering') && (
           <div
             style={{

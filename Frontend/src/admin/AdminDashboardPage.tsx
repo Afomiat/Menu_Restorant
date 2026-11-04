@@ -23,13 +23,15 @@ import {
   toggleAdminItemSoldOut,
   updateOrderStatus,
   updateTableOrdersStatus,
+  isTableActionTarget,
   cancelTableOrders,
   cancelAllActiveOrders,
   clearCompletedOrders,
 } from '../services/orderService';
 import { getAdminToken, clearAdminToken } from '../services/apiClient';
 import { useKitchenWebSocket } from '../hooks/useKitchenWebSocket';
-import type { MenuItem, Category, RestaurantMeta, RestaurantMenu, CartItem, OrderStatus } from '../types';
+import type { MenuItem, Category, RestaurantMeta, RestaurantMenu, CartItem, OrderStatus, PlanTier } from '../types';
+import { PLAN_INFO } from '../utils/plan';
 import { matchesSearchQuery } from '../utils/search';
 import SkeletonLoader from '../components/common/SkeletonLoader';
 import NotFoundPage from '../pages/NotFoundPage';
@@ -57,8 +59,8 @@ export default function AdminDashboardPage() {
     useRestaurantMenu(slug);
 
   // The plan tier is derived exclusively from the backend API response (PostgreSQL tenants.plan).
-  // It is NOT overridable from the UI — the backend RequireVIPPlan middleware is the real gate.
-  const planFromBackend: 'standard' | 'vip' = initialMeta?.plan || 'standard';
+  // It is NOT overridable from the UI — the backend RequirePlan middleware is the real gate.
+  const planFromBackend: PlanTier = initialMeta?.plan || 'basic';
 
   // Active top-level view: 'menu' (Dashboard/Dishes) or 'kitchen' (Live KDS Orders)
   const [activeView, setActiveView] = useState<'menu' | 'kitchen'>('menu');
@@ -155,7 +157,7 @@ export default function AdminDashboardPage() {
 
   const [adminToken, setAdminToken] = useState<string | null>(getAdminToken());
 
-  // Live WebSocket feed for real-time Kitchen Display System (VIP Plan)
+  // Live WebSocket feed for real-time Kitchen Display System (Plus and Pro)
   useKitchenWebSocket({
     token: adminToken,
     onOrderCreated: (orderData: any) => {
@@ -268,18 +270,14 @@ export default function AdminDashboardPage() {
   };
 
   const handleKitchenTableStatusChange = (tableNumber: string, status: OrderStatus) => {
-    // 1. Optimistically update all orders at this table immediately
-    setKitchenOrders((prev) => {
-      const updated = prev.map((o) =>
-        o.tableNumber === tableNumber && o.status !== 'complete' && o.status !== 'cancelled'
-          ? { ...o, status, statusUpdatedAt: Date.now() }
-          : o
-      );
-      saveRestaurantOrders(slug, updated);
-      return updated;
-    });
+    // 1. Optimistically update the orders at this table that the action moves forward
+    setKitchenOrders((prev) =>
+      prev.map((o) =>
+        isTableActionTarget(o, tableNumber, status) ? { ...o, status, statusUpdatedAt: Date.now() } : o
+      )
+    );
 
-    // 2. Persist to server in background
+    // 2. Save and persist to server in background; the service picks the same orders from saved state
     updateTableOrdersStatus(slug, tableNumber, status).catch((err) => {
       console.error('Failed to update table orders on server:', err);
       showToast('⚠️ Failed to sync table status with server');
@@ -753,18 +751,12 @@ export default function AdminDashboardPage() {
                     gap: '5px',
                     letterSpacing: '0.5px',
                     textTransform: 'uppercase',
-                    background:
-                      planFromBackend === 'vip'
-                        ? 'linear-gradient(135deg, #f59e0b, #ea580c)'
-                        : 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                    background: PLAN_INFO[planFromBackend].gradient,
                     color: '#ffffff',
-                    boxShadow:
-                      planFromBackend === 'vip'
-                        ? '0 2px 8px rgba(245, 158, 11, 0.35)'
-                        : '0 2px 8px rgba(59, 130, 246, 0.35)',
+                    boxShadow: `0 2px 8px ${PLAN_INFO[planFromBackend].color}59`,
                   }}
                 >
-                  <span>{planFromBackend === 'vip' ? '👑 VIP Tier' : '⚡ Standard Tier'}</span>
+                  <span>{PLAN_INFO[planFromBackend].icon} {PLAN_INFO[planFromBackend].label} Plan</span>
                 </span>
               </div>
 

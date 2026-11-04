@@ -11,6 +11,8 @@ import (
 )
 
 type Querier interface {
+	BulkCancelAllActiveOrders(ctx context.Context, tenantID pgtype.UUID) error
+	BulkCancelTableOrders(ctx context.Context, arg BulkCancelTableOrdersParams) error
 	CancelOrderInGrace(ctx context.Context, arg CancelOrderInGraceParams) (CancelOrderInGraceRow, error)
 	CreateCategory(ctx context.Context, arg CreateCategoryParams) (Category, error)
 	CreateMenuItem(ctx context.Context, arg CreateMenuItemParams) (MenuItem, error)

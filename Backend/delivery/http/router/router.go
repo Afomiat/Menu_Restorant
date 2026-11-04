@@ -117,7 +117,7 @@ func SetupRouter(deps RouterDependencies) *gin.Engine {
 
 			// 3. Smart Ordering (STRICTLY VIP PLAN ONLY + Protected by Order Rate Limiter)
 			orderRoutes := menuRoutes.Group("/orders")
-			orderRoutes.Use(middleware.RequireVIPPlan(deps.TenantUsecase))
+			orderRoutes.Use(middleware.RequirePlan(deps.TenantUsecase, domain.PlanPlus))
 			{
 				orderRoutes.POST("", orderLimiter.Limit(), orderCtrl.PlaceOrder)
 				orderRoutes.GET("/:id", orderCtrl.GetOrder)
@@ -126,19 +126,29 @@ func SetupRouter(deps RouterDependencies) *gin.Engine {
 		}
 
 		// -------------------------------------------------------------
+		// AZAI TEAM ROUTES (super_admin only, across all restaurants)
+		// -------------------------------------------------------------
+		superAdminRoutes := apiV1.Group("/superadmin")
+		superAdminRoutes.Use(middleware.AuthMiddleware(deps.Config.JWTSecret), middleware.RequireRole("super_admin"))
+		{
+			superAdminRoutes.GET("/plans", tenantCtrl.ListPlans)
+			superAdminRoutes.PATCH("/tenants/:id/plan", tenantCtrl.SetTenantPlan)
+		}
+
+		// -------------------------------------------------------------
 		// STAFF / KITCHEN / ADMIN ROUTES (Protected by JWT Auth & RBAC)
 		// -------------------------------------------------------------
 		adminRoutes := apiV1.Group("/admin")
 		adminRoutes.Use(middleware.AuthMiddleware(deps.Config.JWTSecret))
 		{
-			// Restaurant Profile, Theme Customization & VIP License Upgrade
+			// Restaurant Profile, Theme Customization & Plan Change
 			adminRoutes.GET("/tenant", middleware.RequireRole("manager", "owner", "super_admin"), tenantCtrl.GetTenantProfile)
 			adminRoutes.PATCH("/tenant/theme", middleware.RequireRole("manager", "owner", "super_admin"), tenantCtrl.UpdateTheme)
 			adminRoutes.PATCH("/tenant/plan", middleware.RequireRole("super_admin"), tenantCtrl.UpdatePlan)
 
-			// Kitchen Display System (KDS) live orders (STRICTLY VIP PLAN ONLY)
+			// Kitchen Display System (KDS) live orders (Plus plan or higher)
 			kdsRoutes := adminRoutes.Group("")
-			kdsRoutes.Use(middleware.RequireVIPPlan(deps.TenantUsecase))
+			kdsRoutes.Use(middleware.RequirePlan(deps.TenantUsecase, domain.PlanPlus))
 			{
 				kdsRoutes.GET("/orders", middleware.RequireRole("kitchen", "manager", "owner", "super_admin"), orderCtrl.ListActiveOrders)
 				kdsRoutes.PATCH("/orders/:id/status", middleware.RequireRole("kitchen", "manager", "owner", "waiter", "super_admin"), orderCtrl.UpdateOrderStatus)

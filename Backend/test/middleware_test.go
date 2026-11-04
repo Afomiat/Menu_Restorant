@@ -102,59 +102,59 @@ func TestMiddleware_CrossTenantDataIsolation(t *testing.T) {
 	}
 }
 
-func TestMiddleware_RequireVIPPlan(t *testing.T) {
-	// 1. Customer Context with Standard Plan -> Rejected
-	rStandard := gin.New()
-	rStandard.Use(func(c *gin.Context) {
+func TestMiddleware_RequirePlusPlan(t *testing.T) {
+	// 1. Customer Context with Basic Plan -> Rejected
+	rBasic := gin.New()
+	rBasic.Use(func(c *gin.Context) {
 		c.Set(middleware.TenantContextKey, &domain.Tenant{
 			ID:   uuid.New(),
-			Plan: domain.PlanStandard,
+			Plan: domain.PlanBasic,
 		})
 		c.Next()
 	})
-	rStandard.Use(middleware.RequireVIPPlan(&mockTenantUsecase{hasVIP: false}))
-	rStandard.GET("/orders", func(c *gin.Context) { c.Status(http.StatusOK) })
+	rBasic.Use(middleware.RequirePlan(&mockTenantUsecase{hasPlan: false}, domain.PlanPlus))
+	rBasic.GET("/orders", func(c *gin.Context) { c.Status(http.StatusOK) })
 
 	req := httptest.NewRequest(http.MethodGet, "/orders", nil)
 	w := httptest.NewRecorder()
-	rStandard.ServeHTTP(w, req)
+	rBasic.ServeHTTP(w, req)
 	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected 403 UPGRADE_REQUIRED for Standard plan, got %d", w.Code)
+		t.Fatalf("expected 403 UPGRADE_REQUIRED for Basic plan, got %d", w.Code)
 	}
 
-	// 2. Customer Context with VIP Plan -> Allowed
-	rVIP := gin.New()
-	rVIP.Use(func(c *gin.Context) {
+	// 2. Customer Context with Plus Plan -> Allowed
+	rPlus := gin.New()
+	rPlus.Use(func(c *gin.Context) {
 		c.Set(middleware.TenantContextKey, &domain.Tenant{
 			ID:   uuid.New(),
-			Plan: domain.PlanVIP,
+			Plan: domain.PlanPlus,
 		})
 		c.Next()
 	})
-	rVIP.Use(middleware.RequireVIPPlan(&mockTenantUsecase{hasVIP: true}))
-	rVIP.GET("/orders", func(c *gin.Context) { c.Status(http.StatusOK) })
+	rPlus.Use(middleware.RequirePlan(&mockTenantUsecase{hasPlan: true}, domain.PlanPlus))
+	rPlus.GET("/orders", func(c *gin.Context) { c.Status(http.StatusOK) })
 
 	req = httptest.NewRequest(http.MethodGet, "/orders", nil)
 	w = httptest.NewRecorder()
-	rVIP.ServeHTTP(w, req)
+	rPlus.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200 for VIP plan, got %d", w.Code)
+		t.Fatalf("expected 200 for Plus plan, got %d", w.Code)
 	}
 
-	// 3. Admin Context with VIP tenant ID -> Allowed
-	rAdminVIP := gin.New()
-	rAdminVIP.Use(func(c *gin.Context) {
+	// 3. Admin Context with Plus tenant ID -> Allowed
+	rAdminPlus := gin.New()
+	rAdminPlus.Use(func(c *gin.Context) {
 		c.Set(middleware.TenantIDContextKey, uuid.New())
 		c.Next()
 	})
-	rAdminVIP.Use(middleware.RequireVIPPlan(&mockTenantUsecase{hasVIP: true}))
-	rAdminVIP.GET("/admin/orders", func(c *gin.Context) { c.Status(http.StatusOK) })
+	rAdminPlus.Use(middleware.RequirePlan(&mockTenantUsecase{hasPlan: true}, domain.PlanPlus))
+	rAdminPlus.GET("/admin/orders", func(c *gin.Context) { c.Status(http.StatusOK) })
 
 	req = httptest.NewRequest(http.MethodGet, "/admin/orders", nil)
 	w = httptest.NewRecorder()
-	rAdminVIP.ServeHTTP(w, req)
+	rAdminPlus.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200 for Admin with VIP license, got %d", w.Code)
+		t.Fatalf("expected 200 for Admin with Plus license, got %d", w.Code)
 	}
 }
 

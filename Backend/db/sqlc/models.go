@@ -103,9 +103,9 @@ func (ns NullPaymentStatus) Value() (driver.Value, error) {
 type PlanTier string
 
 const (
-	PlanTierStandard   PlanTier = "standard"
-	PlanTierVip        PlanTier = "vip"
-	PlanTierEnterprise PlanTier = "enterprise"
+	PlanTierBasic PlanTier = "basic"
+	PlanTierPlus  PlanTier = "plus"
+	PlanTierPro   PlanTier = "pro"
 )
 
 func (e *PlanTier) Scan(src interface{}) error {

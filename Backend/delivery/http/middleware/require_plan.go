@@ -9,16 +9,17 @@ import (
 	"menu-backend/domain"
 )
 
-// RequireVIPPlan enforces that digital ordering and KDS features are only active for VIP tier restaurants
-func RequireVIPPlan(tenantUsecase domain.TenantUsecase) gin.HandlerFunc {
+// RequirePlan enforces that a route is only active for restaurants on min or a higher plan
+func RequirePlan(tenantUsecase domain.TenantUsecase, min domain.PlanTier) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 1. Check if full tenant entity is already in context (from TenantMiddleware in customer routes)
 		if tenant, ok := GetTenantFromContext(c); ok && tenant != nil {
-			if !tenant.HasVIPFeatures() {
+			if !tenant.HasPlan(min) {
 				c.JSON(http.StatusForbidden, gin.H{
-					"error":        "UPGRADE_REQUIRED",
-					"message":      "Digital ordering and Kitchen Display are VIP features. Upgrade to VIP tier to enable.",
-					"current_plan": tenant.Plan,
+					"error":         "UPGRADE_REQUIRED",
+					"message":       "This feature needs the " + min.Label() + " plan. Upgrade to enable it.",
+					"current_plan":  tenant.Plan,
+					"required_plan": min,
 				})
 				c.Abort()
 				return
@@ -29,11 +30,12 @@ func RequireVIPPlan(tenantUsecase domain.TenantUsecase) gin.HandlerFunc {
 
 		// 2. Check if tenant ID is in context (from AuthMiddleware in Admin routes)
 		if tenantID, ok := GetTenantIDFromContext(c); ok && tenantID != uuid.Nil {
-			hasVIP, err := tenantUsecase.VerifyVIPAccess(c.Request.Context(), tenantID)
-			if err != nil || !hasVIP {
+			hasPlan, err := tenantUsecase.VerifyPlanAccess(c.Request.Context(), tenantID, min)
+			if err != nil || !hasPlan {
 				c.JSON(http.StatusForbidden, gin.H{
-					"error":   "UPGRADE_REQUIRED",
-					"message": "Kitchen Display System live orders and feeds are restricted to VIP tier restaurants. Please upgrade your license.",
+					"error":         "UPGRADE_REQUIRED",
+					"message":       "This feature needs the " + min.Label() + " plan. Upgrade to enable it.",
+					"required_plan": min,
 				})
 				c.Abort()
 				return

@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	"menu-backend/delivery/http/middleware"
 	"menu-backend/domain"
@@ -80,23 +81,50 @@ type UpdatePlanRequest struct {
 }
 
 // UpdatePlan handles PATCH /api/v1/admin/tenant/plan
-// Allows restaurant owners or super admins to upgrade or change license tier (e.g., standard -> vip)
+// Changes the plan of the logged-in admin's own restaurant (super admins only)
 func (ctrl *TenantController) UpdatePlan(c *gin.Context) {
 	tenantID, ok := middleware.GetTenantIDFromContext(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "restaurant tenant identification missing"})
 		return
 	}
+	ctrl.applyPlan(c, tenantID)
+}
 
+// ListPlans handles GET /api/v1/superadmin/plans
+// Returns every plan from lowest to highest so the admin dashboard can offer them as choices
+func (ctrl *TenantController) ListPlans(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"data": domain.Plans,
+	})
+}
+
+// SetTenantPlan handles PATCH /api/v1/superadmin/tenants/:id/plan
+// Lets the Azai team assign any restaurant to Basic, Plus or Pro
+func (ctrl *TenantController) SetTenantPlan(c *gin.Context) {
+	tenantID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid restaurant id"})
+		return
+	}
+
+	if tenant, err := ctrl.tenantUsecase.GetTenantByID(c.Request.Context(), tenantID); err != nil || tenant == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "restaurant not found"})
+		return
+	}
+	ctrl.applyPlan(c, tenantID)
+}
+
+func (ctrl *TenantController) applyPlan(c *gin.Context, tenantID uuid.UUID) {
 	var req UpdatePlanRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "plan is required (allowed: 'standard' or 'vip')"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": domain.ErrInvalidPlan.Error()})
 		return
 	}
 
 	planTier := domain.PlanTier(req.Plan)
-	if planTier != domain.PlanStandard && planTier != domain.PlanVIP {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid plan; allowed values are 'standard' or 'vip'"})
+	if !planTier.IsValid() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": domain.ErrInvalidPlan.Error()})
 		return
 	}
 
@@ -111,7 +139,7 @@ func (ctrl *TenantController) UpdatePlan(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "restaurant license tier successfully updated",
+		"message": "restaurant plan successfully updated",
 		"plan":    planTier,
 	})
 }

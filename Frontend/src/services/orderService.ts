@@ -1,4 +1,4 @@
-import type { CartItem, OrderStatus, BackendOrder } from '../types';
+import type { CartItem, OrderStatus, BackendOrder, PlanTier } from '../types';
 import { apiClient } from './apiClient';
 
 const ORDER_EVENT_PREFIX = 'azai_orders_updated_';
@@ -213,9 +213,9 @@ export async function toggleAdminItemSoldOut(itemId: string, isSoldOut: boolean)
 }
 
 /**
- * License Upgrade: Update restaurant plan tier ('standard' -> 'vip')
+ * Plan change: set the logged-in restaurant's plan ('basic', 'plus' or 'pro'). Super admins only.
  */
-export async function updateAdminTenantPlan(plan: 'standard' | 'vip', _slug?: string): Promise<boolean> {
+export async function updateAdminTenantPlan(plan: PlanTier, _slug?: string): Promise<boolean> {
   try {
     await apiClient.patch('/admin/tenant/plan', { plan });
     return true;
@@ -377,12 +377,35 @@ export async function updateOrderStatus(slug: string, orderId: string, newStatus
   return true;
 }
 
+// Kitchen progress of an order; table-wide actions only move orders forward
+const STATUS_STEP: Partial<Record<OrderStatus, number>> = {
+  not_started: 0,
+  pending_grace: 0,
+  received: 0,
+  preparing: 1,
+  ready: 2,
+  delivered: 3,
+  complete: 3,
+};
+
+/**
+ * True when a table-wide action (Start All, Mark All Ready, Served) should change this order.
+ * Orders already past the new status are left alone, so Start All for a new round
+ * does not send a dish that is already ready back to cooking.
+ */
+export function isTableActionTarget(order: CartItem, tableNumber: string, newStatus: OrderStatus): boolean {
+  const current = order.status || 'not_started';
+  if (order.tableNumber !== tableNumber || current === 'complete' || current === 'cancelled') return false;
+  if (newStatus === 'cancelled') return true;
+  return (STATUS_STEP[newStatus] ?? 0) > (STATUS_STEP[current] ?? 0);
+}
+
 export async function updateTableOrdersStatus(slug: string, tableNumber: string, newStatus: OrderStatus): Promise<void> {
   const orders = getRestaurantOrders(slug);
   const prevStatuses = new Map<string, OrderStatus>();
 
   const updated = orders.map((order) => {
-    if (order.tableNumber === tableNumber && order.status !== 'complete' && order.status !== 'cancelled') {
+    if (isTableActionTarget(order, tableNumber, newStatus)) {
       if (order.orderId) {
         prevStatuses.set(order.orderId, order.status || 'not_started');
       }
@@ -399,9 +422,7 @@ export async function updateTableOrdersStatus(slug: string, tableNumber: string,
   // Notify backend for all affected live orders concurrently in parallel
   const liveTargetOrders = orders.filter(
     (o) =>
-      o.tableNumber === tableNumber &&
-      o.status !== 'complete' &&
-      o.status !== 'cancelled' &&
+      isTableActionTarget(o, tableNumber, newStatus) &&
       o.orderId &&
       !o.orderId.startsWith('ORD-') &&
       o.orderId.length > 20

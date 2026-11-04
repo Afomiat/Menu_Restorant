@@ -41,3 +41,24 @@ describe('AdminSidebar menu design switch', () => {
     expect(screen.queryByRole('radiogroup', { name: 'Menu design' })).toBeNull();
   });
 });
+
+describe('AdminSidebar plan badge', () => {
+  it.each([
+    ['basic', '⚡ Basic Plan'],
+    ['plus', '👑 Plus Plan'],
+    ['pro', '💎 Pro Plan'],
+  ] as const)('shows the %s plan', (plan, label) => {
+    render(<AdminSidebar meta={{ ...baseMeta, plan }} slug="aura" />);
+
+    expect(screen.getByText(label)).toBeTruthy();
+  });
+
+  it('marks Kitchen Orders as a Plus feature only on Basic', () => {
+    render(<AdminSidebar meta={{ ...baseMeta, plan: 'basic' }} slug="aura" />);
+    expect(screen.getByText('PLUS')).toBeTruthy();
+    cleanup();
+
+    render(<AdminSidebar meta={{ ...baseMeta, plan: 'pro' }} slug="aura" />);
+    expect(screen.queryByText('PLUS')).toBeNull();
+  });
+});
