@@ -1,6 +1,8 @@
-import { UtensilsCrossed, Sparkles, ChefHat, X, QrCode, LogOut, Settings, LayoutGrid, Rows3 } from 'lucide-react';
-import type { RestaurantMeta } from '../types';
+import { UtensilsCrossed, Sparkles, ChefHat, X, QrCode, LogOut, Settings, LayoutGrid, Rows3, Users } from 'lucide-react';
+import type { RestaurantMeta, StaffRole } from '../types';
 import { PLAN_INFO, hasPlan } from '../utils/plan';
+import { canManage, canUseKitchen } from '../utils/roles';
+import { t } from '../i18n/en';
 
 type MenuDesign = NonNullable<RestaurantMeta['template']>;
 
@@ -19,10 +21,13 @@ interface AdminSidebarProps {
   onOpenKitchen?: () => void;
   onOpenTables?: () => void;
   onOpenSettings?: () => void;
+  onOpenStaff?: () => void;
   onLogout?: () => void;
   onChangeDesign?: (design: MenuDesign) => void;
   isMobileOpen?: boolean;
   onCloseMobile?: () => void;
+  /** The signed-in staff member's role; each role only sees what it may use. Defaults to manager. */
+  role?: StaffRole | null;
 }
 
 export default function AdminSidebar({
@@ -34,11 +39,15 @@ export default function AdminSidebar({
   onOpenKitchen,
   onOpenTables,
   onOpenSettings,
+  onOpenStaff,
   onLogout,
   onChangeDesign,
   isMobileOpen = false,
   onCloseMobile,
+  role = 'manager',
 }: AdminSidebarProps) {
+  const isManager = canManage(role);
+  const showKitchen = canUseKitchen(role);
   const displayName = meta.name || 'Azai';
   // Same rule the customer menu uses: anything but 'modern' shows the classic design
   const currentDesign: MenuDesign = meta.template === 'modern' ? 'modern' : 'classic';
@@ -113,15 +122,18 @@ export default function AdminSidebar({
 
           {/* Clean Navigation Items pushed down with 150px gap on desktop */}
           <nav className="admin-sidebar-nav">
-            <button
-              type="button"
-              className={`admin-nav-item ${activeView === 'menu' ? 'active' : ''}`}
-              onClick={handleMenuClick}
-            >
-              <UtensilsCrossed size={18} />
-              <span>Dashboard</span>
-            </button>
+            {isManager && (
+              <button
+                type="button"
+                className={`admin-nav-item ${activeView === 'menu' ? 'active' : ''}`}
+                onClick={handleMenuClick}
+              >
+                <UtensilsCrossed size={18} />
+                <span>Dashboard</span>
+              </button>
+            )}
 
+            {showKitchen && (
             <button
               type="button"
               className={`admin-nav-item ${activeView === 'kitchen' ? 'active' : ''}`}
@@ -160,7 +172,39 @@ export default function AdminSidebar({
                 ) : null}
               </span>
             </button>
+            )}
 
+            {isManager && onOpenStaff && (
+              <button
+                type="button"
+                className="admin-nav-item"
+                onClick={() => {
+                  onOpenStaff();
+                  if (onCloseMobile) onCloseMobile();
+                }}
+              >
+                <Users size={18} />
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                  <span>{t.staff.navLabel}</span>
+                  {meta?.plan && !hasPlan(meta.plan, 'pro') && (
+                    <span
+                      style={{
+                        fontSize: '10px',
+                        fontWeight: 800,
+                        padding: '2px 8px',
+                        borderRadius: '999px',
+                        backgroundColor: 'rgba(139, 92, 246, 0.15)',
+                        color: '#7c3aed',
+                      }}
+                    >
+                      PRO
+                    </span>
+                  )}
+                </span>
+              </button>
+            )}
+
+            {isManager && (
             <button
               type="button"
               className="admin-nav-item"
@@ -172,8 +216,9 @@ export default function AdminSidebar({
               <QrCode size={18} />
               <span>Tables & QR Codes</span>
             </button>
+            )}
 
-            {onOpenSettings && (
+            {isManager && onOpenSettings && (
               <button
                 type="button"
                 className="admin-nav-item"
@@ -214,7 +259,7 @@ export default function AdminSidebar({
           <div className="admin-sidebar-banner-desc">
             Managing <strong>/{slug}</strong> menu in real-time. Changes are automatically saved.
           </div>
-          {onChangeDesign && (
+          {isManager && onChangeDesign && (
             <>
               <div className="admin-design-switch-label">Menu design</div>
               <div className="admin-design-switch" role="radiogroup" aria-label="Menu design">

@@ -53,9 +53,12 @@ func main() {
 	tableRepo := repository.NewTableRepository(queries)
 	orderRepo := repository.NewOrderRepository(pool, queries)
 	uploadRepo := repository.NewCloudinaryUploadRepository(cfg)
+	staffRepo := repository.NewStaffRepository(queries)
+	activityRepo := repository.NewActivityRepository(queries)
 
 	// 6. Initialize Usecases (Business Rules Layer)
-	tenantUsecase := usecase.NewTenantUsecase(tenantRepo)
+	tenantUsecase := usecase.NewTenantUsecase(tenantRepo, activityRepo)
+	staffUsecase := usecase.NewStaffUsecase(staffRepo, tenantRepo, activityRepo)
 	menuUsecase := usecase.NewMenuUsecase(tenantRepo, menuRepo)
 	tableUsecase := usecase.NewTableUsecase(tableRepo, cfg.QRSecretKey)
 	orderUsecase := usecase.NewOrderUsecase(orderRepo, tenantRepo, tableRepo, menuRepo, cfg.QRSecretKey)
@@ -69,8 +72,8 @@ func main() {
 		OrderUsecase:  orderUsecase,
 		TableUsecase:  tableUsecase,
 		UploadUsecase: uploadUsecase,
+		StaffUsecase:  staffUsecase,
 		Hub:           hub,
-		Queries:       queries,
 		Pool:          pool,
 	})
 

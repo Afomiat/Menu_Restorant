@@ -88,9 +88,9 @@ type TenantRepository interface {
 type TenantUsecase interface {
 	GetTenantBySlug(ctx context.Context, slug string) (*Tenant, error)
 	GetTenantByID(ctx context.Context, id uuid.UUID) (*Tenant, error)
-	UpdatePlan(ctx context.Context, id uuid.UUID, plan PlanTier) error
+	// UpdatePlan changes a restaurant's plan and records who changed it
+	UpdatePlan(ctx context.Context, actorID, id uuid.UUID, plan PlanTier) error
 	UpdateTheme(ctx context.Context, id uuid.UUID, themeConfig map[string]interface{}) (*Tenant, error)
 	VerifyPlanAccess(ctx context.Context, tenantID uuid.UUID, min PlanTier) (bool, error)
 	ListActive(ctx context.Context) ([]Tenant, error)
 }
-

@@ -68,7 +68,7 @@ func TestTenantUsecase_VerifyPlanAccess(t *testing.T) {
 		{domain.PlanPlus, domain.PlanPro, false},
 	}
 	for _, tc := range cases {
-		uc := usecase.NewTenantUsecase(&mockTenantRepo{tenant: &domain.Tenant{ID: uuid.New(), Plan: tc.plan}})
+		uc := usecase.NewTenantUsecase(&mockTenantRepo{tenant: &domain.Tenant{ID: uuid.New(), Plan: tc.plan}}, &mockActivityRepo{})
 		got, err := uc.VerifyPlanAccess(context.Background(), uuid.New(), tc.min)
 		if err != nil || got != tc.want {
 			t.Errorf("plan %q, min %q: got %v (err %v), want %v", tc.plan, tc.min, got, err, tc.want)
@@ -77,17 +77,43 @@ func TestTenantUsecase_VerifyPlanAccess(t *testing.T) {
 }
 
 func TestTenantUsecase_UpdatePlanValidatesPlan(t *testing.T) {
-	uc := usecase.NewTenantUsecase(&mockTenantRepo{tenant: &domain.Tenant{ID: uuid.New()}})
+	uc := usecase.NewTenantUsecase(&mockTenantRepo{tenant: &domain.Tenant{ID: uuid.New()}}, &mockActivityRepo{})
 
 	for _, plan := range []domain.PlanTier{domain.PlanBasic, domain.PlanPlus, domain.PlanPro} {
-		if err := uc.UpdatePlan(context.Background(), uuid.New(), plan); err != nil {
+		if err := uc.UpdatePlan(context.Background(), uuid.New(), uuid.New(), plan); err != nil {
 			t.Errorf("expected %q to be accepted, got %v", plan, err)
 		}
 	}
 	for _, plan := range []domain.PlanTier{"standard", "vip", "enterprise", ""} {
-		if err := uc.UpdatePlan(context.Background(), uuid.New(), plan); !errors.Is(err, domain.ErrInvalidPlan) {
+		if err := uc.UpdatePlan(context.Background(), uuid.New(), uuid.New(), plan); !errors.Is(err, domain.ErrInvalidPlan) {
 			t.Errorf("expected %q to be rejected with ErrInvalidPlan, got %v", plan, err)
 		}
+	}
+}
+
+func TestTenantUsecase_UpdatePlanRecordsWhoChangedIt(t *testing.T) {
+	tenantID, actorID := uuid.New(), uuid.New()
+	activity := &mockActivityRepo{}
+	uc := usecase.NewTenantUsecase(&mockTenantRepo{tenant: &domain.Tenant{ID: tenantID, Plan: domain.PlanPlus}}, activity)
+
+	if err := uc.UpdatePlan(context.Background(), actorID, tenantID, domain.PlanPro); err != nil {
+		t.Fatal(err)
+	}
+	if len(activity.records) != 1 {
+		t.Fatalf("expected one activity entry, got %d", len(activity.records))
+	}
+	got := activity.records[0]
+	if got.Action != domain.ActionPlanChanged || got.ActorID != actorID || got.TenantID != tenantID {
+		t.Fatalf("unexpected activity entry %+v", got)
+	}
+	if got.Details["from"] != domain.PlanPlus || got.Details["to"] != domain.PlanPro {
+		t.Fatalf("expected details from plus to pro, got %v", got.Details)
+	}
+
+	// A rejected plan is not recorded
+	_ = uc.UpdatePlan(context.Background(), actorID, tenantID, "vip")
+	if len(activity.records) != 1 {
+		t.Fatalf("a rejected plan change must not be recorded, got %d entries", len(activity.records))
 	}
 }
 
@@ -166,7 +192,7 @@ func TestMiddleware_RequirePlan_AdminContextUsesRanking(t *testing.T) {
 		{domain.PlanPlus, http.StatusOK},
 		{domain.PlanBasic, http.StatusForbidden},
 	} {
-		uc := usecase.NewTenantUsecase(&mockTenantRepo{tenant: &domain.Tenant{ID: uuid.New(), Plan: tc.plan}})
+		uc := usecase.NewTenantUsecase(&mockTenantRepo{tenant: &domain.Tenant{ID: uuid.New(), Plan: tc.plan}}, &mockActivityRepo{})
 		r := gin.New()
 		r.Use(func(c *gin.Context) {
 			c.Set(middleware.TenantIDContextKey, uuid.New())
@@ -194,7 +220,7 @@ func TestKitchenSocket_RequiresPlusOrHigher(t *testing.T) {
 		{domain.PlanBasic, false},
 	} {
 		tenantID := uuid.New()
-		uc := usecase.NewTenantUsecase(&mockTenantRepo{tenant: &domain.Tenant{ID: tenantID, Plan: tc.plan}})
+		uc := usecase.NewTenantUsecase(&mockTenantRepo{tenant: &domain.Tenant{ID: tenantID, Plan: tc.plan}}, &mockActivityRepo{})
 		hub := ws.NewHub()
 		go hub.Run()
 		r := gin.New()

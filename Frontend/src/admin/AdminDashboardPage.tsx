@@ -28,7 +28,11 @@ import {
   cancelAllActiveOrders,
   clearCompletedOrders,
 } from '../services/orderService';
-import { getAdminToken, clearAdminToken } from '../services/apiClient';
+import { getAdminToken, clearAdminToken, getStoredStaff, type StaffUser } from '../services/apiClient';
+import { canManage, canUseKitchen, normalizeRole } from '../utils/roles';
+import { t } from '../i18n/en';
+import AdminStaffModal from './AdminStaffModal';
+import AdminRoleHome from './AdminRoleHome';
 import { useKitchenWebSocket } from '../hooks/useKitchenWebSocket';
 import type { MenuItem, Category, RestaurantMeta, RestaurantMenu, CartItem, OrderStatus, PlanTier } from '../types';
 import { PLAN_INFO } from '../utils/plan';
@@ -156,6 +160,13 @@ export default function AdminDashboardPage() {
   }, [initialMeta, initialCategories, initialItems]);
 
   const [adminToken, setAdminToken] = useState<string | null>(getAdminToken());
+  const [staffUser, setStaffUser] = useState<StaffUser | null>(getStoredStaff());
+  const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
+
+  // Each role sees its own screen. The backend enforces the same rules on every request.
+  const staffRole = adminToken ? normalizeRole(staffUser?.role) ?? 'manager' : null;
+  const isManager = canManage(staffRole);
+  const viewToShow: 'menu' | 'kitchen' = staffRole === 'chef' ? 'kitchen' : activeView;
 
   // Live WebSocket feed for real-time Kitchen Display System (Plus and Pro)
   useKitchenWebSocket({
@@ -195,8 +206,12 @@ export default function AdminDashboardPage() {
 
   // Listen for unauthorized 401 events to prompt login
   useEffect(() => {
-    const handleUnauthorized = () => {
+    const handleUnauthorized = (event: Event) => {
       setAdminToken(null);
+      setStaffUser(null);
+      if ((event as CustomEvent<{ code?: string }>).detail?.code === 'STAFF_INACTIVE') {
+        setLoginNotice(t.inactiveNotice);
+      }
     };
     window.addEventListener('azai:auth:unauthorized', handleUnauthorized);
     return () => window.removeEventListener('azai:auth:unauthorized', handleUnauthorized);
@@ -228,8 +243,9 @@ export default function AdminDashboardPage() {
   }, [adminToken, liveTenantSlug]);
 
   // Authoritatively fetch active kitchen orders from PostgreSQL backend
+  const canSeeKitchen = canUseKitchen(staffRole);
   useEffect(() => {
-    if (!adminToken) {
+    if (!adminToken || !canSeeKitchen) {
       return;
     }
 
@@ -243,11 +259,13 @@ export default function AdminDashboardPage() {
         saveRestaurantOrders(slug, []);
       }
     });
-  }, [slug, items, adminToken]);
+  }, [slug, items, adminToken, canSeeKitchen]);
 
   const handleLogout = () => {
     clearAdminToken();
     setAdminToken(null);
+    setStaffUser(null);
+    setActiveView('menu');
     showToast('Signed out of staff console');
   };
 
@@ -674,15 +692,17 @@ export default function AdminDashboardPage() {
       <AdminSidebar
         meta={meta!}
         slug={slug}
-        activeView={activeView}
+        activeView={viewToShow}
         onSelectView={(view) => setActiveView(view)}
         activeOrdersCount={activeOrdersCount}
         onOpenTables={() => setIsTablesModalOpen(true)}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
+        onOpenStaff={() => setIsStaffModalOpen(true)}
         onLogout={handleLogout}
         onChangeDesign={handleChangeDesign}
         isMobileOpen={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
+        role={staffRole}
       />
 
       {/* Mobile Top Header (Visible on screens <= 1024px) */}
@@ -694,31 +714,35 @@ export default function AdminDashboardPage() {
           </span>
         </div>
 
-        <div className="admin-mobile-header-actions">
-          <button
-            type="button"
-            className="admin-mobile-header-add-btn"
-            onClick={() => {
-              setEditingItem(null);
-              setIsDishModalOpen(true);
-            }}
-            aria-label="Add new dish"
-          >
-            <Plus size={20} strokeWidth={2.5} />
-          </button>
-        </div>
+        {isManager && (
+          <div className="admin-mobile-header-actions">
+            <button
+              type="button"
+              className="admin-mobile-header-add-btn"
+              onClick={() => {
+                setEditingItem(null);
+                setIsDishModalOpen(true);
+              }}
+              aria-label="Add new dish"
+            >
+              <Plus size={20} strokeWidth={2.5} />
+            </button>
+          </div>
+        )}
       </header>
 
       {/* Main Full-Width Edge-to-Edge Dashboard */}
       <main className="admin-main-viewport">
-        {activeView === 'kitchen' ? (
+        {staffRole === 'waiter' || staffRole === 'cashier' ? (
+          <AdminRoleHome role={staffRole} fullName={staffUser?.full_name} onLogout={handleLogout} />
+        ) : viewToShow === 'kitchen' ? (
           /* ── Full Dashboard Kitchen Orders View ────────────────────────────── */
           <AdminKitchenView
             slug={slug}
             meta={meta!}
             orders={kitchenOrders}
             items={items}
-            onBackToMenu={() => setActiveView('menu')}
+            onBackToMenu={isManager ? () => setActiveView('menu') : undefined}
             onOrderStatusChange={handleKitchenOrderStatusChange}
             onTableStatusChange={handleKitchenTableStatusChange}
             onTableCancel={handleKitchenTableCancel}
@@ -1090,6 +1114,15 @@ export default function AdminDashboardPage() {
         restaurantSlug={slug}
       />
 
+      {/* Staff accounts (managers, Pro plan) */}
+      <AdminStaffModal
+        isOpen={isStaffModalOpen && isManager}
+        onClose={() => setIsStaffModalOpen(false)}
+        plan={planFromBackend}
+        currentUserId={staffUser?.id}
+        onToast={showToast}
+      />
+
       {/* Floating Toast Notification */}
       {toastMessage && (
         <div className="admin-toast">
@@ -1099,18 +1132,21 @@ export default function AdminDashboardPage() {
 
       {/* Mobile Bottom Navigation Bar (Visible on screens <= 1024px) */}
       <nav className="admin-mobile-bottom-nav" aria-label="Mobile Navigation">
-        <button
-          type="button"
-          className={`admin-mobile-tab-btn ${activeView === 'menu' ? 'active' : ''}`}
-          onClick={() => setActiveView('menu')}
-        >
-          <UtensilsCrossed size={19} />
-          <span>Staff</span>
-        </button>
+        {isManager && (
+          <button
+            type="button"
+            className={`admin-mobile-tab-btn ${viewToShow === 'menu' ? 'active' : ''}`}
+            onClick={() => setActiveView('menu')}
+          >
+            <UtensilsCrossed size={19} />
+            <span>Staff</span>
+          </button>
+        )}
 
+        {canSeeKitchen && (
         <button
           type="button"
-          className={`admin-mobile-tab-btn ${activeView === 'kitchen' ? 'active' : ''}`}
+          className={`admin-mobile-tab-btn ${viewToShow === 'kitchen' ? 'active' : ''}`}
           onClick={() => setActiveView('kitchen')}
         >
           <div style={{ position: 'relative', display: 'inline-flex' }}>
@@ -1121,6 +1157,7 @@ export default function AdminDashboardPage() {
           </div>
           <span>Kitchen</span>
         </button>
+        )}
 
         <a
           href={`/${slug}`}
@@ -1137,11 +1174,14 @@ export default function AdminDashboardPage() {
       {/* Staff Production Login Modal */}
       <AdminLoginModal
         isOpen={!adminToken}
+        restaurantSlug={slug}
         notice={loginNotice}
-        onSuccess={(token) => {
+        onSuccess={(token, user) => {
           setLoginNotice(null);
+          setStaffUser(user ?? getStoredStaff());
+          setActiveView('menu');
           setAdminToken(token);
-          showToast('Signed in successfully');
+          showToast(user?.full_name ? `Signed in as ${user.full_name}` : 'Signed in successfully');
         }}
       />
     </div>

@@ -28,6 +28,10 @@ db-reset:
 seed:
 	docker compose exec -T db psql -U azai -d azai -v ON_ERROR_STOP=1 -q < db/seed/local_seed.sql
 
+# Run all tests, including the ones that need the local database: make test-db
+test-db:
+	TEST_DATABASE_URL="$(LOCAL_DB_URL)" go test ./...
+
 # Auto-generate sequentially numbered migration: make migrate-create name=init_schema
 migrate-create:
 	migrate create -ext sql -dir db/migrations -seq $(name)
@@ -52,4 +56,4 @@ sqlc:
 run:
 	go run .
 
-.PHONY: db-up db-down db-reset seed migrate-create migrate-up migrate-down migrate-force sqlc run
+.PHONY: db-up db-down db-reset seed test-db migrate-create migrate-up migrate-down migrate-force sqlc run

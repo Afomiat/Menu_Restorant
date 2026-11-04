@@ -165,7 +165,7 @@ func TestMiddleware_RequireRole_RBAC(t *testing.T) {
 
 	r := gin.New()
 	r.Use(middleware.AuthMiddleware(jwtSecret))
-	r.DELETE("/admin/items/123", middleware.RequireRole("manager", "owner"), func(c *gin.Context) {
+	r.DELETE("/admin/items/123", middleware.RequireRole(domain.RoleManager), func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
 

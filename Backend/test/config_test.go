@@ -15,7 +15,16 @@ func writeFile(t *testing.T, dir, name, content string) {
 	}
 }
 
+// clearConfigEnv empties the settings that make exports from the developer's own env files,
+// so each test sees only the files it writes (empty variables are ignored by the loader)
+func clearConfigEnv(t *testing.T) {
+	for _, key := range []string{"DB_URL", "PORT", "ENVIRONMENT", "QR_SECRET_KEY", "JWT_SECRET", "FRONTEND_URL"} {
+		t.Setenv(key, "")
+	}
+}
+
 func TestConfig_EnvLocalOverridesEnv(t *testing.T) {
+	clearConfigEnv(t)
 	dir := t.TempDir()
 	writeFile(t, dir, ".env", "DB_URL=postgres://remote.example.com/db\nPORT=9000\n")
 	writeFile(t, dir, ".env.local", "DB_URL=postgres://azai:azai@localhost:5433/azai\n")
@@ -33,6 +42,7 @@ func TestConfig_EnvLocalOverridesEnv(t *testing.T) {
 }
 
 func TestConfig_WithoutEnvLocalUsesEnv(t *testing.T) {
+	clearConfigEnv(t)
 	withLocal := t.TempDir()
 	writeFile(t, withLocal, ".env", "DB_URL=postgres://remote.example.com/db\n")
 	writeFile(t, withLocal, ".env.local", "DB_URL=postgres://localhost/other\n")
@@ -53,6 +63,7 @@ func TestConfig_WithoutEnvLocalUsesEnv(t *testing.T) {
 }
 
 func TestConfig_EnvironmentVariablesWin(t *testing.T) {
+	clearConfigEnv(t)
 	dir := t.TempDir()
 	writeFile(t, dir, ".env", "DB_URL=postgres://remote.example.com/db\n")
 	writeFile(t, dir, ".env.local", "DB_URL=postgres://localhost/local\n")

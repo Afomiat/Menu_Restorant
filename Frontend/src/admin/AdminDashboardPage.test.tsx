@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { CartItem, MenuItem, OrderStatus, PlanTier, RestaurantMeta } from '../types';
 
@@ -53,17 +53,30 @@ const order = (name: string, status: OrderStatus): CartItem => ({
 });
 let kitchenOrders: CartItem[] = [];
 const updateTableOrdersStatus = vi.fn();
+const fetchAdminActiveOrders = vi.fn(async () => kitchenOrders.map((o) => ({ id: o.orderId })));
 vi.mock('../services/orderService', async () => {
   const actual = await vi.importActual<typeof import('../services/orderService')>('../services/orderService');
   return {
     ...actual,
-    fetchAdminActiveOrders: vi.fn(async () => kitchenOrders.map((o) => ({ id: o.orderId }))),
+    fetchAdminActiveOrders: () => fetchAdminActiveOrders(),
     mapBackendOrderToCartItems: (bo: { id: string }) => kitchenOrders.filter((o) => o.orderId === bo.id),
     updateTableOrdersStatus: (...args: unknown[]) => updateTableOrdersStatus(...args),
   };
 });
 
+const fetchStaff = vi.fn(async () => []);
+vi.mock('../services/staffService', () => ({
+  fetchStaff: () => fetchStaff(),
+  createStaff: vi.fn(),
+  updateStaff: vi.fn(),
+}));
+
 import AdminDashboardPage from './AdminDashboardPage';
+
+/** Signs in as a staff member with this role, the way a successful login stores it. */
+function signedInAs(role: string, full_name = 'Test Person') {
+  localStorage.setItem('azai_staff_user', JSON.stringify({ id: 'u1', email: '', full_name, role, tenant_id: 't1' }));
+}
 
 function renderDashboard() {
   return render(
@@ -78,6 +91,8 @@ function renderDashboard() {
 beforeEach(() => {
   localStorage.clear();
   updateTableOrdersStatus.mockReset().mockResolvedValue(undefined);
+  fetchAdminActiveOrders.mockClear();
+  fetchStaff.mockClear();
   kitchenOrders = [];
   currentPlan = 'pro';
 });
@@ -110,5 +125,66 @@ describe('AdminDashboardPage Start All', () => {
     expect(await screen.findByText('Mark Ready')).toBeTruthy();
     expect(screen.getByText('Served')).toBeTruthy();
     expect(screen.queryByText('Start Cooking')).toBeNull();
+  });
+});
+
+describe('AdminDashboardPage screens by role', () => {
+  const navItems = () => Array.from(document.querySelectorAll('.admin-nav-item')).map((el) => el.textContent?.trim());
+
+  it('opens the kitchen for a chef and hides menu editing', async () => {
+    signedInAs('chef');
+    kitchenOrders = [order('Coffee', 'not_started')];
+    renderDashboard();
+
+    expect(await screen.findByText('Start All')).toBeTruthy();
+    // Kitchen Orders shows the number of open orders (1)
+    expect(navItems()).toEqual(['Kitchen Orders1', 'Sign Out']);
+    expect(screen.queryByLabelText('Add new dish')).toBeNull();
+  });
+
+  it('treats a login from before the Pro roles (kitchen) as a chef', async () => {
+    signedInAs('kitchen');
+    kitchenOrders = [order('Coffee', 'not_started')];
+    renderDashboard();
+
+    expect(await screen.findByText('Start All')).toBeTruthy();
+  });
+
+  it('shows a waiter their own screen and does not load kitchen orders', () => {
+    signedInAs('waiter', 'Abebe Kebede');
+    renderDashboard();
+
+    expect(screen.getByText('Hello, Abebe Kebede')).toBeTruthy();
+    expect(screen.getByText('Signed in as Waiter')).toBeTruthy();
+    expect(fetchAdminActiveOrders).not.toHaveBeenCalled();
+  });
+
+  it('shows a cashier their own screen', () => {
+    signedInAs('cashier', 'Liya');
+    renderDashboard();
+
+    expect(screen.getByText('Signed in as Cashier')).toBeTruthy();
+  });
+
+  it('lets a manager open the Staff screen', async () => {
+    signedInAs('manager');
+    renderDashboard();
+
+    fireEvent.click(screen.getByText('Staff', { selector: '.admin-nav-item span span' }));
+
+    expect(await screen.findByRole('dialog', { name: 'Staff' })).toBeTruthy();
+    expect(fetchStaff).toHaveBeenCalledTimes(1);
+  });
+
+  it('tells a turned-off staff member why they were signed out', async () => {
+    signedInAs('waiter');
+    renderDashboard();
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent('azai:auth:unauthorized', { detail: { code: 'STAFF_INACTIVE' } }));
+    });
+
+    expect(await screen.findByText(/Your account was turned off by a manager/)).toBeTruthy();
+    expect(screen.getByLabelText('Phone number or email')).toBeTruthy();
   });
 });

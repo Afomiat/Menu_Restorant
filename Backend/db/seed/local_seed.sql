@@ -15,16 +15,22 @@ INSERT INTO tenants (id, slug, name, plan, theme_config) VALUES
   ('00000000-0000-0000-0000-00000000000d', 'demo-pro', 'Demo Pro Restaurant', 'pro',
    '{"template": "modern", "welcomeMessage": "Everything in Plus, plus staff tools (Pro plan)"}');
 
+-- Staff sign in with their phone at /<restaurant>/admin, or with their email.
 -- bcrypt hash of "password123"
-INSERT INTO users (tenant_id, email, password_hash, role) VALUES
-  (NULL, 'superadmin@azai.local', '$2a$10$h1FfJxEZkCmxiqHhuwDuZeeCOu7KHmGYSrgfCTVFrBj3x3VruwkQ6', 'super_admin'),
-  ('00000000-0000-0000-0000-00000000000b', 'owner@basic.azai.local', '$2a$10$h1FfJxEZkCmxiqHhuwDuZeeCOu7KHmGYSrgfCTVFrBj3x3VruwkQ6', 'owner'),
-  ('00000000-0000-0000-0000-00000000000c', 'owner@plus.azai.local', '$2a$10$h1FfJxEZkCmxiqHhuwDuZeeCOu7KHmGYSrgfCTVFrBj3x3VruwkQ6', 'owner'),
-  ('00000000-0000-0000-0000-00000000000c', 'kitchen@plus.azai.local', '$2a$10$h1FfJxEZkCmxiqHhuwDuZeeCOu7KHmGYSrgfCTVFrBj3x3VruwkQ6', 'kitchen'),
-  ('00000000-0000-0000-0000-00000000000c', 'waiter@plus.azai.local', '$2a$10$h1FfJxEZkCmxiqHhuwDuZeeCOu7KHmGYSrgfCTVFrBj3x3VruwkQ6', 'waiter'),
-  ('00000000-0000-0000-0000-00000000000d', 'owner@pro.azai.local', '$2a$10$h1FfJxEZkCmxiqHhuwDuZeeCOu7KHmGYSrgfCTVFrBj3x3VruwkQ6', 'owner'),
-  ('00000000-0000-0000-0000-00000000000d', 'kitchen@pro.azai.local', '$2a$10$h1FfJxEZkCmxiqHhuwDuZeeCOu7KHmGYSrgfCTVFrBj3x3VruwkQ6', 'kitchen'),
-  ('00000000-0000-0000-0000-00000000000d', 'waiter@pro.azai.local', '$2a$10$h1FfJxEZkCmxiqHhuwDuZeeCOu7KHmGYSrgfCTVFrBj3x3VruwkQ6', 'waiter');
+INSERT INTO users (tenant_id, full_name, phone, email, password_hash, role) VALUES
+  (NULL, 'Azai Team', NULL, 'superadmin@azai.local', '$2a$10$h1FfJxEZkCmxiqHhuwDuZeeCOu7KHmGYSrgfCTVFrBj3x3VruwkQ6', 'super_admin'),
+
+  ('00000000-0000-0000-0000-00000000000b', 'Meron Tadesse', '+251911300001', 'manager@basic.azai.local', '$2a$10$h1FfJxEZkCmxiqHhuwDuZeeCOu7KHmGYSrgfCTVFrBj3x3VruwkQ6', 'manager'),
+
+  ('00000000-0000-0000-0000-00000000000c', 'Dawit Bekele', '+251911100001', 'manager@plus.azai.local', '$2a$10$h1FfJxEZkCmxiqHhuwDuZeeCOu7KHmGYSrgfCTVFrBj3x3VruwkQ6', 'manager'),
+  ('00000000-0000-0000-0000-00000000000c', 'Selam Girma', '+251911100002', 'chef@plus.azai.local', '$2a$10$h1FfJxEZkCmxiqHhuwDuZeeCOu7KHmGYSrgfCTVFrBj3x3VruwkQ6', 'chef'),
+  ('00000000-0000-0000-0000-00000000000c', 'Yonas Haile', '+251911100003', 'waiter@plus.azai.local', '$2a$10$h1FfJxEZkCmxiqHhuwDuZeeCOu7KHmGYSrgfCTVFrBj3x3VruwkQ6', 'waiter'),
+
+  ('00000000-0000-0000-0000-00000000000d', 'Hana Alemu', '+251911200001', 'manager@pro.azai.local', '$2a$10$h1FfJxEZkCmxiqHhuwDuZeeCOu7KHmGYSrgfCTVFrBj3x3VruwkQ6', 'manager'),
+  ('00000000-0000-0000-0000-00000000000d', 'Liya Mekonnen', '+251911200002', 'cashier@pro.azai.local', '$2a$10$h1FfJxEZkCmxiqHhuwDuZeeCOu7KHmGYSrgfCTVFrBj3x3VruwkQ6', 'cashier'),
+  ('00000000-0000-0000-0000-00000000000d', 'Abebe Kebede', '+251911200003', 'waiter@pro.azai.local', '$2a$10$h1FfJxEZkCmxiqHhuwDuZeeCOu7KHmGYSrgfCTVFrBj3x3VruwkQ6', 'waiter'),
+  ('00000000-0000-0000-0000-00000000000d', 'Tigist Worku', '+251911200004', 'chef@pro.azai.local', '$2a$10$h1FfJxEZkCmxiqHhuwDuZeeCOu7KHmGYSrgfCTVFrBj3x3VruwkQ6', 'chef'),
+  ('00000000-0000-0000-0000-00000000000d', 'Bereket Assefa', '+251911200005', 'waiter2@pro.azai.local', '$2a$10$h1FfJxEZkCmxiqHhuwDuZeeCOu7KHmGYSrgfCTVFrBj3x3VruwkQ6', 'waiter');
 
 -- Tables 1 to 5 in every restaurant
 INSERT INTO restaurant_tables (tenant_id, table_number, qr_secret)

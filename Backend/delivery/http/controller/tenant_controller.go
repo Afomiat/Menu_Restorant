@@ -128,7 +128,12 @@ func (ctrl *TenantController) applyPlan(c *gin.Context, tenantID uuid.UUID) {
 		return
 	}
 
-	if err := ctrl.tenantUsecase.UpdatePlan(c.Request.Context(), tenantID, planTier); err != nil {
+	var actorID uuid.UUID
+	if claims, ok := middleware.GetAuthClaims(c); ok {
+		actorID = claims.UserID
+	}
+
+	if err := ctrl.tenantUsecase.UpdatePlan(c.Request.Context(), actorID, tenantID, planTier); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update plan"})
 		return
 	}

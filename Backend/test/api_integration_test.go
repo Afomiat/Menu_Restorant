@@ -33,7 +33,7 @@ func (m *mockFullTenantUsecase) GetTenantByID(ctx context.Context, id uuid.UUID)
 	}
 	return m.tenant, nil
 }
-func (m *mockFullTenantUsecase) UpdatePlan(ctx context.Context, id uuid.UUID, plan domain.PlanTier) error {
+func (m *mockFullTenantUsecase) UpdatePlan(ctx context.Context, actorID, id uuid.UUID, plan domain.PlanTier) error {
 	m.tenant.Plan = plan
 	return nil
 }
@@ -101,7 +101,7 @@ func setupTestRouter(tenant *domain.Tenant, qrSecret, jwtSecret string) (*gin.En
 		OrderUsecase:  orderUc,
 		TableUsecase:  tableUc,
 		Hub:           nil,
-		Queries:       nil,
+		StaffUsecase:  allActiveStaff{},
 	})
 
 	return r, testOrder

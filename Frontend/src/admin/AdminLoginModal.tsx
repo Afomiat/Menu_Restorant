@@ -1,17 +1,20 @@
 import { useState } from 'react';
-import { Lock, Mail, ChefHat, AlertCircle, Loader2 } from 'lucide-react';
-import { loginStaff } from '../services/apiClient';
+import { Lock, User, ChefHat, AlertCircle, Loader2 } from 'lucide-react';
+import { loginStaff, type StaffUser } from '../services/apiClient';
+import { t } from '../i18n/en';
 
 interface AdminLoginModalProps {
   isOpen: boolean;
-  onSuccess: (token: string) => void;
+  /** The restaurant whose admin page is open; staff who sign in with a phone belong to it. */
+  restaurantSlug?: string;
+  onSuccess: (token: string, user?: StaffUser) => void;
   onClose?: () => void;
   /** Explains why the staff member has to sign in again (e.g. signed in to another restaurant). */
   notice?: string | null;
 }
 
-export default function AdminLoginModal({ isOpen, onSuccess, onClose, notice }: AdminLoginModalProps) {
-  const [email, setEmail] = useState('');
+export default function AdminLoginModal({ isOpen, restaurantSlug, onSuccess, onClose, notice }: AdminLoginModalProps) {
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -20,8 +23,8 @@ export default function AdminLoginModal({ isOpen, onSuccess, onClose, notice }: 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password.trim()) {
-      setError('Please enter both email and password.');
+    if (!identifier.trim() || !password.trim()) {
+      setError(t.login.missingFields);
       return;
     }
 
@@ -29,14 +32,14 @@ export default function AdminLoginModal({ isOpen, onSuccess, onClose, notice }: 
     setError(null);
 
     try {
-      const res = await loginStaff(email.trim(), password);
+      const res = await loginStaff(identifier.trim(), password, restaurantSlug);
       if (res && res.token) {
-        onSuccess(res.token);
+        onSuccess(res.token, res.user);
       } else {
         setError('Authentication failed. No token received.');
       }
     } catch (err: any) {
-      setError(err?.message || 'Invalid email or password. Please try again.');
+      setError(err?.message || 'Wrong phone, email or password. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -150,7 +153,7 @@ export default function AdminLoginModal({ isOpen, onSuccess, onClose, notice }: 
 
           <div style={{ marginBottom: '16px' }}>
             <label
-              htmlFor="staff-login-email"
+              htmlFor="staff-login-identifier"
               style={{
                 display: 'block',
                 fontSize: '12px',
@@ -159,10 +162,10 @@ export default function AdminLoginModal({ isOpen, onSuccess, onClose, notice }: 
                 marginBottom: '6px',
               }}
             >
-              Staff Email Address
+              {t.login.identifierLabel}
             </label>
             <div style={{ position: 'relative' }}>
-              <Mail
+              <User
                 size={16}
                 style={{
                   position: 'absolute',
@@ -173,13 +176,14 @@ export default function AdminLoginModal({ isOpen, onSuccess, onClose, notice }: 
                 }}
               />
               <input
-                id="staff-login-email"
-                type="email"
+                id="staff-login-identifier"
+                type="text"
+                autoComplete="username"
                 required
                 autoFocus
-                placeholder="e.g. chef@restaurant.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                placeholder={t.login.identifierPlaceholder}
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
                 style={{
                   width: '100%',
                   padding: '10px 12px 10px 36px',

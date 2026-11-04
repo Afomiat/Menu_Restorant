@@ -29,17 +29,25 @@ Runs everything on your machine with a local database in Docker, so Supabase and
 4. In `Frontend/`: `npm run dev`, then open http://localhost:5173
 
 Sample restaurants, one per plan: `demo-basic`, `demo-plus`, `demo-pro` (admin at `/<slug>/admin`).
-Staff logins, all with password `password123`:
+Staff sign in on their restaurant's admin page with their phone number (or their email).
+All passwords are `password123`:
 
-| Login | Role |
-|---|---|
-| `superadmin@azai.local` | Azai team: only the `/api/v1/superadmin` endpoints (plans); not linked to a restaurant, so it cannot open a restaurant dashboard |
-| `owner@basic.azai.local` | Owner of Demo Basic Cafe |
-| `owner@plus.azai.local`, `kitchen@plus.azai.local`, `waiter@plus.azai.local` | Demo Plus Bistro |
-| `owner@pro.azai.local`, `kitchen@pro.azai.local`, `waiter@pro.azai.local` | Demo Pro Restaurant |
+| Restaurant | Name | Role | Phone | Email |
+|---|---|---|---|---|
+| `demo-basic` | Meron Tadesse | Manager | 0911 300 001 | `manager@basic.azai.local` |
+| `demo-plus` | Dawit Bekele | Manager | 0911 100 001 | `manager@plus.azai.local` |
+| `demo-plus` | Selam Girma | Chef | 0911 100 002 | `chef@plus.azai.local` |
+| `demo-plus` | Yonas Haile | Waiter | 0911 100 003 | `waiter@plus.azai.local` |
+| `demo-pro` | Hana Alemu | Manager | 0911 200 001 | `manager@pro.azai.local` |
+| `demo-pro` | Liya Mekonnen | Cashier | 0911 200 002 | `cashier@pro.azai.local` |
+| `demo-pro` | Abebe Kebede | Waiter | 0911 200 003 | `waiter@pro.azai.local` |
+| `demo-pro` | Tigist Worku | Chef | 0911 200 004 | `chef@pro.azai.local` |
+| `demo-pro` | Bereket Assefa | Waiter | 0911 200 005 | `waiter2@pro.azai.local` |
+| (none) | Azai Team | Super admin | | `superadmin@azai.local` (only the `/api/v1/superadmin` endpoints; it cannot open a restaurant dashboard) |
 
 Other commands in `Backend/`: `make db-up` / `make db-down` start and stop the database (data is kept),
-`make seed` reloads the sample data, `make migrate-up` applies new migrations.
+`make seed` reloads the sample data, `make migrate-up` applies new migrations,
+`make test-db` runs all tests including the ones that use the local database.
 
 Remove the two `.env.local` files to go back to Supabase and Render.
 

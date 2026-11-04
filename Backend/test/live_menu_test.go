@@ -121,6 +121,7 @@ func newLiveMenuEnv(t *testing.T) *liveMenuEnv {
 		MenuUsecase:   usecase.NewMenuUsecase(tenantRepo, menuRepo),
 		OrderUsecase:  usecase.NewOrderUsecase(&mockOrderRepo{}, tenantRepo, tableRepo, menuRepo, liveMenuQRSecret),
 		TableUsecase:  usecase.NewTableUsecase(tableRepo, liveMenuQRSecret),
+		StaffUsecase:  allActiveStaff{},
 		Hub:           hub,
 	})
 

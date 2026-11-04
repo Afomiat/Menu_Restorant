@@ -155,9 +155,9 @@ func (m *mockOrderRepo) BulkCancelAllActive(_ context.Context, _ uuid.UUID) erro
 }
 
 type mockTenantUsecase struct {
-	tenant *domain.Tenant
+	tenant  *domain.Tenant
 	hasPlan bool
-	err    error
+	err     error
 }
 
 func (m *mockTenantUsecase) GetTenantBySlug(ctx context.Context, slug string) (*domain.Tenant, error) {
@@ -166,7 +166,7 @@ func (m *mockTenantUsecase) GetTenantBySlug(ctx context.Context, slug string) (*
 func (m *mockTenantUsecase) GetTenantByID(ctx context.Context, id uuid.UUID) (*domain.Tenant, error) {
 	return m.tenant, m.err
 }
-func (m *mockTenantUsecase) UpdatePlan(ctx context.Context, id uuid.UUID, plan domain.PlanTier) error {
+func (m *mockTenantUsecase) UpdatePlan(ctx context.Context, actorID, id uuid.UUID, plan domain.PlanTier) error {
 	return m.err
 }
 func (m *mockTenantUsecase) UpdateTheme(ctx context.Context, id uuid.UUID, themeConfig map[string]interface{}) (*domain.Tenant, error) {

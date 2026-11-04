@@ -1,57 +1,64 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 
-	"menu-backend/db/sqlc"
-	"menu-backend/internal/converter"
+	"menu-backend/domain"
 	"menu-backend/internal/security"
 )
 
 type AuthController struct {
-	queries   *sqlc.Queries
-	jwtSecret string
+	staffUsecase domain.StaffUsecase
+	jwtSecret    string
 }
 
-func NewAuthController(queries *sqlc.Queries, jwtSecret string) *AuthController {
+func NewAuthController(staffUsecase domain.StaffUsecase, jwtSecret string) *AuthController {
 	return &AuthController{
-		queries:   queries,
-		jwtSecret: jwtSecret,
+		staffUsecase: staffUsecase,
+		jwtSecret:    jwtSecret,
 	}
 }
 
+// LoginRequest signs in with an email, or with a phone number at a restaurant (its slug)
 type LoginRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required"`
+	Email      string `json:"email" binding:"omitempty,email,max=255"`
+	Phone      string `json:"phone" binding:"omitempty,max=32"`
+	Restaurant string `json:"restaurant" binding:"omitempty,max=64"`
+	Password   string `json:"password" binding:"required,max=128"`
 }
 
 // Login handles POST /api/v1/auth/login
-// Authenticates restaurant staff/manager and returns JWT with role and tenant_id
+// Authenticates restaurant staff and returns a JWT with their role and tenant_id
 func (ctrl *AuthController) Login(c *gin.Context) {
 	var req LoginRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid email or password format"})
+	if err := c.ShouldBindJSON(&req); err != nil || (req.Email == "" && req.Phone == "") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "enter your phone number or email, and your password"})
 		return
 	}
 
-	user, err := ctrl.queries.GetUserByEmail(c.Request.Context(), req.Email)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid email or password"})
+	staff, err := ctrl.staffUsecase.Login(c.Request.Context(), domain.LoginInput{
+		Email:          req.Email,
+		Phone:          req.Phone,
+		RestaurantSlug: req.Restaurant,
+		Password:       req.Password,
+	})
+	switch {
+	case errors.Is(err, domain.ErrInvalidLogin):
+		c.JSON(http.StatusUnauthorized, gin.H{"error": domain.ErrInvalidLogin.Error()})
+		return
+	case errors.Is(err, domain.ErrStaffInactive):
+		c.JSON(http.StatusForbidden, gin.H{"error": "STAFF_INACTIVE", "message": domain.ErrStaffInactive.Error()})
+		return
+	case err != nil:
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to sign in"})
 		return
 	}
 
-	if !security.CheckPassword(req.Password, user.PasswordHash) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid email or password"})
-		return
-	}
-
-	userID := converter.PgToUUID(user.ID)
-	tenantID := converter.PgToUUID(user.TenantID)
-
-	token, err := security.GenerateJWT(userID, tenantID, string(user.Role), ctrl.jwtSecret, 24*time.Hour)
+	token, err := security.GenerateJWT(staff.ID, staff.TenantID, string(staff.Role), ctrl.jwtSecret, 24*time.Hour)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate session token"})
 		return
@@ -60,10 +67,12 @@ func (ctrl *AuthController) Login(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"token": token,
 		"user": gin.H{
-			"id":        userID,
-			"email":     user.Email,
-			"role":      user.Role,
-			"tenant_id": tenantID,
+			"id":        staff.ID,
+			"email":     staff.Email,
+			"phone":     staff.Phone,
+			"full_name": staff.FullName,
+			"role":      staff.Role,
+			"tenant_id": staff.TenantID,
 		},
 	})
 }

@@ -11,15 +11,29 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countActiveManagers = `-- name: CountActiveManagers :one
+SELECT COUNT(*) FROM users
+WHERE tenant_id = $1 AND role = 'manager' AND is_active
+`
+
+func (q *Queries) CountActiveManagers(ctx context.Context, tenantID pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveManagers, tenantID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (tenant_id, email, password_hash, role)
-VALUES ($1, $2, $3, $4)
-RETURNING id, tenant_id, email, password_hash, role, created_at
+INSERT INTO users (tenant_id, email, phone, full_name, password_hash, role)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, tenant_id, email, password_hash, role, created_at, full_name, phone, is_active
 `
 
 type CreateUserParams struct {
 	TenantID     pgtype.UUID `json:"tenant_id"`
-	Email        string      `json:"email"`
+	Email        pgtype.Text `json:"email"`
+	Phone        pgtype.Text `json:"phone"`
+	FullName     string      `json:"full_name"`
 	PasswordHash string      `json:"password_hash"`
 	Role         UserRole    `json:"role"`
 }
@@ -28,6 +42,8 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	row := q.db.QueryRow(ctx, createUser,
 		arg.TenantID,
 		arg.Email,
+		arg.Phone,
+		arg.FullName,
 		arg.PasswordHash,
 		arg.Role,
 	)
@@ -39,18 +55,50 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.PasswordHash,
 		&i.Role,
 		&i.CreatedAt,
+		&i.FullName,
+		&i.Phone,
+		&i.IsActive,
+	)
+	return i, err
+}
+
+const getStaffByID = `-- name: GetStaffByID :one
+SELECT id, tenant_id, email, password_hash, role, created_at, full_name, phone, is_active
+FROM users
+WHERE tenant_id = $1 AND id = $2
+LIMIT 1
+`
+
+type GetStaffByIDParams struct {
+	TenantID pgtype.UUID `json:"tenant_id"`
+	ID       pgtype.UUID `json:"id"`
+}
+
+func (q *Queries) GetStaffByID(ctx context.Context, arg GetStaffByIDParams) (User, error) {
+	row := q.db.QueryRow(ctx, getStaffByID, arg.TenantID, arg.ID)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Role,
+		&i.CreatedAt,
+		&i.FullName,
+		&i.Phone,
+		&i.IsActive,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, tenant_id, email, password_hash, role, created_at
+SELECT id, tenant_id, email, password_hash, role, created_at, full_name, phone, is_active
 FROM users
 WHERE email = $1
 LIMIT 1
 `
 
-func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
+func (q *Queries) GetUserByEmail(ctx context.Context, email pgtype.Text) (User, error) {
 	row := q.db.QueryRow(ctx, getUserByEmail, email)
 	var i User
 	err := row.Scan(
@@ -60,6 +108,129 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.PasswordHash,
 		&i.Role,
 		&i.CreatedAt,
+		&i.FullName,
+		&i.Phone,
+		&i.IsActive,
+	)
+	return i, err
+}
+
+const getUserByTenantPhone = `-- name: GetUserByTenantPhone :one
+SELECT id, tenant_id, email, password_hash, role, created_at, full_name, phone, is_active
+FROM users
+WHERE tenant_id = $1 AND phone = $2
+LIMIT 1
+`
+
+type GetUserByTenantPhoneParams struct {
+	TenantID pgtype.UUID `json:"tenant_id"`
+	Phone    pgtype.Text `json:"phone"`
+}
+
+func (q *Queries) GetUserByTenantPhone(ctx context.Context, arg GetUserByTenantPhoneParams) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByTenantPhone, arg.TenantID, arg.Phone)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Role,
+		&i.CreatedAt,
+		&i.FullName,
+		&i.Phone,
+		&i.IsActive,
+	)
+	return i, err
+}
+
+const isUserActive = `-- name: IsUserActive :one
+SELECT is_active FROM users WHERE id = $1
+`
+
+func (q *Queries) IsUserActive(ctx context.Context, id pgtype.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, isUserActive, id)
+	var is_active bool
+	err := row.Scan(&is_active)
+	return is_active, err
+}
+
+const listStaff = `-- name: ListStaff :many
+SELECT id, tenant_id, email, password_hash, role, created_at, full_name, phone, is_active
+FROM users
+WHERE tenant_id = $1
+ORDER BY is_active DESC, full_name, created_at
+`
+
+func (q *Queries) ListStaff(ctx context.Context, tenantID pgtype.UUID) ([]User, error) {
+	rows, err := q.db.Query(ctx, listStaff, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []User{}
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.Email,
+			&i.PasswordHash,
+			&i.Role,
+			&i.CreatedAt,
+			&i.FullName,
+			&i.Phone,
+			&i.IsActive,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateStaff = `-- name: UpdateStaff :one
+UPDATE users
+SET full_name = COALESCE($1, full_name),
+    role = COALESCE($2, role),
+    is_active = COALESCE($3, is_active),
+    password_hash = COALESCE($4, password_hash)
+WHERE tenant_id = $5 AND id = $6
+RETURNING id, tenant_id, email, password_hash, role, created_at, full_name, phone, is_active
+`
+
+type UpdateStaffParams struct {
+	FullName     pgtype.Text  `json:"full_name"`
+	Role         NullUserRole `json:"role"`
+	IsActive     pgtype.Bool  `json:"is_active"`
+	PasswordHash pgtype.Text  `json:"password_hash"`
+	TenantID     pgtype.UUID  `json:"tenant_id"`
+	ID           pgtype.UUID  `json:"id"`
+}
+
+func (q *Queries) UpdateStaff(ctx context.Context, arg UpdateStaffParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateStaff,
+		arg.FullName,
+		arg.Role,
+		arg.IsActive,
+		arg.PasswordHash,
+		arg.TenantID,
+		arg.ID,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Role,
+		&i.CreatedAt,
+		&i.FullName,
+		&i.Phone,
+		&i.IsActive,
 	)
 	return i, err
 }

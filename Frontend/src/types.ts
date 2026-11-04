@@ -59,6 +59,21 @@ export interface RestaurantMeta {
 /** Plan tiers from lowest to highest: each plan includes everything below it. */
 export type PlanTier = 'basic' | 'plus' | 'pro';
 
+/** Staff roles; super_admin is the Azai team. */
+export type StaffRole = 'manager' | 'cashier' | 'waiter' | 'chef' | 'super_admin';
+
+/** A staff account as the manager's Staff screen shows it. */
+export interface StaffMember {
+  id: string;
+  tenant_id: string;
+  full_name: string;
+  phone: string;
+  email: string;
+  role: StaffRole;
+  is_active: boolean;
+  created_at: string;
+}
+
 export type OrderStatus =
   | 'not_started'
   | 'pending_grace'

@@ -151,6 +151,8 @@ const (
 	UserRoleManager    UserRole = "manager"
 	UserRoleKitchen    UserRole = "kitchen"
 	UserRoleWaiter     UserRole = "waiter"
+	UserRoleCashier    UserRole = "cashier"
+	UserRoleChef       UserRole = "chef"
 )
 
 func (e *UserRole) Scan(src interface{}) error {
@@ -186,6 +188,16 @@ func (ns NullUserRole) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.UserRole), nil
+}
+
+type ActivityLog struct {
+	ID        pgtype.UUID        `json:"id"`
+	TenantID  pgtype.UUID        `json:"tenant_id"`
+	ActorID   pgtype.UUID        `json:"actor_id"`
+	Action    string             `json:"action"`
+	OrderID   pgtype.UUID        `json:"order_id"`
+	Details   []byte             `json:"details"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type Category struct {
@@ -285,8 +297,11 @@ type Tenant struct {
 type User struct {
 	ID           pgtype.UUID        `json:"id"`
 	TenantID     pgtype.UUID        `json:"tenant_id"`
-	Email        string             `json:"email"`
+	Email        pgtype.Text        `json:"email"`
 	PasswordHash string             `json:"password_hash"`
 	Role         UserRole           `json:"role"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	FullName     string             `json:"full_name"`
+	Phone        pgtype.Text        `json:"phone"`
+	IsActive     bool               `json:"is_active"`
 }
