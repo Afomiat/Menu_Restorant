@@ -13,6 +13,8 @@ export interface MenuItem {
   weightLabel?: string; // e.g. "500 CR", "410 GR"
   badge?: string; // e.g. "-25%", "POPULAR", "NEW"
   variants?: { name: string; priceAdjustment: number }[];
+  /** Minutes the dish takes to cook; empty uses the restaurant's default prep time (Pro). */
+  prepMinutes?: number | null;
 }
 
 export interface Category {
@@ -52,6 +54,8 @@ export interface RestaurantMeta {
   /** Free-text opening hours, e.g. "Daily 11:00 AM – 10:00 PM". */
   openingHours?: string;
   plan?: PlanTier;
+  /** Pro timings; present on the staff profile (GET /admin/tenant). */
+  settings?: TenantSettings;
   /** Backend tenant slug. Set only for restaurants loaded from the live API. */
   slug?: string;
 }
@@ -93,6 +97,19 @@ export interface CartItem {
   placedAt?: number;
   status?: OrderStatus;
   tableNumber?: string | null;
+  /** The order's cooking target in minutes (Pro): its slowest dish. */
+  targetMinutes?: number;
+  /** When the chef started the order (ms), for the timer and the customer's estimate. */
+  startedAt?: number;
+}
+
+/** A restaurant's Pro timings, in minutes. */
+export interface TenantSettings {
+  default_prep_minutes: number;
+  bill_reminder_minutes: number;
+  bill_escalation_minutes: number;
+  confirm_reminder_minutes: number;
+  long_table_minutes: number;
 }
 
 export interface RestaurantMenu {
@@ -132,6 +149,7 @@ export interface BackendMenuItem {
   is_available: boolean;
   is_sold_out: boolean;
   created_at: string;
+  prep_minutes?: number | null;
 }
 
 export interface BackendFullMenuResponse {
@@ -171,6 +189,29 @@ export interface BackendOrder {
   grace_period_ends_at: string;
   created_at: string;
   items?: BackendOrderItem[];
+  target_minutes?: number;
+  started_at?: string | null;
+  started_by?: string | null;
+  ready_at?: string | null;
+  ready_by?: string | null;
+  served_at?: string | null;
+  served_by?: string | null;
+}
+
+/** A dining table as staff screens see it (Pro adds its waiter). */
+export interface BackendTable {
+  id: string;
+  tenant_id: string;
+  table_number: string;
+  is_active: boolean;
+  assigned_waiter_id?: string | null;
+  assigned_waiter_name?: string;
+}
+
+/** One table with its open orders, for the waiter's screen. */
+export interface TableOrders {
+  table: BackendTable;
+  orders: BackendOrder[];
 }
 
 

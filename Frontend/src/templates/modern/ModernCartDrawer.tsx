@@ -3,6 +3,7 @@ import type { CartItem } from '../../types';
 import { formatPrice } from '../../utils/currency';
 import { useCartDrawerLogic } from '../../hooks/useCartDrawerLogic';
 import { sizedImageUrl } from '../../utils/imageUrl';
+import OrderEstimate from '../../components/common/OrderEstimate';
 
 interface ModernCartDrawerProps {
   cart: CartItem[];
@@ -493,6 +494,7 @@ export default function ModernCartDrawer({
                                 Delivered
                               </span>
                             )}
+                            <OrderEstimate order={order} />
                           </div>
                         )}
                       </div>

@@ -13,6 +13,12 @@ interface UseKitchenWebSocketOptions {
   onOrderCancelled?: (orderId: string) => void;
   onOrderStatusUpdated?: (orderId: string, status: string) => void;
   onItemSoldOutToggled?: (itemId: string, isSoldOut: boolean) => void;
+  /** Pro: food is ready at one of this waiter's tables (sent only to that waiter, or managers). */
+  onOrderReady?: (data: { order_id: string; table_number: string }) => void;
+  /** Pro: an order has cooked for twice its target (sent to managers). */
+  onOrderVeryLate?: (data: { order_id: string; table_number: string; target_minutes: number; cooking_minutes: number }) => void;
+  /** Play the built-in chime for new orders (default). Screens with their own bell turn it off. */
+  chimeOnNewOrder?: boolean;
 }
 
 export function useKitchenWebSocket(options: UseKitchenWebSocketOptions = {}) {
@@ -95,7 +101,7 @@ export function useKitchenWebSocket(options: UseKitchenWebSocketOptions = {}) {
 
           switch (parsed.event) {
             case 'order:created':
-              playChime();
+              if (optionsRef.current.chimeOnNewOrder !== false) playChime();
               optionsRef.current.onOrderCreated?.(parsed.data);
               break;
             case 'order:cancelled':
@@ -103,6 +109,12 @@ export function useKitchenWebSocket(options: UseKitchenWebSocketOptions = {}) {
               break;
             case 'order:status_updated':
               optionsRef.current.onOrderStatusUpdated?.(parsed.data?.order_id, parsed.data?.status);
+              break;
+            case 'order:ready':
+              optionsRef.current.onOrderReady?.(parsed.data);
+              break;
+            case 'order:very_late':
+              optionsRef.current.onOrderVeryLate?.(parsed.data);
               break;
             case 'item:sold_out_toggled':
               optionsRef.current.onItemSoldOutToggled?.(parsed.data?.item_id, parsed.data?.is_sold_out);

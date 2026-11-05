@@ -1,5 +1,6 @@
 import type {
   PlanTier,
+  TenantSettings,
   RestaurantMenu,
   MenuItem,
   Category,
@@ -78,6 +79,7 @@ function mapBackendToRestaurantMenu(data: BackendFullMenuResponse['data']): Rest
       ? (item.tags as string).toLowerCase().split(/[\s,]+/).filter(Boolean) as any
       : [],
     available: item.is_available && !item.is_sold_out,
+    prepMinutes: item.prep_minutes ?? null,
   }));
 
   return { meta, categories, items, plan: meta.plan || 'basic' };
@@ -397,6 +399,8 @@ export async function createAdminItem(item: {
   price: number;
   imageUrl?: string;
   tags?: string[];
+  /** Pro: minutes the dish takes; null uses the restaurant default. */
+  prepMinutes?: number | null;
 }): Promise<BackendMenuItem> {
   const res = await apiClient.post<{ message: string; data: BackendMenuItem }>('/admin/items', {
     category_id: item.categoryId,
@@ -405,6 +409,7 @@ export async function createAdminItem(item: {
     price: item.price,
     image_url: item.imageUrl || '',
     tags: item.tags || [],
+    prep_minutes: item.prepMinutes ?? null,
   });
   return res.data;
 }
@@ -419,6 +424,7 @@ export async function updateAdminItem(
     imageUrl?: string;
     tags?: string[];
     isAvailable?: boolean;
+    prepMinutes?: number | null;
   }
 ): Promise<BackendMenuItem> {
   const res = await apiClient.put<{ message: string; data: BackendMenuItem }>(`/admin/items/${id}`, {
@@ -429,6 +435,7 @@ export async function updateAdminItem(
     image_url: item.imageUrl || '',
     tags: item.tags || [],
     is_available: item.isAvailable !== false,
+    prep_minutes: item.prepMinutes ?? null,
   });
   return res.data;
 }
@@ -473,6 +480,12 @@ export async function updateAdminTenantTheme(themeConfig: Record<string, any>): 
 /**
  * Fetches live restaurant tenant profile from PostgreSQL
  */
+/** Pro manager: change prep and reminder times; only the fields sent change. */
+export async function updateTenantSettings(changes: Partial<TenantSettings>): Promise<TenantSettings> {
+  const res = await apiClient.patch<{ data: TenantSettings }>('/admin/tenant/settings', changes);
+  return res.data;
+}
+
 export async function fetchAdminTenantProfile(): Promise<RestaurantMeta | null> {
   try {
     const res = await apiClient.get<{ data: any }>('/admin/tenant');
@@ -482,6 +495,7 @@ export async function fetchAdminTenantProfile(): Promise<RestaurantMeta | null> 
         slug: res.data.slug,
         currency: res.data.currency || 'ETB',
         plan: normalizePlan(res.data.plan),
+        settings: res.data.settings,
         ...(res.data.theme_config || {}),
       };
     }

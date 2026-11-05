@@ -53,7 +53,7 @@ export default function ClassicMenuPage({
   restaurantSlug,
   tableNumber,
 }: ClassicMenuPageProps) {
-  const { can } = useFeatureGate();
+  const { can, hasPlan } = useFeatureGate();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('');
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
@@ -77,6 +77,7 @@ export default function ClassicMenuPage({
     items,
     loading: false,
     tableNumber,
+    oneOrderPerCart: hasPlan('pro'),
   });
 
   // Set initial active category once data loads

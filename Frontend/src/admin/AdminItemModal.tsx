@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, type ChangeEvent } from 'react';
 import { X, Check, Image as ImageIcon, UploadCloud, Link as LinkIcon, Trash2, Sparkles, Loader2 } from 'lucide-react';
 import type { MenuItem, Category } from '../types';
 import { uploadImageToCloudinary } from '../services/uploadService';
+import { t as text } from '../i18n/en';
+import { parsePrepMinutes } from '../utils/kitchenTimer';
 
 interface AdminItemModalProps {
   isOpen: boolean;
@@ -11,6 +13,9 @@ interface AdminItemModalProps {
   defaultCategoryId?: string;
   onClose: () => void;
   onSave: (item: MenuItem) => void;
+  /** Pro: show the prep time field; empty uses the restaurant default. */
+  showPrepTime?: boolean;
+  defaultPrepMinutes?: number;
 }
 
 const ALL_TAGS: ('vegetarian' | 'spicy' | 'gluten-free' | 'vegan' | 'chef-pick')[] = [
@@ -44,6 +49,8 @@ export default function AdminItemModal({
   defaultCategoryId,
   onClose,
   onSave,
+  showPrepTime = false,
+  defaultPrepMinutes = 15,
 }: AdminItemModalProps) {
   const [formData, setFormData] = useState<Partial<MenuItem> & { priceInput?: string | number }>({
     name: '',
@@ -156,6 +163,7 @@ export default function AdminItemModal({
       imageUrl: formData.imageUrl?.trim() || '/images/default_food.png',
       tags: formData.tags || [],
       available: formData.available !== false,
+      prepMinutes: parsePrepMinutes(formData.prepMinutes),
     };
 
     onSave(finalizedItem);
@@ -456,6 +464,25 @@ export default function AdminItemModal({
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               />
             </div>
+
+            {showPrepTime && (
+              <div>
+                <label className="admin-input-label" htmlFor="dish-prep-minutes">{text.dish.prepMinutes}</label>
+                <input
+                  id="dish-prep-minutes"
+                  type="number"
+                  min={1}
+                  max={240}
+                  className="admin-input-control"
+                  placeholder={String(defaultPrepMinutes)}
+                  value={formData.prepMinutes ?? ''}
+                  onChange={(e) =>
+                    setFormData({ ...formData, prepMinutes: e.target.value === '' ? null : Number(e.target.value) })
+                  }
+                />
+                <p style={{ fontSize: '12px', color: '#64748b', margin: '4px 0 0' }}>{text.dish.prepHint(defaultPrepMinutes)}</p>
+              </div>
+            )}
 
             {/* Dietary / Feature Tags */}
             <div>

@@ -33,6 +33,24 @@ import { canManage, canUseKitchen, normalizeRole } from '../utils/roles';
 import { t } from '../i18n/en';
 import AdminStaffModal from './AdminStaffModal';
 import AdminRoleHome from './AdminRoleHome';
+import ProKitchenBoard from './ProKitchenBoard';
+import WaiterTablesScreen, { type ReadyAlert } from './WaiterTablesScreen';
+import { useBell } from '../hooks/useBell';
+import { hasPlan } from '../utils/plan';
+
+/** When cooking started: kept while cooking or later, set now when it starts, cleared when moved back to new. */
+function startedAtFor(row: CartItem, status: OrderStatus): number | undefined {
+  if (status === 'preparing') return row.startedAt ?? Date.now();
+  if (status === 'not_started' || status === 'pending_grace') return undefined;
+  return row.startedAt;
+}
+
+interface VeryLateAlert {
+  orderId: string;
+  tableNumber: string;
+  cookingMinutes: number;
+  targetMinutes: number;
+}
 import { useKitchenWebSocket } from '../hooks/useKitchenWebSocket';
 import type { MenuItem, Category, RestaurantMeta, RestaurantMenu, CartItem, OrderStatus, PlanTier } from '../types';
 import { PLAN_INFO } from '../utils/plan';
@@ -168,11 +186,39 @@ export default function AdminDashboardPage() {
   const isManager = canManage(staffRole);
   const viewToShow: 'menu' | 'kitchen' = staffRole === 'chef' ? 'kitchen' : activeView;
 
+  // Pro screens: the kitchen board, the waiter's tables, bells and alerts
+  const isPro = hasPlan(planFromBackend, 'pro');
+  const bell = useBell();
+  const [readyAlerts, setReadyAlerts] = useState<ReadyAlert[]>([]);
+  const [veryLateAlerts, setVeryLateAlerts] = useState<VeryLateAlert[]>([]);
+  const [ordersChanged, setOrdersChanged] = useState(0);
+  const markOrdersChanged = () => setOrdersChanged((n) => n + 1);
+
   // Live WebSocket feed for real-time Kitchen Display System (Plus and Pro)
   useKitchenWebSocket({
     token: adminToken,
+    // Pro screens ring their own bell (the kitchen for new orders, waiters for their tables)
+    chimeOnNewOrder: !isPro,
+    onOrderReady: (data) => {
+      if (!data?.order_id) return;
+      setReadyAlerts((prev) =>
+        prev.some((a) => a.orderId === data.order_id) ? prev : [...prev, { orderId: data.order_id, tableNumber: data.table_number }]
+      );
+      bell.ring('bell');
+      markOrdersChanged();
+    },
+    onOrderVeryLate: (data) => {
+      if (!data?.order_id) return;
+      setVeryLateAlerts((prev) =>
+        prev.some((a) => a.orderId === data.order_id)
+          ? prev
+          : [...prev, { orderId: data.order_id, tableNumber: data.table_number, cookingMinutes: data.cooking_minutes, targetMinutes: data.target_minutes }]
+      );
+      bell.ring('alert');
+    },
     onOrderCreated: (orderData: any) => {
       if (!orderData) return;
+      markOrdersChanged();
       const newItems = mapBackendOrderToCartItems(orderData, items);
       setKitchenOrders((prev) => {
         const filtered = prev.filter((o) => o.orderId !== orderData.id);
@@ -195,9 +241,10 @@ export default function AdminDashboardPage() {
     },
     onOrderStatusUpdated: (orderId: string, status: string) => {
       if (!orderId || !status) return;
+      markOrdersChanged();
       const mapped = mapBackendStatusToFrontend(status);
       setKitchenOrders((prev) => {
-        const updated = prev.map((o) => (o.orderId === orderId ? { ...o, status: mapped } : o));
+        const updated = prev.map((o) => (o.orderId === orderId ? { ...o, status: mapped, startedAt: startedAtFor(o, mapped) } : o));
         saveRestaurantOrders(slug, updated);
         return updated;
       });
@@ -274,7 +321,7 @@ export default function AdminDashboardPage() {
     // 1. Optimistically update local React state immediately (0ms perceived latency)
     setKitchenOrders((prev) => {
       const updated = prev.map((o) =>
-        o.orderId === orderId ? { ...o, status, statusUpdatedAt: Date.now() } : o
+        o.orderId === orderId ? { ...o, status, statusUpdatedAt: Date.now(), startedAt: startedAtFor(o, status) } : o
       );
       saveRestaurantOrders(slug, updated);
       return updated;
@@ -291,7 +338,7 @@ export default function AdminDashboardPage() {
     // 1. Optimistically update the orders at this table that the action moves forward
     setKitchenOrders((prev) =>
       prev.map((o) =>
-        isTableActionTarget(o, tableNumber, status) ? { ...o, status, statusUpdatedAt: Date.now() } : o
+        isTableActionTarget(o, tableNumber, status) ? { ...o, status, statusUpdatedAt: Date.now(), startedAt: startedAtFor(o, status) } : o
       )
     );
 
@@ -537,6 +584,7 @@ export default function AdminDashboardPage() {
     imageUrl: item.imageUrl,
     tags: item.tags,
     isAvailable: item.available !== false,
+    prepMinutes: item.prepMinutes ?? null,
   });
 
   const setSoldOutOnBackend = async (itemId: string, isSoldOut: boolean) => {
@@ -733,8 +781,42 @@ export default function AdminDashboardPage() {
 
       {/* Main Full-Width Edge-to-Edge Dashboard */}
       <main className="admin-main-viewport">
-        {staffRole === 'waiter' || staffRole === 'cashier' ? (
+        {isManager &&
+          veryLateAlerts.map((alert) => (
+            <div
+              key={alert.orderId}
+              role="alert"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: '#dc2626', color: '#fff', borderRadius: '12px', padding: '12px 16px', margin: '0 0 10px', fontWeight: 700 }}
+            >
+              <span>{t.kitchen.veryLate(alert.tableNumber, alert.cookingMinutes, alert.targetMinutes)}</span>
+              <button
+                type="button"
+                className="admin-sec-pill-btn"
+                onClick={() => setVeryLateAlerts((prev) => prev.filter((a) => a.orderId !== alert.orderId))}
+              >
+                {t.kitchen.dismiss}
+              </button>
+            </div>
+          ))}
+        {staffRole === 'waiter' && isPro ? (
+          <WaiterTablesScreen
+            fullName={staffUser?.full_name}
+            onLogout={handleLogout}
+            bell={bell}
+            readyAlerts={readyAlerts}
+            onDismissAlert={(orderId) => setReadyAlerts((prev) => prev.filter((a) => a.orderId !== orderId))}
+            refreshSignal={ordersChanged}
+          />
+        ) : staffRole === 'waiter' || staffRole === 'cashier' ? (
           <AdminRoleHome role={staffRole} fullName={staffUser?.full_name} onLogout={handleLogout} />
+        ) : viewToShow === 'kitchen' && isPro ? (
+          <ProKitchenBoard
+            orders={kitchenOrders}
+            role={staffRole}
+            bell={bell}
+            onOrderStatusChange={handleKitchenOrderStatusChange}
+            onCancelOrder={(orderId) => handleKitchenOrderStatusChange(orderId, 'cancelled')}
+          />
         ) : viewToShow === 'kitchen' ? (
           /* ── Full Dashboard Kitchen Orders View ────────────────────────────── */
           <AdminKitchenView
@@ -1039,6 +1121,7 @@ export default function AdminDashboardPage() {
           setEditingItem(null);
         }}
         onSave={handleSaveItem}
+        showPrepTime={isPro}
       />
 
       {/* Categories Add Modal */}
@@ -1105,6 +1188,8 @@ export default function AdminDashboardPage() {
         onClose={() => setIsSettingsModalOpen(false)}
         onSave={handleSaveSettings}
         onResetToDefault={handleResetToDefault}
+        showProTimings={isPro && isManager}
+        onToast={showToast}
       />
 
       {/* Dining Tables & QR Code Generator Modal */}
@@ -1112,6 +1197,7 @@ export default function AdminDashboardPage() {
         isOpen={isTablesModalOpen}
         onClose={() => setIsTablesModalOpen(false)}
         restaurantSlug={slug}
+        plan={planFromBackend}
       />
 
       {/* Staff accounts (managers, Pro plan) */}

@@ -36,6 +36,8 @@ interface UseMenuCartOptions {
   tableNumber: string | null;
   tableToken?: string | null;
   isTableVerified?: boolean;
+  /** Pro: send the whole cart as one order, so the kitchen starts and readies it together. */
+  oneOrderPerCart?: boolean;
 }
 
 export interface ActiveUndoState {
@@ -50,6 +52,7 @@ export default function useMenuCart({
   loading,
   tableNumber,
   tableToken,
+  oneOrderPerCart = false,
 }: UseMenuCartOptions) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartRehydrated, setCartRehydrated] = useState(false);
@@ -244,9 +247,11 @@ export default function useMenuCart({
             const found = results.find((r) => r.orderId === o.orderId);
             if (found && found.liveOrder && found.liveOrder.status) {
               const mapped = mapBackendStatusToFrontend(found.liveOrder.status);
-              if (mapped !== o.status) {
+              const startedAt = found.liveOrder.started_at ? new Date(found.liveOrder.started_at).getTime() : undefined;
+              const targetMinutes = found.liveOrder.target_minutes || o.targetMinutes;
+              if (mapped !== o.status || startedAt !== o.startedAt || targetMinutes !== o.targetMinutes) {
                 hasChanges = true;
-                return { ...o, status: mapped };
+                return { ...o, status: mapped, startedAt, targetMinutes };
               }
             }
             return o;
@@ -344,20 +349,20 @@ export default function useMenuCart({
 
     // 1. Try Live Backend Order first (for database tenants like Azai Burger)
     try {
-      const orderPromises = cart.map((c) =>
+      // Pro sends the cart as one order; Basic and Plus send one order per dish, as before
+      const groups: CartItem[][] = oneOrderPerCart ? [cart] : cart.map((c) => [c]);
+      const orderPromises = groups.map((group) =>
         placeLiveOrder(slug, {
           tableNumber: effectiveTable,
           tableToken: effectiveToken,
-          items: [
-            {
-              menu_item_id: c.item.id,
-              item_name: c.item.name,
-              unit_price: c.item.price,
-              quantity: c.quantity,
-              notes: c.notes || '',
-              modifiers: [],
-            },
-          ],
+          items: group.map((c) => ({
+            menu_item_id: c.item.id,
+            item_name: c.item.name,
+            unit_price: c.item.price,
+            quantity: c.quantity,
+            notes: c.notes || '',
+            modifiers: [],
+          })),
         })
       );
 
@@ -368,29 +373,32 @@ export default function useMenuCart({
         const newPlacedItems: CartItem[] = [];
         const newOrderIds: string[] = [];
 
-        successfulOrders.forEach((res, i) => {
-          const originalCartItem = cart[i];
-          const it = res.order.items?.[0];
+        results.forEach((res, groupIndex) => {
+          if (!res || !res.order) return;
           newOrderIds.push(res.order.id);
+          groups[groupIndex].forEach((originalCartItem, i) => {
+            const it = res.order.items?.[i];
 
-          newPlacedItems.push({
-            orderId: res.order.id,
-            placedAt: new Date(res.order.created_at).getTime(),
-            status: mapBackendStatusToFrontend(res.order.status),
-            tableNumber: res.order.table_number,
-            quantity: it?.quantity || originalCartItem?.quantity || 1,
-            variant: originalCartItem?.variant || '',
-            notes: it?.notes || originalCartItem?.notes || '',
-            item: originalCartItem?.item || {
-              id: it?.menu_item_id || res.order.id,
-              name: it?.item_name || 'Dish Item',
-              price: it?.unit_price || 0,
-              imageUrl: '/images/default_food.png',
-              description: '',
-              tags: [],
-              available: true,
-              categoryId: 'all',
-            },
+            newPlacedItems.push({
+              targetMinutes: res.order.target_minutes || undefined,
+              orderId: res.order.id,
+              placedAt: new Date(res.order.created_at).getTime(),
+              status: mapBackendStatusToFrontend(res.order.status),
+              tableNumber: res.order.table_number,
+              quantity: it?.quantity || originalCartItem?.quantity || 1,
+              variant: originalCartItem?.variant || '',
+              notes: it?.notes || originalCartItem?.notes || '',
+              item: originalCartItem?.item || {
+                id: it?.menu_item_id || res.order.id,
+                name: it?.item_name || 'Dish Item',
+                price: it?.unit_price || 0,
+                imageUrl: '/images/default_food.png',
+                description: '',
+                tags: [],
+                available: true,
+                categoryId: 'all',
+              },
+            });
           });
         });
 

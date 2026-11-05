@@ -2,6 +2,7 @@ import { ShoppingBag, X, Plus, Minus, Trash2, CheckCircle2, ChefHat, RotateCcw }
 import type { CartItem } from '../../types';
 import { formatPrice } from '../../utils/currency';
 import { useCartDrawerLogic } from '../../hooks/useCartDrawerLogic';
+import OrderEstimate from '../../components/common/OrderEstimate';
 
 interface ClassicCartDrawerProps {
   cart: CartItem[];
@@ -798,7 +799,7 @@ export default function ClassicCartDrawer({
 
                             {/* Action / Live Status Badge */}
                             {order.orderId && (
-                              <div style={{ flexShrink: 0 }}>
+                              <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
                                 {(!status || status === 'not_started') ? (
                                   <button
                                     type="button"
@@ -874,6 +875,7 @@ export default function ClassicCartDrawer({
                                     Delivered
                                   </span>
                                 )}
+                                <OrderEstimate order={order} color="rgba(255, 255, 255, 0.75)" />
                               </div>
                             )}
                           </div>

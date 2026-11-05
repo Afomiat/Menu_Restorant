@@ -45,6 +45,56 @@ export const en = {
     saved: 'Saved',
   },
 
+  kitchen: {
+    title: 'Kitchen',
+    enableSound: 'Tap to enable sound',
+    empty: 'No open orders. New orders appear here with a bell.',
+    table: (n: string) => `Table ${n}`,
+    waiting: (waited: string, target: number) => `New · ${waited} · ${target} min`,
+    cooking: 'Cooking',
+    readyWaiting: 'Ready · waiting for the waiter',
+    start: 'Start',
+    ready: 'Ready',
+    served: 'Served',
+    cancel: 'Cancel order',
+    veryLate: (table: string, minutes: number, target: number) =>
+      `Table ${table}: cooking for ${minutes} min (target ${target} min)`,
+    dismiss: 'Dismiss',
+  },
+
+  waiter: {
+    title: 'My tables',
+    empty: 'No tables are assigned to you yet. Ask your manager.',
+    noOrders: 'No open orders',
+    foodReady: 'Food ready',
+    cooking: 'Cooking',
+    ordered: 'Ordered',
+    served: 'Served',
+    readyBanner: (table: string) => `Table ${table}: food is ready`,
+    order: (n: number) => `Order ${n}`,
+  },
+
+  tables: {
+    waiter: 'Waiter',
+    noWaiter: 'No waiter (alerts go to managers)',
+  },
+
+  settings: {
+    proTitle: 'Pro timings (minutes)',
+    defaultPrep: 'Default prep time',
+    billReminder: 'Remind waiter about an unpaid bill after',
+    billEscalation: 'Alert manager about an unpaid bill after',
+    confirmReminder: 'Remind cashier to confirm after',
+    longTable: 'Remind waiter about a long-open table after',
+    save: 'Save timings',
+    saved: 'Timings saved',
+  },
+
+  dish: {
+    prepMinutes: 'Prep time (minutes)',
+    prepHint: (fallback: number) => `Leave empty to use the restaurant default (${fallback} min).`,
+  },
+
   roleHome: {
     greeting: (name: string) => (name ? `Hello, ${name}` : 'Hello'),
     signedInAs: (role: string) => `Signed in as ${role}`,

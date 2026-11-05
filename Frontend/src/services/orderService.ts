@@ -1,4 +1,4 @@
-import type { CartItem, OrderStatus, BackendOrder, PlanTier } from '../types';
+import type { CartItem, OrderStatus, BackendOrder, BackendTable, PlanTier, TableOrders } from '../types';
 import { apiClient } from './apiClient';
 
 const ORDER_EVENT_PREFIX = 'azai_orders_updated_';
@@ -123,10 +123,16 @@ export function mapBackendStatusToFrontend(backendStatus?: string): OrderStatus 
 export function mapBackendOrderToCartItems(order: BackendOrder, menuItems: any[] = []): CartItem[] {
   const status = mapBackendStatusToFrontend(order.status);
   const placedAt = order.created_at ? new Date(order.created_at).getTime() : Date.now();
+  // Pro timing: the order's target and when cooking started
+  const timing: Pick<CartItem, 'targetMinutes' | 'startedAt'> = {
+    targetMinutes: order.target_minutes || undefined,
+    startedAt: order.started_at ? new Date(order.started_at).getTime() : undefined,
+  };
 
   if (!order.items || order.items.length === 0) {
     return [
       {
+        ...timing,
         orderId: order.id,
         placedAt,
         status,
@@ -151,6 +157,7 @@ export function mapBackendOrderToCartItems(order: BackendOrder, menuItems: any[]
   return order.items.map((it) => {
     const matched = menuItems.find((m) => m.id === it.menu_item_id);
     return {
+      ...timing,
       orderId: order.id,
       placedAt,
       status,
@@ -225,11 +232,18 @@ export async function updateAdminTenantPlan(plan: PlanTier, _slug?: string): Pro
   }
 }
 
-export interface AdminTable {
-  id: string;
-  tenant_id: string;
-  table_number: string;
-  is_active: boolean;
+export type AdminTable = BackendTable;
+
+/** Pro manager: give a table to a waiter, or to nobody (null). */
+export async function assignTableWaiter(tableId: string, waiterId: string | null): Promise<AdminTable> {
+  const res = await apiClient.patch<{ data: AdminTable }>(`/admin/tables/${tableId}/waiter`, { waiter_id: waiterId });
+  return res.data;
+}
+
+/** Pro: a waiter's tables with their open orders (every table for a manager). */
+export async function fetchMyTables(): Promise<TableOrders[]> {
+  const res = await apiClient.get<{ data: TableOrders[] }>('/admin/my-tables');
+  return res?.data || [];
 }
 
 /**

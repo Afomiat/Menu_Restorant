@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { CartItem, MenuItem, OrderStatus, PlanTier, RestaurantMeta } from '../types';
 
@@ -23,7 +23,14 @@ vi.mock('../hooks/useRestaurantMenu', () => ({
     plan: currentPlan,
   }),
 }));
-vi.mock('../hooks/useKitchenWebSocket', () => ({ useKitchenWebSocket: () => ({ isConnected: true }) }));
+// Keeps the options the dashboard passes, so a test can fire live events through them
+let wsOptions: Record<string, (...args: never[]) => void> = {};
+vi.mock('../hooks/useKitchenWebSocket', () => ({
+  useKitchenWebSocket: (opts: typeof wsOptions) => {
+    wsOptions = opts;
+    return { isConnected: true };
+  },
+}));
 vi.mock('../services/apiClient', async () => {
   const actual = await vi.importActual<typeof import('../services/apiClient')>('../services/apiClient');
   return { ...actual, getAdminToken: () => 'token', clearAdminToken: vi.fn() };
@@ -53,6 +60,8 @@ const order = (name: string, status: OrderStatus): CartItem => ({
 });
 let kitchenOrders: CartItem[] = [];
 const updateTableOrdersStatus = vi.fn();
+const updateOrderStatus = vi.fn(async (..._args: unknown[]) => true);
+const fetchMyTables = vi.fn(async () => [] as unknown[]);
 const fetchAdminActiveOrders = vi.fn(async () => kitchenOrders.map((o) => ({ id: o.orderId })));
 vi.mock('../services/orderService', async () => {
   const actual = await vi.importActual<typeof import('../services/orderService')>('../services/orderService');
@@ -61,6 +70,8 @@ vi.mock('../services/orderService', async () => {
     fetchAdminActiveOrders: () => fetchAdminActiveOrders(),
     mapBackendOrderToCartItems: (bo: { id: string }) => kitchenOrders.filter((o) => o.orderId === bo.id),
     updateTableOrdersStatus: (...args: unknown[]) => updateTableOrdersStatus(...args),
+    updateOrderStatus: (...args: unknown[]) => updateOrderStatus(...args),
+    fetchMyTables: () => fetchMyTables(),
   };
 });
 
@@ -93,6 +104,9 @@ beforeEach(() => {
   updateTableOrdersStatus.mockReset().mockResolvedValue(undefined);
   fetchAdminActiveOrders.mockClear();
   fetchStaff.mockClear();
+  updateOrderStatus.mockClear();
+  fetchMyTables.mockReset().mockResolvedValue([]);
+  wsOptions = {};
   kitchenOrders = [];
   currentPlan = 'pro';
 });
@@ -112,8 +126,9 @@ describe('AdminDashboardPage plan badge', () => {
   });
 });
 
-describe('AdminDashboardPage Start All', () => {
+describe('AdminDashboardPage Start All (Plus kitchen)', () => {
   it('starts the new round without sending the ready dish back to cooking', async () => {
+    currentPlan = 'plus';
     kitchenOrders = [order('Tibs', 'ready'), order('Coffee', 'not_started')];
     renderDashboard();
 
@@ -132,6 +147,7 @@ describe('AdminDashboardPage screens by role', () => {
   const navItems = () => Array.from(document.querySelectorAll('.admin-nav-item')).map((el) => el.textContent?.trim());
 
   it('opens the kitchen for a chef and hides menu editing', async () => {
+    currentPlan = 'plus';
     signedInAs('chef');
     kitchenOrders = [order('Coffee', 'not_started')];
     renderDashboard();
@@ -143,6 +159,7 @@ describe('AdminDashboardPage screens by role', () => {
   });
 
   it('treats a login from before the Pro roles (kitchen) as a chef', async () => {
+    currentPlan = 'plus';
     signedInAs('kitchen');
     kitchenOrders = [order('Coffee', 'not_started')];
     renderDashboard();
@@ -151,6 +168,7 @@ describe('AdminDashboardPage screens by role', () => {
   });
 
   it('shows a waiter their own screen and does not load kitchen orders', () => {
+    currentPlan = 'plus';
     signedInAs('waiter', 'Abebe Kebede');
     renderDashboard();
 
@@ -177,6 +195,7 @@ describe('AdminDashboardPage screens by role', () => {
   });
 
   it('tells a turned-off staff member why they were signed out', async () => {
+    currentPlan = 'plus';
     signedInAs('waiter');
     renderDashboard();
 
@@ -186,5 +205,68 @@ describe('AdminDashboardPage screens by role', () => {
 
     expect(await screen.findByText(/Your account was turned off by a manager/)).toBeTruthy();
     expect(screen.getByLabelText('Phone number or email')).toBeTruthy();
+  });
+});
+
+describe('AdminDashboardPage Pro screens', () => {
+  it('gives a chef the Pro kitchen board and starts the whole order', async () => {
+    signedInAs('chef');
+    kitchenOrders = [order('Coffee', 'not_started')];
+    renderDashboard();
+
+    expect(await screen.findByText('Tap to enable sound')).toBeTruthy();
+    expect(screen.queryByText('Start All')).toBeNull();
+
+    fireEvent.click(await screen.findByText('Start'));
+
+    expect(updateOrderStatus).toHaveBeenCalledWith('bistro', 'Coffee-0000-0000-0000-000000000000', 'preparing');
+    // The timer starts at once
+    expect((await screen.findByTestId('ticket-time')).textContent).toMatch(/^0:0\d \/ 15:00$/);
+  });
+
+  it('gives a waiter their tables and shows the food-ready bell as a banner', async () => {
+    signedInAs('waiter', 'Abebe Kebede');
+    renderDashboard();
+
+    expect(await screen.findByText('My tables')).toBeTruthy();
+    await waitFor(() => expect(fetchMyTables).toHaveBeenCalled());
+    expect(fetchAdminActiveOrders).not.toHaveBeenCalled();
+
+    act(() => wsOptions.onOrderReady?.({ order_id: 'o1', table_number: '5' } as never));
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Table 5: food is ready');
+  });
+
+  it('alerts a manager about an order cooking for twice its target', async () => {
+    signedInAs('manager');
+    renderDashboard();
+
+    act(() => wsOptions.onOrderVeryLate?.({ order_id: 'o9', table_number: '7', target_minutes: 15, cooking_minutes: 31 } as never));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('Table 7: cooking for 31 min (target 15 min)');
+    fireEvent.click(within(alert).getByText('Dismiss'));
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('does not show the very-late alert to a chef', async () => {
+    signedInAs('chef');
+    renderDashboard();
+
+    act(() => wsOptions.onOrderVeryLate?.({ order_id: 'o9', table_number: '7', target_minutes: 15, cooking_minutes: 31 } as never));
+
+    expect(screen.queryByText(/cooking for 31 min/)).toBeNull();
+  });
+
+  it('turns the old new-order chime off on Pro and keeps it below Pro', () => {
+    signedInAs('chef');
+    renderDashboard();
+    expect(wsOptions.chimeOnNewOrder).toBe(false);
+    cleanup();
+
+    currentPlan = 'plus';
+    signedInAs('chef');
+    renderDashboard();
+    expect(wsOptions.chimeOnNewOrder).toBe(true);
   });
 });
