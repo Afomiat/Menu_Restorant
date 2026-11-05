@@ -20,6 +20,11 @@ type Config struct {
 	CloudinaryCloudName string `mapstructure:"CLOUDINARY_CLOUD_NAME"`
 	CloudinaryAPIKey    string `mapstructure:"CLOUDINARY_API_KEY"`
 	CloudinaryAPISecret string `mapstructure:"CLOUDINARY_API_SECRET"`
+
+	// Web push for staff phones (make vapid); empty keys turn push off
+	VAPIDPublicKey  string `mapstructure:"VAPID_PUBLIC_KEY"`
+	VAPIDPrivateKey string `mapstructure:"VAPID_PRIVATE_KEY"`
+	VAPIDSubject    string `mapstructure:"VAPID_SUBJECT"`
 }
 
 // LoadConfig reads configuration from .env, then .env.local, then environment variables.
@@ -42,6 +47,9 @@ func LoadConfig(path string) (*Config, error) {
 	_ = v.BindEnv("CLOUDINARY_CLOUD_NAME")
 	_ = v.BindEnv("CLOUDINARY_API_KEY")
 	_ = v.BindEnv("CLOUDINARY_API_SECRET")
+	_ = v.BindEnv("VAPID_PUBLIC_KEY")
+	_ = v.BindEnv("VAPID_PRIVATE_KEY")
+	_ = v.BindEnv("VAPID_SUBJECT")
 
 	// Default fallback values
 	v.SetDefault("PORT", "8080")
@@ -49,6 +57,7 @@ func LoadConfig(path string) (*Config, error) {
 	v.SetDefault("QR_SECRET_KEY", "azai-restaurant-menu-qr-secret-key-32-chars")
 	v.SetDefault("JWT_SECRET", "azai-restaurant-jwt-secret-key-32-chars")
 	v.SetDefault("FRONTEND_URL", "http://localhost:5173")
+	v.SetDefault("VAPID_SUBJECT", "mailto:support@azai.et")
 
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {

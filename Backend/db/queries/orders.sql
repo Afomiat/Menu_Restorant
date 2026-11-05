@@ -17,14 +17,14 @@ VALUES ($1, $2, $3, $4)
 RETURNING id, order_item_id, modifier_id, modifier_name, price_applied;
 
 -- name: GetOrderByID :one
-SELECT id, tenant_id, table_id, table_number, customer_session_token, status, payment_status, total_amount, grace_period_ends_at, created_at, target_minutes, started_at, started_by, ready_at, ready_by, served_at, served_by
+SELECT id, tenant_id, table_id, table_number, customer_session_token, status, payment_status, total_amount, grace_period_ends_at, created_at, target_minutes, started_at, started_by, ready_at, ready_by, served_at, served_by, remake_of
 FROM orders
 WHERE id = $1 AND tenant_id = $2
 LIMIT 1;
 
 -- name: ListActiveOrdersByTenant :many
 SELECT id, tenant_id, table_id, table_number, status, payment_status, total_amount, grace_period_ends_at, created_at,
-       target_minutes, started_at, started_by, ready_at, ready_by, served_at, served_by
+       target_minutes, started_at, started_by, ready_at, ready_by, served_at, served_by, remake_of
 FROM orders
 WHERE tenant_id = $1 AND status NOT IN ('delivered', 'cancelled')
 ORDER BY created_at DESC;

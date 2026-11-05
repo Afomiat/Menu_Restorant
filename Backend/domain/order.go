@@ -63,6 +63,8 @@ type Order struct {
 	WaiterID *uuid.UUID `json:"waiter_id,omitempty"`
 	// BillID is the Pro bill the order is on
 	BillID *uuid.UUID `json:"bill_id,omitempty"`
+	// RemakeOf is the order this one cooks again after a problem; the kitchen shows remakes first
+	RemakeOf *uuid.UUID `json:"remake_of,omitempty"`
 }
 
 // Actor is the signed-in staff member doing something

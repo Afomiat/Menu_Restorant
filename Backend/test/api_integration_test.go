@@ -59,7 +59,7 @@ func setupTestRouter(tenant *domain.Tenant, qrSecret, jwtSecret string) (*gin.En
 }
 
 // setupTestRouterWithBills also wires a bill usecase (nil: no bills, as below Pro)
-func setupTestRouterWithBills(tenant *domain.Tenant, qrSecret, jwtSecret string, bills domain.BillUsecase) (*gin.Engine, *domain.Order) {
+func setupTestRouterWithBills(tenant *domain.Tenant, qrSecret, jwtSecret string, bills domain.BillUsecase, extra ...func(*router.RouterDependencies)) (*gin.Engine, *domain.Order) {
 	cfg := &config.Config{
 		Environment: "test",
 		QRSecretKey: qrSecret,
@@ -102,7 +102,7 @@ func setupTestRouterWithBills(tenant *domain.Tenant, qrSecret, jwtSecret string,
 	menuUc := usecase.NewMenuUsecase(&mockTenantRepo{tenant: tenant}, menuRepo)
 	tableUc := usecase.NewTableUsecase(tableRepo, newMemStaffRepo(), &mockActivityRepo{}, qrSecret)
 
-	r := router.SetupRouter(router.RouterDependencies{
+	deps := router.RouterDependencies{
 		Config:        cfg,
 		TenantUsecase: tenantUc,
 		MenuUsecase:   menuUc,
@@ -111,7 +111,11 @@ func setupTestRouterWithBills(tenant *domain.Tenant, qrSecret, jwtSecret string,
 		Hub:           nil,
 		StaffUsecase:  allActiveStaff{},
 		BillUsecase:   bills,
-	})
+	}
+	for _, apply := range extra {
+		apply(&deps)
+	}
+	r := router.SetupRouter(deps)
 
 	return r, testOrder
 }

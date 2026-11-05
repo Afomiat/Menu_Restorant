@@ -162,7 +162,17 @@ type CreateOrderItemParams struct {
 	Notes      pgtype.Text    `json:"notes"`
 }
 
-func (q *Queries) CreateOrderItem(ctx context.Context, arg CreateOrderItemParams) (OrderItem, error) {
+type CreateOrderItemRow struct {
+	ID         pgtype.UUID    `json:"id"`
+	OrderID    pgtype.UUID    `json:"order_id"`
+	MenuItemID pgtype.UUID    `json:"menu_item_id"`
+	ItemName   string         `json:"item_name"`
+	UnitPrice  pgtype.Numeric `json:"unit_price"`
+	Quantity   int32          `json:"quantity"`
+	Notes      pgtype.Text    `json:"notes"`
+}
+
+func (q *Queries) CreateOrderItem(ctx context.Context, arg CreateOrderItemParams) (CreateOrderItemRow, error) {
 	row := q.db.QueryRow(ctx, createOrderItem,
 		arg.OrderID,
 		arg.MenuItemID,
@@ -171,7 +181,7 @@ func (q *Queries) CreateOrderItem(ctx context.Context, arg CreateOrderItemParams
 		arg.Quantity,
 		arg.Notes,
 	)
-	var i OrderItem
+	var i CreateOrderItemRow
 	err := row.Scan(
 		&i.ID,
 		&i.OrderID,
@@ -216,7 +226,7 @@ func (q *Queries) CreateOrderItemModifier(ctx context.Context, arg CreateOrderIt
 }
 
 const getOrderByID = `-- name: GetOrderByID :one
-SELECT id, tenant_id, table_id, table_number, customer_session_token, status, payment_status, total_amount, grace_period_ends_at, created_at, target_minutes, started_at, started_by, ready_at, ready_by, served_at, served_by
+SELECT id, tenant_id, table_id, table_number, customer_session_token, status, payment_status, total_amount, grace_period_ends_at, created_at, target_minutes, started_at, started_by, ready_at, ready_by, served_at, served_by, remake_of
 FROM orders
 WHERE id = $1 AND tenant_id = $2
 LIMIT 1
@@ -245,6 +255,7 @@ type GetOrderByIDRow struct {
 	ReadyBy              pgtype.UUID        `json:"ready_by"`
 	ServedAt             pgtype.Timestamptz `json:"served_at"`
 	ServedBy             pgtype.UUID        `json:"served_by"`
+	RemakeOf             pgtype.UUID        `json:"remake_of"`
 }
 
 func (q *Queries) GetOrderByID(ctx context.Context, arg GetOrderByIDParams) (GetOrderByIDRow, error) {
@@ -268,13 +279,14 @@ func (q *Queries) GetOrderByID(ctx context.Context, arg GetOrderByIDParams) (Get
 		&i.ReadyBy,
 		&i.ServedAt,
 		&i.ServedBy,
+		&i.RemakeOf,
 	)
 	return i, err
 }
 
 const listActiveOrdersByTenant = `-- name: ListActiveOrdersByTenant :many
 SELECT id, tenant_id, table_id, table_number, status, payment_status, total_amount, grace_period_ends_at, created_at,
-       target_minutes, started_at, started_by, ready_at, ready_by, served_at, served_by
+       target_minutes, started_at, started_by, ready_at, ready_by, served_at, served_by, remake_of
 FROM orders
 WHERE tenant_id = $1 AND status NOT IN ('delivered', 'cancelled')
 ORDER BY created_at DESC
@@ -297,6 +309,7 @@ type ListActiveOrdersByTenantRow struct {
 	ReadyBy           pgtype.UUID        `json:"ready_by"`
 	ServedAt          pgtype.Timestamptz `json:"served_at"`
 	ServedBy          pgtype.UUID        `json:"served_by"`
+	RemakeOf          pgtype.UUID        `json:"remake_of"`
 }
 
 func (q *Queries) ListActiveOrdersByTenant(ctx context.Context, tenantID pgtype.UUID) ([]ListActiveOrdersByTenantRow, error) {
@@ -325,6 +338,7 @@ func (q *Queries) ListActiveOrdersByTenant(ctx context.Context, tenantID pgtype.
 			&i.ReadyBy,
 			&i.ServedAt,
 			&i.ServedBy,
+			&i.RemakeOf,
 		); err != nil {
 			return nil, err
 		}
@@ -374,15 +388,25 @@ FROM order_items
 WHERE order_id = $1
 `
 
-func (q *Queries) ListOrderItemsByOrderID(ctx context.Context, orderID pgtype.UUID) ([]OrderItem, error) {
+type ListOrderItemsByOrderIDRow struct {
+	ID         pgtype.UUID    `json:"id"`
+	OrderID    pgtype.UUID    `json:"order_id"`
+	MenuItemID pgtype.UUID    `json:"menu_item_id"`
+	ItemName   string         `json:"item_name"`
+	UnitPrice  pgtype.Numeric `json:"unit_price"`
+	Quantity   int32          `json:"quantity"`
+	Notes      pgtype.Text    `json:"notes"`
+}
+
+func (q *Queries) ListOrderItemsByOrderID(ctx context.Context, orderID pgtype.UUID) ([]ListOrderItemsByOrderIDRow, error) {
 	rows, err := q.db.Query(ctx, listOrderItemsByOrderID, orderID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []OrderItem{}
+	items := []ListOrderItemsByOrderIDRow{}
 	for rows.Next() {
-		var i OrderItem
+		var i ListOrderItemsByOrderIDRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.OrderID,

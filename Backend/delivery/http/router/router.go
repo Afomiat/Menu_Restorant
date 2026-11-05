@@ -16,16 +16,21 @@ import (
 )
 
 type RouterDependencies struct {
-	Config        *config.Config
-	TenantUsecase domain.TenantUsecase
-	MenuUsecase   domain.MenuUsecase
-	OrderUsecase  domain.OrderUsecase
-	TableUsecase  domain.TableUsecase
-	UploadUsecase domain.UploadUsecase
-	StaffUsecase  domain.StaffUsecase
-	BillUsecase   domain.BillUsecase
-	Hub           *ws.Hub
-	Pool          *pgxpool.Pool
+	Config         *config.Config
+	TenantUsecase  domain.TenantUsecase
+	MenuUsecase    domain.MenuUsecase
+	OrderUsecase   domain.OrderUsecase
+	TableUsecase   domain.TableUsecase
+	UploadUsecase  domain.UploadUsecase
+	StaffUsecase   domain.StaffUsecase
+	BillUsecase    domain.BillUsecase
+	ProblemUsecase domain.ProblemUsecase
+	ReportUsecase  domain.ReportUsecase
+	PushRepo       domain.PushRepository
+	// Notifier sends targeted alerts (live screens, plus web push when it is on); defaults to the hub
+	Notifier domain.Notifier
+	Hub      *ws.Hub
+	Pool     *pgxpool.Pool
 }
 
 // SetupRouter configures routes, middlewares, security headers, rate limiters, and CORS
@@ -85,7 +90,12 @@ func SetupRouter(deps RouterDependencies) *gin.Engine {
 	// Initialize Controllers
 	menuCtrl := controller.NewMenuController(deps.MenuUsecase, deps.OrderUsecase, deps.Hub)
 	tableCtrl := controller.NewTableController(deps.TableUsecase, deps.TenantUsecase, deps.BillUsecase)
-	orderCtrl := controller.NewOrderController(deps.OrderUsecase, deps.BillUsecase, deps.Hub)
+	var notifier domain.Notifier = deps.Notifier
+	if notifier == nil && deps.Hub != nil {
+		notifier = deps.Hub
+	}
+	orderCtrl := controller.NewOrderController(deps.OrderUsecase, deps.BillUsecase, deps.Hub, notifier)
+	problemCtrl := controller.NewProblemController(deps.ProblemUsecase, deps.ReportUsecase, deps.PushRepo, deps.Config.VAPIDPublicKey)
 	billCtrl := controller.NewBillController(deps.BillUsecase, deps.Config.QRSecretKey)
 	tenantCtrl := controller.NewTenantController(deps.TenantUsecase, deps.Hub)
 	authCtrl := controller.NewAuthController(deps.StaffUsecase, deps.Config.JWTSecret)
@@ -185,6 +195,21 @@ func SetupRouter(deps RouterDependencies) *gin.Engine {
 				proRoutes.POST("/bills/:id/move", waiter, billCtrl.Move)
 				proRoutes.POST("/bills/:id/handover", waiter, billCtrl.Handover)
 				proRoutes.GET("/colleagues", waiter, staffCtrl.ListColleagues)
+
+				// Problems with dishes and walkouts: waiters report, managers decide
+				proRoutes.POST("/orders/:id/problems", waiter, problemCtrl.ReportProblem)
+				proRoutes.POST("/problems/:id/decision", manager, problemCtrl.DecideProblem)
+				proRoutes.POST("/bills/:id/walkout", waiter, problemCtrl.MarkWalkout)
+				proRoutes.POST("/bills/:id/walkout-decision", manager, problemCtrl.DecideWalkout)
+				proRoutes.GET("/decisions", manager, problemCtrl.Pending)
+
+				// Reports
+				proRoutes.GET("/reports/daily", manager, problemCtrl.DailyReport)
+				proRoutes.GET("/reports/my-shift", middleware.RequireRole(domain.RoleWaiter, domain.RoleCashier), problemCtrl.MyShiftReport)
+
+				// Web push for locked phones
+				proRoutes.GET("/push/key", allStaff, problemCtrl.PushKey)
+				proRoutes.POST("/push/subscribe", allStaff, problemCtrl.SubscribePush)
 
 				// Shifts
 				proRoutes.GET("/shifts/me", allStaff, billCtrl.MyShift)

@@ -32,6 +32,10 @@ seed:
 test-db:
 	TEST_DATABASE_URL="$(LOCAL_DB_URL)" go test ./...
 
+# Print a new key pair for web push (put it in .env.local, or in the server's environment): make vapid
+vapid:
+	go run ./tools/vapid
+
 # Auto-generate sequentially numbered migration: make migrate-create name=init_schema
 migrate-create:
 	migrate create -ext sql -dir db/migrations -seq $(name)
@@ -56,4 +60,4 @@ sqlc:
 run:
 	go run .
 
-.PHONY: db-up db-down db-reset seed test-db migrate-create migrate-up migrate-down migrate-force sqlc run
+.PHONY: db-up db-down db-reset seed test-db vapid migrate-create migrate-up migrate-down migrate-force sqlc run

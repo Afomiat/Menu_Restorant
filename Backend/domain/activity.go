@@ -25,6 +25,11 @@ const (
 	ActionBillHandover  = "bill.handed_over"
 	ActionShiftStarted  = "shift.started"
 	ActionShiftEnded    = "shift.ended"
+
+	ActionProblemReported = "problem.reported"
+	ActionProblemDecided  = "problem.decided"
+	ActionWalkoutMarked   = "walkout.marked"
+	ActionWalkoutDecided  = "walkout.decided"
 )
 
 // Activity is one entry of a restaurant's who-did-what log

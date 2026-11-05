@@ -56,6 +56,49 @@ func (ns NullBillStatus) Value() (driver.Value, error) {
 	return string(ns.BillStatus), nil
 }
 
+type Fault string
+
+const (
+	FaultKitchen Fault = "kitchen"
+	FaultWaiter  Fault = "waiter"
+	FaultNone    Fault = "none"
+)
+
+func (e *Fault) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = Fault(s)
+	case string:
+		*e = Fault(s)
+	default:
+		return fmt.Errorf("unsupported scan type for Fault: %T", src)
+	}
+	return nil
+}
+
+type NullFault struct {
+	Fault Fault `json:"fault"`
+	Valid bool  `json:"valid"` // Valid is true if Fault is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullFault) Scan(value interface{}) error {
+	if value == nil {
+		ns.Fault, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.Fault.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullFault) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.Fault), nil
+}
+
 type OrderStatus string
 
 const (
@@ -231,6 +274,94 @@ func (ns NullPlanTier) Value() (driver.Value, error) {
 	return string(ns.PlanTier), nil
 }
 
+type ProblemDecision string
+
+const (
+	ProblemDecisionRemake         ProblemDecision = "remake"
+	ProblemDecisionRemoveFromBill ProblemDecision = "remove_from_bill"
+)
+
+func (e *ProblemDecision) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ProblemDecision(s)
+	case string:
+		*e = ProblemDecision(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ProblemDecision: %T", src)
+	}
+	return nil
+}
+
+type NullProblemDecision struct {
+	ProblemDecision ProblemDecision `json:"problem_decision"`
+	Valid           bool            `json:"valid"` // Valid is true if ProblemDecision is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullProblemDecision) Scan(value interface{}) error {
+	if value == nil {
+		ns.ProblemDecision, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ProblemDecision.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullProblemDecision) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ProblemDecision), nil
+}
+
+type ProblemReason string
+
+const (
+	ProblemReasonCold          ProblemReason = "cold"
+	ProblemReasonWrongDish     ProblemReason = "wrong_dish"
+	ProblemReasonUndercooked   ProblemReason = "undercooked"
+	ProblemReasonTooSlow       ProblemReason = "too_slow"
+	ProblemReasonForeignObject ProblemReason = "foreign_object"
+	ProblemReasonOther         ProblemReason = "other"
+)
+
+func (e *ProblemReason) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ProblemReason(s)
+	case string:
+		*e = ProblemReason(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ProblemReason: %T", src)
+	}
+	return nil
+}
+
+type NullProblemReason struct {
+	ProblemReason ProblemReason `json:"problem_reason"`
+	Valid         bool          `json:"valid"` // Valid is true if ProblemReason is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullProblemReason) Scan(value interface{}) error {
+	if value == nil {
+		ns.ProblemReason, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ProblemReason.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullProblemReason) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ProblemReason), nil
+}
+
 type UserRole string
 
 const (
@@ -278,6 +409,48 @@ func (ns NullUserRole) Value() (driver.Value, error) {
 	return string(ns.UserRole), nil
 }
 
+type WalkoutDecision string
+
+const (
+	WalkoutDecisionWaiterPays     WalkoutDecision = "waiter_pays"
+	WalkoutDecisionRestaurantLoss WalkoutDecision = "restaurant_loss"
+)
+
+func (e *WalkoutDecision) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = WalkoutDecision(s)
+	case string:
+		*e = WalkoutDecision(s)
+	default:
+		return fmt.Errorf("unsupported scan type for WalkoutDecision: %T", src)
+	}
+	return nil
+}
+
+type NullWalkoutDecision struct {
+	WalkoutDecision WalkoutDecision `json:"walkout_decision"`
+	Valid           bool            `json:"valid"` // Valid is true if WalkoutDecision is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullWalkoutDecision) Scan(value interface{}) error {
+	if value == nil {
+		ns.WalkoutDecision, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.WalkoutDecision.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullWalkoutDecision) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.WalkoutDecision), nil
+}
+
 type ActivityLog struct {
 	ID        pgtype.UUID        `json:"id"`
 	TenantID  pgtype.UUID        `json:"tenant_id"`
@@ -290,23 +463,30 @@ type ActivityLog struct {
 }
 
 type Bill struct {
-	ID                 pgtype.UUID        `json:"id"`
-	TenantID           pgtype.UUID        `json:"tenant_id"`
-	TableID            pgtype.UUID        `json:"table_id"`
-	TableNumber        string             `json:"table_number"`
-	WaiterID           pgtype.UUID        `json:"waiter_id"`
-	Status             BillStatus         `json:"status"`
-	RequestedAt        pgtype.Timestamptz `json:"requested_at"`
-	CollectedBy        pgtype.UUID        `json:"collected_by"`
-	CollectedAt        pgtype.Timestamptz `json:"collected_at"`
-	ConfirmedBy        pgtype.UUID        `json:"confirmed_by"`
-	ConfirmedAt        pgtype.Timestamptz `json:"confirmed_at"`
-	RemindedAt         pgtype.Timestamptz `json:"reminded_at"`
-	EscalatedAt        pgtype.Timestamptz `json:"escalated_at"`
-	ConfirmRemindedAt  pgtype.Timestamptz `json:"confirm_reminded_at"`
-	LongOpenRemindedAt pgtype.Timestamptz `json:"long_open_reminded_at"`
-	CreatedAt          pgtype.Timestamptz `json:"created_at"`
-	ClosedAt           pgtype.Timestamptz `json:"closed_at"`
+	ID                 pgtype.UUID         `json:"id"`
+	TenantID           pgtype.UUID         `json:"tenant_id"`
+	TableID            pgtype.UUID         `json:"table_id"`
+	TableNumber        string              `json:"table_number"`
+	WaiterID           pgtype.UUID         `json:"waiter_id"`
+	Status             BillStatus          `json:"status"`
+	RequestedAt        pgtype.Timestamptz  `json:"requested_at"`
+	CollectedBy        pgtype.UUID         `json:"collected_by"`
+	CollectedAt        pgtype.Timestamptz  `json:"collected_at"`
+	ConfirmedBy        pgtype.UUID         `json:"confirmed_by"`
+	ConfirmedAt        pgtype.Timestamptz  `json:"confirmed_at"`
+	RemindedAt         pgtype.Timestamptz  `json:"reminded_at"`
+	EscalatedAt        pgtype.Timestamptz  `json:"escalated_at"`
+	ConfirmRemindedAt  pgtype.Timestamptz  `json:"confirm_reminded_at"`
+	LongOpenRemindedAt pgtype.Timestamptz  `json:"long_open_reminded_at"`
+	CreatedAt          pgtype.Timestamptz  `json:"created_at"`
+	ClosedAt           pgtype.Timestamptz  `json:"closed_at"`
+	WalkoutMarkedBy    pgtype.UUID         `json:"walkout_marked_by"`
+	WalkoutAt          pgtype.Timestamptz  `json:"walkout_at"`
+	WalkoutAmount      pgtype.Numeric      `json:"walkout_amount"`
+	WalkoutDecision    NullWalkoutDecision `json:"walkout_decision"`
+	WalkoutDecidedBy   pgtype.UUID         `json:"walkout_decided_by"`
+	WalkoutDecidedAt   pgtype.Timestamptz  `json:"walkout_decided_at"`
+	WalkoutNote        string              `json:"walkout_note"`
 }
 
 type BillPayment struct {
@@ -384,16 +564,18 @@ type Order struct {
 	ServedBy             pgtype.UUID        `json:"served_by"`
 	VeryLateAlertedAt    pgtype.Timestamptz `json:"very_late_alerted_at"`
 	BillID               pgtype.UUID        `json:"bill_id"`
+	RemakeOf             pgtype.UUID        `json:"remake_of"`
 }
 
 type OrderItem struct {
-	ID         pgtype.UUID    `json:"id"`
-	OrderID    pgtype.UUID    `json:"order_id"`
-	MenuItemID pgtype.UUID    `json:"menu_item_id"`
-	ItemName   string         `json:"item_name"`
-	UnitPrice  pgtype.Numeric `json:"unit_price"`
-	Quantity   int32          `json:"quantity"`
-	Notes      pgtype.Text    `json:"notes"`
+	ID         pgtype.UUID        `json:"id"`
+	OrderID    pgtype.UUID        `json:"order_id"`
+	MenuItemID pgtype.UUID        `json:"menu_item_id"`
+	ItemName   string             `json:"item_name"`
+	UnitPrice  pgtype.Numeric     `json:"unit_price"`
+	Quantity   int32              `json:"quantity"`
+	Notes      pgtype.Text        `json:"notes"`
+	RemovedAt  pgtype.Timestamptz `json:"removed_at"`
 }
 
 type OrderItemModifier struct {
@@ -402,6 +584,33 @@ type OrderItemModifier struct {
 	ModifierID   pgtype.UUID    `json:"modifier_id"`
 	ModifierName string         `json:"modifier_name"`
 	PriceApplied pgtype.Numeric `json:"price_applied"`
+}
+
+type OrderProblem struct {
+	ID            pgtype.UUID         `json:"id"`
+	TenantID      pgtype.UUID         `json:"tenant_id"`
+	OrderID       pgtype.UUID         `json:"order_id"`
+	OrderItemID   pgtype.UUID         `json:"order_item_id"`
+	Reason        ProblemReason       `json:"reason"`
+	Note          string              `json:"note"`
+	ReportedBy    pgtype.UUID         `json:"reported_by"`
+	ReportedAt    pgtype.Timestamptz  `json:"reported_at"`
+	Decision      NullProblemDecision `json:"decision"`
+	Fault         NullFault           `json:"fault"`
+	DecidedBy     pgtype.UUID         `json:"decided_by"`
+	DecidedAt     pgtype.Timestamptz  `json:"decided_at"`
+	RemovedAmount pgtype.Numeric      `json:"removed_amount"`
+	RemakeOrderID pgtype.UUID         `json:"remake_order_id"`
+}
+
+type PushSubscription struct {
+	ID        pgtype.UUID        `json:"id"`
+	TenantID  pgtype.UUID        `json:"tenant_id"`
+	UserID    pgtype.UUID        `json:"user_id"`
+	Endpoint  string             `json:"endpoint"`
+	P256dh    string             `json:"p256dh"`
+	Auth      string             `json:"auth"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type RestaurantTable struct {

@@ -19,13 +19,19 @@ type OrderController struct {
 	orderUsecase domain.OrderUsecase
 	billUsecase  domain.BillUsecase
 	hub          *ws.Hub
+	// notifier sends targeted alerts to live screens and, with push on, to locked phones
+	notifier domain.Notifier
 }
 
-func NewOrderController(orderUsecase domain.OrderUsecase, billUsecase domain.BillUsecase, hub *ws.Hub) *OrderController {
+func NewOrderController(orderUsecase domain.OrderUsecase, billUsecase domain.BillUsecase, hub *ws.Hub, notifier domain.Notifier) *OrderController {
+	if notifier == nil && hub != nil {
+		notifier = hub
+	}
 	return &OrderController{
 		orderUsecase: orderUsecase,
 		billUsecase:  billUsecase,
 		hub:          hub,
+		notifier:     notifier,
 	}
 }
 
@@ -292,7 +298,7 @@ func (ctrl *OrderController) UpdateOrderStatus(c *gin.Context) {
 		})
 		// Food ready rings a bell for the table's waiter only (or the managers without one)
 		if orderStatus == domain.StatusReady {
-			ctrl.hub.NotifyStaff(tenantID, domain.WaiterOrManagers(order.WaiterID), "order:ready", gin.H{
+			ctrl.notifier.NotifyStaff(tenantID, domain.WaiterOrManagers(order.WaiterID), "order:ready", gin.H{
 				"order_id":     orderID,
 				"table_number": order.TableNumber,
 			})

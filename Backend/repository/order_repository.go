@@ -124,6 +124,7 @@ func (r *orderRepository) GetByID(ctx context.Context, tenantID, orderID uuid.UU
 		ReadyBy:              converter.PgToUUIDPtr(row.ReadyBy),
 		ServedAt:             converter.PgToTimePtr(row.ServedAt),
 		ServedBy:             converter.PgToUUIDPtr(row.ServedBy),
+		RemakeOf:             converter.PgToUUIDPtr(row.RemakeOf),
 	}
 
 	items, err := r.loadOrderItems(ctx, order.ID)
@@ -172,6 +173,7 @@ func (r *orderRepository) ListActiveByTenant(ctx context.Context, tenantID uuid.
 			ReadyBy:           converter.PgToUUIDPtr(row.ReadyBy),
 			ServedAt:          converter.PgToTimePtr(row.ServedAt),
 			ServedBy:          converter.PgToUUIDPtr(row.ServedBy),
+			RemakeOf:          converter.PgToUUIDPtr(row.RemakeOf),
 		}
 		orderMap[id] = &orders[i]
 	}
