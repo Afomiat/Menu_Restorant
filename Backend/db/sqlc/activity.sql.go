@@ -24,15 +24,25 @@ type ListActivityParams struct {
 	Limit    int32       `json:"limit"`
 }
 
-func (q *Queries) ListActivity(ctx context.Context, arg ListActivityParams) ([]ActivityLog, error) {
+type ListActivityRow struct {
+	ID        pgtype.UUID        `json:"id"`
+	TenantID  pgtype.UUID        `json:"tenant_id"`
+	ActorID   pgtype.UUID        `json:"actor_id"`
+	Action    string             `json:"action"`
+	OrderID   pgtype.UUID        `json:"order_id"`
+	Details   []byte             `json:"details"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) ListActivity(ctx context.Context, arg ListActivityParams) ([]ListActivityRow, error) {
 	rows, err := q.db.Query(ctx, listActivity, arg.TenantID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ActivityLog{}
+	items := []ListActivityRow{}
 	for rows.Next() {
-		var i ActivityLog
+		var i ListActivityRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.TenantID,
@@ -53,8 +63,8 @@ func (q *Queries) ListActivity(ctx context.Context, arg ListActivityParams) ([]A
 }
 
 const recordActivity = `-- name: RecordActivity :exec
-INSERT INTO activity_log (tenant_id, actor_id, action, order_id, details)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO activity_log (tenant_id, actor_id, action, order_id, details, bill_id)
+VALUES ($1, $2, $3, $4, $5, $6)
 `
 
 type RecordActivityParams struct {
@@ -63,6 +73,7 @@ type RecordActivityParams struct {
 	Action   string      `json:"action"`
 	OrderID  pgtype.UUID `json:"order_id"`
 	Details  []byte      `json:"details"`
+	BillID   pgtype.UUID `json:"bill_id"`
 }
 
 func (q *Queries) RecordActivity(ctx context.Context, arg RecordActivityParams) error {
@@ -72,6 +83,7 @@ func (q *Queries) RecordActivity(ctx context.Context, arg RecordActivityParams) 
 		arg.Action,
 		arg.OrderID,
 		arg.Details,
+		arg.BillID,
 	)
 	return err
 }

@@ -61,6 +61,8 @@ type Order struct {
 	ServedBy      *uuid.UUID `json:"served_by"`
 	// WaiterID is the waiter of the order's table when the order was changed (nil: none assigned)
 	WaiterID *uuid.UUID `json:"waiter_id,omitempty"`
+	// BillID is the Pro bill the order is on
+	BillID *uuid.UUID `json:"bill_id,omitempty"`
 }
 
 // Actor is the signed-in staff member doing something

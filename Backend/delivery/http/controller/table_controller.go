@@ -14,12 +14,14 @@ import (
 type TableController struct {
 	tableUsecase  domain.TableUsecase
 	tenantUsecase domain.TenantUsecase
+	billUsecase   domain.BillUsecase
 }
 
-func NewTableController(tableUsecase domain.TableUsecase, tenantUsecase domain.TenantUsecase) *TableController {
+func NewTableController(tableUsecase domain.TableUsecase, tenantUsecase domain.TenantUsecase, billUsecase domain.BillUsecase) *TableController {
 	return &TableController{
 		tableUsecase:  tableUsecase,
 		tenantUsecase: tenantUsecase,
+		billUsecase:   billUsecase,
 	}
 }
 
@@ -183,6 +185,11 @@ func (ctrl *TableController) ValidateTable(c *gin.Context) {
 			"message": "This table QR code is invalid, expired, or has been tampered with.",
 		})
 		return
+	}
+
+	// Pro: new customers scanning a table whose bill is still unpaid alert the waiter and managers
+	if ctrl.billUsecase != nil && tenant.HasPlan(domain.PlanPro) {
+		ctrl.billUsecase.CheckRescan(c.Request.Context(), tenant.ID, tableNumber, c.GetHeader("X-Session-Token"))
 	}
 
 	c.JSON(http.StatusOK, gin.H{

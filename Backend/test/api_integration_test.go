@@ -55,6 +55,11 @@ func (m *mockFullTenantUsecase) ListActive(ctx context.Context) ([]domain.Tenant
 }
 
 func setupTestRouter(tenant *domain.Tenant, qrSecret, jwtSecret string) (*gin.Engine, *domain.Order) {
+	return setupTestRouterWithBills(tenant, qrSecret, jwtSecret, nil)
+}
+
+// setupTestRouterWithBills also wires a bill usecase (nil: no bills, as below Pro)
+func setupTestRouterWithBills(tenant *domain.Tenant, qrSecret, jwtSecret string, bills domain.BillUsecase) (*gin.Engine, *domain.Order) {
 	cfg := &config.Config{
 		Environment: "test",
 		QRSecretKey: qrSecret,
@@ -105,6 +110,7 @@ func setupTestRouter(tenant *domain.Tenant, qrSecret, jwtSecret string) (*gin.En
 		TableUsecase:  tableUc,
 		Hub:           nil,
 		StaffUsecase:  allActiveStaff{},
+		BillUsecase:   bills,
 	})
 
 	return r, testOrder

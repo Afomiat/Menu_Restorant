@@ -55,6 +55,7 @@ func main() {
 	uploadRepo := repository.NewCloudinaryUploadRepository(cfg)
 	staffRepo := repository.NewStaffRepository(queries)
 	activityRepo := repository.NewActivityRepository(queries)
+	billRepo := repository.NewBillRepository(pool, queries)
 
 	// 6. Initialize Usecases (Business Rules Layer)
 	tenantUsecase := usecase.NewTenantUsecase(tenantRepo, activityRepo)
@@ -63,11 +64,13 @@ func main() {
 	tableUsecase := usecase.NewTableUsecase(tableRepo, staffRepo, activityRepo, cfg.QRSecretKey)
 	orderUsecase := usecase.NewOrderUsecase(orderRepo, tenantRepo, tableRepo, menuRepo, cfg.QRSecretKey)
 	uploadUsecase := usecase.NewUploadUsecase(tenantRepo, uploadRepo)
+	billUsecase := usecase.NewBillUsecase(billRepo, tableRepo, staffRepo, activityRepo, hub)
 
-	// Background checks (late orders) run on the server, so alerts go out with no screen open
+	// Background checks (late orders, unpaid bills) run on the server, so alerts go out with no screen open
 	watchCtx, stopWatching := context.WithCancel(context.Background())
 	defer stopWatching()
 	go usecase.NewKitchenWatcher(orderRepo, hub).Run(watchCtx)
+	go usecase.NewBillWatcher(billRepo, hub).Run(watchCtx)
 
 	// 7. Initialize Delivery Router (Gin HTTP Server)
 	r := router.SetupRouter(router.RouterDependencies{
@@ -78,6 +81,7 @@ func main() {
 		TableUsecase:  tableUsecase,
 		UploadUsecase: uploadUsecase,
 		StaffUsecase:  staffUsecase,
+		BillUsecase:   billUsecase,
 		Hub:           hub,
 		Pool:          pool,
 	})

@@ -11,6 +11,51 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type BillStatus string
+
+const (
+	BillStatusOpen          BillStatus = "open"
+	BillStatusBillRequested BillStatus = "bill_requested"
+	BillStatusCollected     BillStatus = "collected"
+	BillStatusConfirmed     BillStatus = "confirmed"
+	BillStatusWalkout       BillStatus = "walkout"
+)
+
+func (e *BillStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = BillStatus(s)
+	case string:
+		*e = BillStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for BillStatus: %T", src)
+	}
+	return nil
+}
+
+type NullBillStatus struct {
+	BillStatus BillStatus `json:"bill_status"`
+	Valid      bool       `json:"valid"` // Valid is true if BillStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullBillStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.BillStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.BillStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullBillStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.BillStatus), nil
+}
+
 type OrderStatus string
 
 const (
@@ -55,6 +100,49 @@ func (ns NullOrderStatus) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.OrderStatus), nil
+}
+
+type PaymentMethod string
+
+const (
+	PaymentMethodCash        PaymentMethod = "cash"
+	PaymentMethodTelebirr    PaymentMethod = "telebirr"
+	PaymentMethodCbeBirrBank PaymentMethod = "cbe_birr_bank"
+)
+
+func (e *PaymentMethod) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = PaymentMethod(s)
+	case string:
+		*e = PaymentMethod(s)
+	default:
+		return fmt.Errorf("unsupported scan type for PaymentMethod: %T", src)
+	}
+	return nil
+}
+
+type NullPaymentMethod struct {
+	PaymentMethod PaymentMethod `json:"payment_method"`
+	Valid         bool          `json:"valid"` // Valid is true if PaymentMethod is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullPaymentMethod) Scan(value interface{}) error {
+	if value == nil {
+		ns.PaymentMethod, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.PaymentMethod.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullPaymentMethod) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.PaymentMethod), nil
 }
 
 type PaymentStatus string
@@ -198,6 +286,38 @@ type ActivityLog struct {
 	OrderID   pgtype.UUID        `json:"order_id"`
 	Details   []byte             `json:"details"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	BillID    pgtype.UUID        `json:"bill_id"`
+}
+
+type Bill struct {
+	ID                 pgtype.UUID        `json:"id"`
+	TenantID           pgtype.UUID        `json:"tenant_id"`
+	TableID            pgtype.UUID        `json:"table_id"`
+	TableNumber        string             `json:"table_number"`
+	WaiterID           pgtype.UUID        `json:"waiter_id"`
+	Status             BillStatus         `json:"status"`
+	RequestedAt        pgtype.Timestamptz `json:"requested_at"`
+	CollectedBy        pgtype.UUID        `json:"collected_by"`
+	CollectedAt        pgtype.Timestamptz `json:"collected_at"`
+	ConfirmedBy        pgtype.UUID        `json:"confirmed_by"`
+	ConfirmedAt        pgtype.Timestamptz `json:"confirmed_at"`
+	RemindedAt         pgtype.Timestamptz `json:"reminded_at"`
+	EscalatedAt        pgtype.Timestamptz `json:"escalated_at"`
+	ConfirmRemindedAt  pgtype.Timestamptz `json:"confirm_reminded_at"`
+	LongOpenRemindedAt pgtype.Timestamptz `json:"long_open_reminded_at"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	ClosedAt           pgtype.Timestamptz `json:"closed_at"`
+}
+
+type BillPayment struct {
+	ID          pgtype.UUID        `json:"id"`
+	BillID      pgtype.UUID        `json:"bill_id"`
+	TenantID    pgtype.UUID        `json:"tenant_id"`
+	Amount      pgtype.Numeric     `json:"amount"`
+	Method      PaymentMethod      `json:"method"`
+	Reference   string             `json:"reference"`
+	CollectedBy pgtype.UUID        `json:"collected_by"`
+	CollectedAt pgtype.Timestamptz `json:"collected_at"`
 }
 
 type Category struct {
@@ -263,6 +383,7 @@ type Order struct {
 	ServedAt             pgtype.Timestamptz `json:"served_at"`
 	ServedBy             pgtype.UUID        `json:"served_by"`
 	VeryLateAlertedAt    pgtype.Timestamptz `json:"very_late_alerted_at"`
+	BillID               pgtype.UUID        `json:"bill_id"`
 }
 
 type OrderItem struct {
@@ -290,6 +411,14 @@ type RestaurantTable struct {
 	QrSecret         string      `json:"qr_secret"`
 	IsActive         bool        `json:"is_active"`
 	AssignedWaiterID pgtype.UUID `json:"assigned_waiter_id"`
+}
+
+type StaffShift struct {
+	ID        pgtype.UUID        `json:"id"`
+	TenantID  pgtype.UUID        `json:"tenant_id"`
+	UserID    pgtype.UUID        `json:"user_id"`
+	StartedAt pgtype.Timestamptz `json:"started_at"`
+	EndedAt   pgtype.Timestamptz `json:"ended_at"`
 }
 
 type Tenant struct {

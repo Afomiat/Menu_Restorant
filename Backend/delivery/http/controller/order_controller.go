@@ -2,6 +2,7 @@ package controller
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"strings"
 
@@ -16,12 +17,14 @@ import (
 
 type OrderController struct {
 	orderUsecase domain.OrderUsecase
+	billUsecase  domain.BillUsecase
 	hub          *ws.Hub
 }
 
-func NewOrderController(orderUsecase domain.OrderUsecase, hub *ws.Hub) *OrderController {
+func NewOrderController(orderUsecase domain.OrderUsecase, billUsecase domain.BillUsecase, hub *ws.Hub) *OrderController {
 	return &OrderController{
 		orderUsecase: orderUsecase,
+		billUsecase:  billUsecase,
 		hub:          hub,
 	}
 }
@@ -101,6 +104,13 @@ func (ctrl *OrderController) PlaceOrder(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	// Pro: the order goes on its table's bill (opening one for the table's first order)
+	if ctrl.billUsecase != nil {
+		if err := ctrl.billUsecase.AttachOrder(c.Request.Context(), tenant, order); err != nil {
+			log.Printf("order %s: could not put it on the table's bill: %v", order.ID, err)
+		}
 	}
 
 	// Broadcast real-time order to the restaurant's private kitchen tablet room

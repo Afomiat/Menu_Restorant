@@ -35,6 +35,7 @@ func (r *activityRepository) Record(ctx context.Context, a domain.Activity) erro
 		Action:   a.Action,
 		Details:  detailsJSON,
 	}
+	params.BillID = converter.UUIDPtrToPg(a.BillID)
 	if a.OrderID != nil {
 		params.OrderID = converter.UUIDToPg(*a.OrderID)
 	}

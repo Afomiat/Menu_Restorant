@@ -23,6 +23,7 @@ type RouterDependencies struct {
 	TableUsecase  domain.TableUsecase
 	UploadUsecase domain.UploadUsecase
 	StaffUsecase  domain.StaffUsecase
+	BillUsecase   domain.BillUsecase
 	Hub           *ws.Hub
 	Pool          *pgxpool.Pool
 }
@@ -83,8 +84,9 @@ func SetupRouter(deps RouterDependencies) *gin.Engine {
 
 	// Initialize Controllers
 	menuCtrl := controller.NewMenuController(deps.MenuUsecase, deps.OrderUsecase, deps.Hub)
-	tableCtrl := controller.NewTableController(deps.TableUsecase, deps.TenantUsecase)
-	orderCtrl := controller.NewOrderController(deps.OrderUsecase, deps.Hub)
+	tableCtrl := controller.NewTableController(deps.TableUsecase, deps.TenantUsecase, deps.BillUsecase)
+	orderCtrl := controller.NewOrderController(deps.OrderUsecase, deps.BillUsecase, deps.Hub)
+	billCtrl := controller.NewBillController(deps.BillUsecase, deps.Config.QRSecretKey)
 	tenantCtrl := controller.NewTenantController(deps.TenantUsecase, deps.Hub)
 	authCtrl := controller.NewAuthController(deps.StaffUsecase, deps.Config.JWTSecret)
 	staffCtrl := controller.NewStaffController(deps.StaffUsecase)
@@ -123,6 +125,9 @@ func SetupRouter(deps RouterDependencies) *gin.Engine {
 				orderRoutes.GET("/:id", orderCtrl.GetOrder)
 				orderRoutes.POST("/:id/undo", orderCtrl.UndoOrder)
 			}
+
+			// 4. "Ask for the bill" (Pro plan, proven by the table QR token)
+			menuRoutes.POST("/bills/request", middleware.RequirePlan(deps.TenantUsecase, domain.PlanPro), orderLimiter.Limit(), billCtrl.RequestBillByCustomer)
 		}
 
 		// -------------------------------------------------------------
@@ -170,6 +175,20 @@ func SetupRouter(deps RouterDependencies) *gin.Engine {
 			{
 				proRoutes.GET("/my-tables", middleware.RequireRole(domain.RoleWaiter, domain.RoleManager), orderCtrl.MyTables)
 				proRoutes.PATCH("/tables/:id/waiter", manager, tableCtrl.AssignWaiter)
+
+				// Bills: waiters collect, cashiers confirm, managers do everything
+				waiter := middleware.RequireRole(domain.RoleWaiter, domain.RoleManager)
+				proRoutes.GET("/bills", middleware.RequireRole(domain.RoleWaiter, domain.RoleCashier, domain.RoleManager), billCtrl.ListBills)
+				proRoutes.POST("/bills/:id/request", waiter, billCtrl.RequestBill)
+				proRoutes.POST("/bills/:id/collect", waiter, billCtrl.Collect)
+				proRoutes.POST("/bills/:id/confirm", middleware.RequireRole(domain.RoleCashier, domain.RoleManager), billCtrl.Confirm)
+				proRoutes.POST("/bills/:id/move", waiter, billCtrl.Move)
+				proRoutes.POST("/bills/:id/handover", waiter, billCtrl.Handover)
+
+				// Shifts
+				proRoutes.GET("/shifts/me", allStaff, billCtrl.MyShift)
+				proRoutes.POST("/shifts/start", allStaff, billCtrl.StartShift)
+				proRoutes.POST("/shifts/end", allStaff, billCtrl.EndShift)
 			}
 
 			// Staff accounts (Pro plan, managers only)

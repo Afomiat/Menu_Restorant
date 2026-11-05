@@ -15,6 +15,16 @@ const (
 
 	ActionSettingsChanged = "settings.changed"
 	ActionWaiterAssigned  = "table.waiter_assigned"
+
+	ActionBillRequested = "bill.requested"
+	ActionBillPaid      = "bill.payment"
+	ActionBillCollected = "bill.collected"
+	ActionBillConfirmed = "bill.confirmed"
+	ActionBillMoved     = "bill.moved"
+	ActionBillMerged    = "bill.merged"
+	ActionBillHandover  = "bill.handed_over"
+	ActionShiftStarted  = "shift.started"
+	ActionShiftEnded    = "shift.ended"
 )
 
 // Activity is one entry of a restaurant's who-did-what log
@@ -25,6 +35,7 @@ type Activity struct {
 	ActorID   uuid.UUID              `json:"actor_id"`
 	Action    string                 `json:"action"`
 	OrderID   *uuid.UUID             `json:"order_id,omitempty"`
+	BillID    *uuid.UUID             `json:"bill_id,omitempty"`
 	Details   map[string]interface{} `json:"details"`
 	CreatedAt time.Time              `json:"created_at"`
 }
