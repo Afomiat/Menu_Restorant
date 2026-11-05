@@ -244,6 +244,7 @@ type CreateItemRequest struct {
 	Price       float64   `json:"price" binding:"required,gte=0"`
 	ImageUrl    string    `json:"image_url" binding:"max=500"`
 	Tags        []string  `json:"tags"`
+	PrepMinutes *int      `json:"prep_minutes"`
 }
 
 // CreateItem handles POST /api/v1/admin/items
@@ -268,6 +269,7 @@ func (ctrl *MenuController) CreateItem(c *gin.Context) {
 		Price:       req.Price,
 		ImageUrl:    req.ImageUrl,
 		Tags:        req.Tags,
+		PrepMinutes: req.PrepMinutes,
 	})
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -290,6 +292,7 @@ type UpdateItemRequest struct {
 	ImageUrl    string    `json:"image_url" binding:"max=500"`
 	Tags        []string  `json:"tags"`
 	IsAvailable bool      `json:"is_available"`
+	PrepMinutes *int      `json:"prep_minutes"`
 }
 
 // UpdateItem handles PUT /api/v1/admin/items/:id
@@ -323,6 +326,7 @@ func (ctrl *MenuController) UpdateItem(c *gin.Context) {
 		ImageUrl:    req.ImageUrl,
 		Tags:        req.Tags,
 		IsAvailable: req.IsAvailable,
+		PrepMinutes: req.PrepMinutes,
 	})
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

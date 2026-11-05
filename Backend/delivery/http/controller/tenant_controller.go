@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -78,6 +79,35 @@ func (ctrl *TenantController) UpdateTheme(c *gin.Context) {
 
 type UpdatePlanRequest struct {
 	Plan string `json:"plan" binding:"required"`
+}
+
+// UpdateSettings handles PATCH /api/v1/admin/tenant/settings
+// Managers of Pro restaurants change prep and reminder times; only the fields sent change
+func (ctrl *TenantController) UpdateSettings(c *gin.Context) {
+	tenantID, ok := middleware.GetTenantIDFromContext(c)
+	claims, hasClaims := middleware.GetAuthClaims(c)
+	if !ok || !hasClaims {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+		return
+	}
+
+	var changes domain.TenantSettingsChanges
+	if err := c.ShouldBindJSON(&changes); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "settings must be whole minutes"})
+		return
+	}
+
+	settings, err := ctrl.tenantUsecase.UpdateSettings(c.Request.Context(), claims.UserID, tenantID, changes)
+	var validation *domain.ValidationError
+	switch {
+	case errors.As(err, &validation):
+		c.JSON(http.StatusBadRequest, gin.H{"error": validation.Message})
+		return
+	case err != nil:
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save settings"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": settings})
 }
 
 // UpdatePlan handles PATCH /api/v1/admin/tenant/plan

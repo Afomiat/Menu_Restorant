@@ -138,9 +138,10 @@ func (r *menuRepository) CreateItem(ctx context.Context, item *domain.MenuItem) 
 		Description: item.Description,
 		Price:       converter.FloatToNumeric(item.Price),
 		ImageUrl:    item.ImageUrl,
-		Tags:        item.Tags,
+		Tags:        tagsOrEmpty(item.Tags),
 		IsAvailable: item.IsAvailable,
 		IsSoldOut:   item.IsSoldOut,
+		PrepMinutes: converter.IntPtrToPg(item.PrepMinutes),
 	})
 	if err != nil {
 		return err
@@ -158,8 +159,9 @@ func (r *menuRepository) UpdateItem(ctx context.Context, item *domain.MenuItem) 
 		Description: item.Description,
 		Price:       converter.FloatToNumeric(item.Price),
 		ImageUrl:    item.ImageUrl,
-		Tags:        item.Tags,
+		Tags:        tagsOrEmpty(item.Tags),
 		IsAvailable: item.IsAvailable,
+		PrepMinutes: converter.IntPtrToPg(item.PrepMinutes),
 	})
 	return err
 }
@@ -227,6 +229,14 @@ func toDomainMenuItem(m sqlc.MenuItem) domain.MenuItem {
 		Tags:        m.Tags,
 		IsAvailable: m.IsAvailable,
 		IsSoldOut:   m.IsSoldOut,
+		PrepMinutes: converter.PgToIntPtr(m.PrepMinutes),
 	}
 }
 
+// tagsOrEmpty stores a dish without tags as an empty list; the column does not allow NULL
+func tagsOrEmpty(tags []string) []string {
+	if tags == nil {
+		return []string{}
+	}
+	return tags
+}

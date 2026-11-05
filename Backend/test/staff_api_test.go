@@ -15,32 +15,43 @@ import (
 	"menu-backend/delivery/http/router"
 	"menu-backend/domain"
 	"menu-backend/internal/security"
+	"menu-backend/internal/ws"
 	"menu-backend/usecase"
 )
 
 const staffJWTSecret = "test-jwt-secret-key-32-chars-staff"
 
 type staffAPI struct {
-	r        *gin.Engine
-	env      *staffEnv
-	tenantUc *mockFullTenantUsecase
+	r         *gin.Engine
+	env       *staffEnv
+	tenantUc  *mockFullTenantUsecase
+	table     *domain.RestaurantTable
+	orderRepo *mockOrderRepo
+	hub       *ws.Hub
 }
 
-// newStaffAPI builds the real router with the real staff usecase over in-memory staff
+// newStaffAPI builds the real router with the real staff, table and order usecases over
+// in-memory data: one restaurant with table 5
 func newStaffAPI(plan domain.PlanTier) *staffAPI {
 	env := newStaffEnv()
 	env.tenant.Plan = plan
 	tenantUc := &mockFullTenantUsecase{tenant: env.tenant}
 	tenantRepo := &mockTenantRepo{tenant: env.tenant}
+	table := &domain.RestaurantTable{ID: uuid.New(), TenantID: env.tenant.ID, TableNumber: "5", IsActive: true}
+	tableRepo := &mockTableRepo{table: table}
+	orderRepo := &mockOrderRepo{}
+	hub := ws.NewHub()
+	go hub.Run()
 	r := router.SetupRouter(router.RouterDependencies{
 		Config:        &config.Config{Environment: "test", JWTSecret: staffJWTSecret, QRSecretKey: "test-qr-secret-key-32-chars-staff"},
 		TenantUsecase: tenantUc,
 		MenuUsecase:   usecase.NewMenuUsecase(tenantRepo, &mockMenuRepo{}),
-		OrderUsecase:  usecase.NewOrderUsecase(&mockOrderRepo{}, tenantRepo, &mockTableRepo{}, &mockMenuRepo{}, "test-qr-secret-key-32-chars-staff"),
-		TableUsecase:  usecase.NewTableUsecase(&mockTableRepo{}, "test-qr-secret-key-32-chars-staff"),
+		OrderUsecase:  usecase.NewOrderUsecase(orderRepo, tenantRepo, tableRepo, &mockMenuRepo{}, "test-qr-secret-key-32-chars-staff"),
+		TableUsecase:  usecase.NewTableUsecase(tableRepo, env.repo, env.activity, "test-qr-secret-key-32-chars-staff"),
 		StaffUsecase:  env.uc,
+		Hub:           hub,
 	})
-	return &staffAPI{r: r, env: env, tenantUc: tenantUc}
+	return &staffAPI{r: r, env: env, tenantUc: tenantUc, table: table, orderRepo: orderRepo, hub: hub}
 }
 
 func (a *staffAPI) token(s domain.Staff) string {

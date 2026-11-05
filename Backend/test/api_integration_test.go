@@ -37,6 +37,9 @@ func (m *mockFullTenantUsecase) UpdatePlan(ctx context.Context, actorID, id uuid
 	m.tenant.Plan = plan
 	return nil
 }
+func (m *mockFullTenantUsecase) UpdateSettings(ctx context.Context, actorID, tenantID uuid.UUID, changes domain.TenantSettingsChanges) (*domain.TenantSettings, error) {
+	return usecase.NewTenantUsecase(&mockTenantRepo{tenant: m.tenant}, &mockActivityRepo{}).UpdateSettings(ctx, actorID, tenantID, changes)
+}
 func (m *mockFullTenantUsecase) UpdateTheme(ctx context.Context, id uuid.UUID, themeConfig map[string]interface{}) (*domain.Tenant, error) {
 	m.tenant.ThemeConfig = themeConfig
 	return m.tenant, nil
@@ -92,7 +95,7 @@ func setupTestRouter(tenant *domain.Tenant, qrSecret, jwtSecret string) (*gin.En
 
 	orderUc := usecase.NewOrderUsecase(orderRepo, &mockTenantRepo{tenant: tenant}, tableRepo, menuRepo, qrSecret)
 	menuUc := usecase.NewMenuUsecase(&mockTenantRepo{tenant: tenant}, menuRepo)
-	tableUc := usecase.NewTableUsecase(tableRepo, qrSecret)
+	tableUc := usecase.NewTableUsecase(tableRepo, newMemStaffRepo(), &mockActivityRepo{}, qrSecret)
 
 	r := router.SetupRouter(router.RouterDependencies{
 		Config:        cfg,

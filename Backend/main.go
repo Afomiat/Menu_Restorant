@@ -60,9 +60,14 @@ func main() {
 	tenantUsecase := usecase.NewTenantUsecase(tenantRepo, activityRepo)
 	staffUsecase := usecase.NewStaffUsecase(staffRepo, tenantRepo, activityRepo)
 	menuUsecase := usecase.NewMenuUsecase(tenantRepo, menuRepo)
-	tableUsecase := usecase.NewTableUsecase(tableRepo, cfg.QRSecretKey)
+	tableUsecase := usecase.NewTableUsecase(tableRepo, staffRepo, activityRepo, cfg.QRSecretKey)
 	orderUsecase := usecase.NewOrderUsecase(orderRepo, tenantRepo, tableRepo, menuRepo, cfg.QRSecretKey)
 	uploadUsecase := usecase.NewUploadUsecase(tenantRepo, uploadRepo)
+
+	// Background checks (late orders) run on the server, so alerts go out with no screen open
+	watchCtx, stopWatching := context.WithCancel(context.Background())
+	defer stopWatching()
+	go usecase.NewKitchenWatcher(orderRepo, hub).Run(watchCtx)
 
 	// 7. Initialize Delivery Router (Gin HTTP Server)
 	r := router.SetupRouter(router.RouterDependencies{

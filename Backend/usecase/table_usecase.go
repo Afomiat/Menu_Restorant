@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -11,15 +12,47 @@ import (
 )
 
 type tableUsecase struct {
-	tableRepo domain.TableRepository
-	secretKey string
+	tableRepo    domain.TableRepository
+	staffRepo    domain.StaffRepository
+	activityRepo domain.ActivityRepository
+	secretKey    string
 }
 
-func NewTableUsecase(tableRepo domain.TableRepository, secretKey string) domain.TableUsecase {
+func NewTableUsecase(tableRepo domain.TableRepository, staffRepo domain.StaffRepository, activityRepo domain.ActivityRepository, secretKey string) domain.TableUsecase {
 	return &tableUsecase{
-		tableRepo: tableRepo,
-		secretKey: secretKey,
+		tableRepo:    tableRepo,
+		staffRepo:    staffRepo,
+		activityRepo: activityRepo,
+		secretKey:    secretKey,
 	}
+}
+
+func (u *tableUsecase) AssignWaiter(ctx context.Context, actorID, tenantID, tableID uuid.UUID, waiterID *uuid.UUID) (*domain.RestaurantTable, error) {
+	waiterName := ""
+	if waiterID != nil {
+		waiter, err := u.staffRepo.GetByID(ctx, tenantID, *waiterID)
+		if errors.Is(err, domain.ErrStaffNotFound) || (err == nil && (waiter.Role != domain.RoleWaiter || !waiter.IsActive)) {
+			return nil, domain.ErrNotAWaiter
+		}
+		if err != nil {
+			return nil, err
+		}
+		waiterName = waiter.FullName
+	}
+
+	table, err := u.tableRepo.UpdateWaiter(ctx, tenantID, tableID, waiterID)
+	if err != nil {
+		return nil, err
+	}
+	table.AssignedWaiterName = waiterName
+
+	recordActivity(ctx, u.activityRepo, domain.Activity{
+		TenantID: tenantID,
+		ActorID:  actorID,
+		Action:   domain.ActionWaiterAssigned,
+		Details:  map[string]interface{}{"table_id": tableID, "table_number": table.TableNumber, "waiter_id": waiterID, "waiter_name": waiterName},
+	})
+	return table, nil
 }
 
 // GenerateTableQR creates a tamper-proof QR code URL with an HMAC token

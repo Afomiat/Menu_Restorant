@@ -65,8 +65,62 @@ type Tenant struct {
 	Currency    string                 `json:"currency"`
 	ThemeConfig map[string]interface{} `json:"theme_config"`
 	IsActive    bool                   `json:"is_active"`
+	Settings    TenantSettings         `json:"settings"`
 	CreatedAt   time.Time              `json:"created_at"`
 	UpdatedAt   time.Time              `json:"updated_at"`
+}
+
+// TenantSettings are a restaurant's Pro timings, all in minutes
+type TenantSettings struct {
+	// DefaultPrepMinutes is the cooking time of dishes without their own prep time
+	DefaultPrepMinutes int `json:"default_prep_minutes"`
+	// BillReminderMinutes after the customer asks for the bill, the waiter is reminded
+	BillReminderMinutes int `json:"bill_reminder_minutes"`
+	// BillEscalationMinutes after the customer asks for the bill, the manager is alerted
+	BillEscalationMinutes int `json:"bill_escalation_minutes"`
+	// ConfirmReminderMinutes after the waiter collects, the cashier is reminded to confirm
+	ConfirmReminderMinutes int `json:"confirm_reminder_minutes"`
+	// LongTableMinutes after a table opens, its waiter is reminded the table is still open
+	LongTableMinutes int `json:"long_table_minutes"`
+}
+
+// DefaultTenantSettings are used for any setting a restaurant has not changed
+var DefaultTenantSettings = TenantSettings{
+	DefaultPrepMinutes:     15,
+	BillReminderMinutes:    10,
+	BillEscalationMinutes:  20,
+	ConfirmReminderMinutes: 15,
+	LongTableMinutes:       120,
+}
+
+// WithDefaults fills settings that are not set (zero) with the defaults
+func (s TenantSettings) WithDefaults() TenantSettings {
+	d := DefaultTenantSettings
+	if s.DefaultPrepMinutes > 0 {
+		d.DefaultPrepMinutes = s.DefaultPrepMinutes
+	}
+	if s.BillReminderMinutes > 0 {
+		d.BillReminderMinutes = s.BillReminderMinutes
+	}
+	if s.BillEscalationMinutes > 0 {
+		d.BillEscalationMinutes = s.BillEscalationMinutes
+	}
+	if s.ConfirmReminderMinutes > 0 {
+		d.ConfirmReminderMinutes = s.ConfirmReminderMinutes
+	}
+	if s.LongTableMinutes > 0 {
+		d.LongTableMinutes = s.LongTableMinutes
+	}
+	return d
+}
+
+// TenantSettingsChanges changes only the settings that are set
+type TenantSettingsChanges struct {
+	DefaultPrepMinutes     *int `json:"default_prep_minutes"`
+	BillReminderMinutes    *int `json:"bill_reminder_minutes"`
+	BillEscalationMinutes  *int `json:"bill_escalation_minutes"`
+	ConfirmReminderMinutes *int `json:"confirm_reminder_minutes"`
+	LongTableMinutes       *int `json:"long_table_minutes"`
 }
 
 // HasPlan reports whether the tenant's plan includes the features of min
@@ -81,6 +135,7 @@ type TenantRepository interface {
 	Create(ctx context.Context, tenant *Tenant) error
 	UpdatePlan(ctx context.Context, id uuid.UUID, plan PlanTier) error
 	UpdateTheme(ctx context.Context, id uuid.UUID, themeConfig map[string]interface{}) (*Tenant, error)
+	UpdateSettings(ctx context.Context, id uuid.UUID, settings TenantSettings) (*Tenant, error)
 	ListActive(ctx context.Context) ([]Tenant, error)
 }
 
@@ -92,5 +147,7 @@ type TenantUsecase interface {
 	UpdatePlan(ctx context.Context, actorID, id uuid.UUID, plan PlanTier) error
 	UpdateTheme(ctx context.Context, id uuid.UUID, themeConfig map[string]interface{}) (*Tenant, error)
 	VerifyPlanAccess(ctx context.Context, tenantID uuid.UUID, min PlanTier) (bool, error)
+	// UpdateSettings changes a restaurant's Pro timings and records who changed them
+	UpdateSettings(ctx context.Context, actorID, tenantID uuid.UUID, changes TenantSettingsChanges) (*TenantSettings, error)
 	ListActive(ctx context.Context) ([]Tenant, error)
 }

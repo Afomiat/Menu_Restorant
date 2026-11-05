@@ -2,6 +2,7 @@ package test
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -30,6 +31,13 @@ func (m *mockTenantRepo) UpdatePlan(ctx context.Context, id uuid.UUID, plan doma
 func (m *mockTenantRepo) UpdateTheme(ctx context.Context, id uuid.UUID, themeConfig map[string]interface{}) (*domain.Tenant, error) {
 	return m.tenant, m.err
 }
+func (m *mockTenantRepo) UpdateSettings(ctx context.Context, id uuid.UUID, settings domain.TenantSettings) (*domain.Tenant, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	m.tenant.Settings = settings
+	return m.tenant, nil
+}
 func (m *mockTenantRepo) ListActive(ctx context.Context) ([]domain.Tenant, error) {
 	if m.tenant != nil {
 		return []domain.Tenant{*m.tenant}, nil
@@ -56,6 +64,14 @@ func (m *mockTableRepo) Create(ctx context.Context, table *domain.RestaurantTabl
 }
 func (m *mockTableRepo) UpdateQRSecret(ctx context.Context, id, tenantID uuid.UUID, qrSecret string) error {
 	return m.err
+}
+func (m *mockTableRepo) UpdateWaiter(ctx context.Context, tenantID, tableID uuid.UUID, waiterID *uuid.UUID) (*domain.RestaurantTable, error) {
+	if m.table == nil || m.table.ID != tableID {
+		return nil, domain.ErrTableNotFound
+	}
+	m.table.AssignedWaiterID = waiterID
+	t := *m.table
+	return &t, nil
 }
 
 type mockMenuRepo struct {
@@ -124,6 +140,15 @@ type mockOrderRepo struct {
 	createdOrder *domain.Order
 	err          error
 	cancelCalled bool
+	// statusCalls records UpdateStatus calls: status and who
+	statusCalls []statusCall
+	veryLate    []domain.LateOrder
+	alerted     []uuid.UUID
+}
+
+type statusCall struct {
+	status domain.OrderStatus
+	actor  uuid.UUID
 }
 
 func (m *mockOrderRepo) Create(ctx context.Context, order *domain.Order) error {
@@ -140,7 +165,35 @@ func (m *mockOrderRepo) ListActiveByTenant(ctx context.Context, tenantID uuid.UU
 	}
 	return nil, m.err
 }
-func (m *mockOrderRepo) UpdateStatus(ctx context.Context, tenantID, orderID uuid.UUID, status domain.OrderStatus) error {
+func (m *mockOrderRepo) UpdateStatus(ctx context.Context, tenantID, orderID uuid.UUID, status domain.OrderStatus, actorID uuid.UUID) (*domain.Order, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	m.statusCalls = append(m.statusCalls, statusCall{status: status, actor: actorID})
+	tableNumber := "4"
+	if m.createdOrder != nil {
+		tableNumber = m.createdOrder.TableNumber
+	}
+	return &domain.Order{ID: orderID, TenantID: tenantID, TableNumber: tableNumber, Status: status}, nil
+}
+func (m *mockOrderRepo) ListVeryLate(ctx context.Context, now time.Time) ([]domain.LateOrder, error) {
+	var late []domain.LateOrder
+	for _, o := range m.veryLate {
+		if !now.Before(o.StartedAt.Add(time.Duration(o.TargetMinutes*2) * time.Minute)) {
+			late = append(late, o)
+		}
+	}
+	return late, m.err
+}
+func (m *mockOrderRepo) MarkVeryLateAlerted(ctx context.Context, orderID uuid.UUID) error {
+	m.alerted = append(m.alerted, orderID)
+	kept := m.veryLate[:0]
+	for _, o := range m.veryLate {
+		if o.ID != orderID {
+			kept = append(kept, o)
+		}
+	}
+	m.veryLate = kept
 	return m.err
 }
 func (m *mockOrderRepo) CancelInGrace(ctx context.Context, tenantID, orderID uuid.UUID, sessionToken string) error {
@@ -171,6 +224,9 @@ func (m *mockTenantUsecase) UpdatePlan(ctx context.Context, actorID, id uuid.UUI
 }
 func (m *mockTenantUsecase) UpdateTheme(ctx context.Context, id uuid.UUID, themeConfig map[string]interface{}) (*domain.Tenant, error) {
 	return m.tenant, m.err
+}
+func (m *mockTenantUsecase) UpdateSettings(ctx context.Context, actorID, tenantID uuid.UUID, changes domain.TenantSettingsChanges) (*domain.TenantSettings, error) {
+	return nil, m.err
 }
 func (m *mockTenantUsecase) VerifyPlanAccess(ctx context.Context, tenantID uuid.UUID, min domain.PlanTier) (bool, error) {
 	return m.hasPlan, m.err

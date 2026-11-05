@@ -74,10 +74,10 @@ func (q *Queries) CancelOrderInGrace(ctx context.Context, arg CancelOrderInGrace
 const createOrder = `-- name: CreateOrder :one
 INSERT INTO orders (
     tenant_id, table_id, table_number, customer_session_token,
-    status, payment_status, total_amount, grace_period_ends_at
+    status, payment_status, total_amount, grace_period_ends_at, target_minutes
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, tenant_id, table_id, table_number, customer_session_token, status, payment_status, total_amount, grace_period_ends_at, created_at
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id, tenant_id, table_id, table_number, customer_session_token, status, payment_status, total_amount, grace_period_ends_at, created_at, target_minutes, started_at, started_by, ready_at, ready_by, served_at, served_by
 `
 
 type CreateOrderParams struct {
@@ -89,6 +89,7 @@ type CreateOrderParams struct {
 	PaymentStatus        PaymentStatus      `json:"payment_status"`
 	TotalAmount          pgtype.Numeric     `json:"total_amount"`
 	GracePeriodEndsAt    pgtype.Timestamptz `json:"grace_period_ends_at"`
+	TargetMinutes        pgtype.Int4        `json:"target_minutes"`
 }
 
 type CreateOrderRow struct {
@@ -102,6 +103,13 @@ type CreateOrderRow struct {
 	TotalAmount          pgtype.Numeric     `json:"total_amount"`
 	GracePeriodEndsAt    pgtype.Timestamptz `json:"grace_period_ends_at"`
 	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	TargetMinutes        pgtype.Int4        `json:"target_minutes"`
+	StartedAt            pgtype.Timestamptz `json:"started_at"`
+	StartedBy            pgtype.UUID        `json:"started_by"`
+	ReadyAt              pgtype.Timestamptz `json:"ready_at"`
+	ReadyBy              pgtype.UUID        `json:"ready_by"`
+	ServedAt             pgtype.Timestamptz `json:"served_at"`
+	ServedBy             pgtype.UUID        `json:"served_by"`
 }
 
 func (q *Queries) CreateOrder(ctx context.Context, arg CreateOrderParams) (CreateOrderRow, error) {
@@ -114,6 +122,7 @@ func (q *Queries) CreateOrder(ctx context.Context, arg CreateOrderParams) (Creat
 		arg.PaymentStatus,
 		arg.TotalAmount,
 		arg.GracePeriodEndsAt,
+		arg.TargetMinutes,
 	)
 	var i CreateOrderRow
 	err := row.Scan(
@@ -127,6 +136,13 @@ func (q *Queries) CreateOrder(ctx context.Context, arg CreateOrderParams) (Creat
 		&i.TotalAmount,
 		&i.GracePeriodEndsAt,
 		&i.CreatedAt,
+		&i.TargetMinutes,
+		&i.StartedAt,
+		&i.StartedBy,
+		&i.ReadyAt,
+		&i.ReadyBy,
+		&i.ServedAt,
+		&i.ServedBy,
 	)
 	return i, err
 }
@@ -200,7 +216,7 @@ func (q *Queries) CreateOrderItemModifier(ctx context.Context, arg CreateOrderIt
 }
 
 const getOrderByID = `-- name: GetOrderByID :one
-SELECT id, tenant_id, table_id, table_number, customer_session_token, status, payment_status, total_amount, grace_period_ends_at, created_at
+SELECT id, tenant_id, table_id, table_number, customer_session_token, status, payment_status, total_amount, grace_period_ends_at, created_at, target_minutes, started_at, started_by, ready_at, ready_by, served_at, served_by
 FROM orders
 WHERE id = $1 AND tenant_id = $2
 LIMIT 1
@@ -222,6 +238,13 @@ type GetOrderByIDRow struct {
 	TotalAmount          pgtype.Numeric     `json:"total_amount"`
 	GracePeriodEndsAt    pgtype.Timestamptz `json:"grace_period_ends_at"`
 	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	TargetMinutes        pgtype.Int4        `json:"target_minutes"`
+	StartedAt            pgtype.Timestamptz `json:"started_at"`
+	StartedBy            pgtype.UUID        `json:"started_by"`
+	ReadyAt              pgtype.Timestamptz `json:"ready_at"`
+	ReadyBy              pgtype.UUID        `json:"ready_by"`
+	ServedAt             pgtype.Timestamptz `json:"served_at"`
+	ServedBy             pgtype.UUID        `json:"served_by"`
 }
 
 func (q *Queries) GetOrderByID(ctx context.Context, arg GetOrderByIDParams) (GetOrderByIDRow, error) {
@@ -238,12 +261,20 @@ func (q *Queries) GetOrderByID(ctx context.Context, arg GetOrderByIDParams) (Get
 		&i.TotalAmount,
 		&i.GracePeriodEndsAt,
 		&i.CreatedAt,
+		&i.TargetMinutes,
+		&i.StartedAt,
+		&i.StartedBy,
+		&i.ReadyAt,
+		&i.ReadyBy,
+		&i.ServedAt,
+		&i.ServedBy,
 	)
 	return i, err
 }
 
 const listActiveOrdersByTenant = `-- name: ListActiveOrdersByTenant :many
-SELECT id, tenant_id, table_id, table_number, status, payment_status, total_amount, grace_period_ends_at, created_at
+SELECT id, tenant_id, table_id, table_number, status, payment_status, total_amount, grace_period_ends_at, created_at,
+       target_minutes, started_at, started_by, ready_at, ready_by, served_at, served_by
 FROM orders
 WHERE tenant_id = $1 AND status NOT IN ('delivered', 'cancelled')
 ORDER BY created_at DESC
@@ -259,6 +290,13 @@ type ListActiveOrdersByTenantRow struct {
 	TotalAmount       pgtype.Numeric     `json:"total_amount"`
 	GracePeriodEndsAt pgtype.Timestamptz `json:"grace_period_ends_at"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	TargetMinutes     pgtype.Int4        `json:"target_minutes"`
+	StartedAt         pgtype.Timestamptz `json:"started_at"`
+	StartedBy         pgtype.UUID        `json:"started_by"`
+	ReadyAt           pgtype.Timestamptz `json:"ready_at"`
+	ReadyBy           pgtype.UUID        `json:"ready_by"`
+	ServedAt          pgtype.Timestamptz `json:"served_at"`
+	ServedBy          pgtype.UUID        `json:"served_by"`
 }
 
 func (q *Queries) ListActiveOrdersByTenant(ctx context.Context, tenantID pgtype.UUID) ([]ListActiveOrdersByTenantRow, error) {
@@ -280,6 +318,13 @@ func (q *Queries) ListActiveOrdersByTenant(ctx context.Context, tenantID pgtype.
 			&i.TotalAmount,
 			&i.GracePeriodEndsAt,
 			&i.CreatedAt,
+			&i.TargetMinutes,
+			&i.StartedAt,
+			&i.StartedBy,
+			&i.ReadyAt,
+			&i.ReadyBy,
+			&i.ServedAt,
+			&i.ServedBy,
 		); err != nil {
 			return nil, err
 		}
@@ -357,32 +402,123 @@ func (q *Queries) ListOrderItemsByOrderID(ctx context.Context, orderID pgtype.UU
 	return items, nil
 }
 
+const listVeryLateOrders = `-- name: ListVeryLateOrders :many
+SELECT o.id, o.tenant_id, o.table_number, o.target_minutes, o.started_at
+FROM orders o
+JOIN tenants t ON t.id = o.tenant_id
+WHERE o.status = 'preparing'
+  AND t.plan = 'pro'
+  AND o.very_late_alerted_at IS NULL
+  AND o.target_minutes IS NOT NULL
+  AND o.started_at + make_interval(mins => o.target_minutes * 2) <= $1::timestamptz
+`
+
+type ListVeryLateOrdersRow struct {
+	ID            pgtype.UUID        `json:"id"`
+	TenantID      pgtype.UUID        `json:"tenant_id"`
+	TableNumber   string             `json:"table_number"`
+	TargetMinutes pgtype.Int4        `json:"target_minutes"`
+	StartedAt     pgtype.Timestamptz `json:"started_at"`
+}
+
+// Pro orders cooking for twice their target that no manager has been alerted about yet
+func (q *Queries) ListVeryLateOrders(ctx context.Context, now pgtype.Timestamptz) ([]ListVeryLateOrdersRow, error) {
+	rows, err := q.db.Query(ctx, listVeryLateOrders, now)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListVeryLateOrdersRow{}
+	for rows.Next() {
+		var i ListVeryLateOrdersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.TableNumber,
+			&i.TargetMinutes,
+			&i.StartedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const markOrderVeryLateAlerted = `-- name: MarkOrderVeryLateAlerted :exec
+UPDATE orders SET very_late_alerted_at = NOW() WHERE id = $1
+`
+
+func (q *Queries) MarkOrderVeryLateAlerted(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, markOrderVeryLateAlerted, id)
+	return err
+}
+
 const updateOrderStatus = `-- name: UpdateOrderStatus :one
 UPDATE orders
-SET status = $3, updated_at = NOW()
-WHERE id = $1 AND tenant_id = $2
-RETURNING id, tenant_id, status, updated_at
+SET status = $1::order_status,
+    updated_at = NOW(),
+    started_at = CASE
+        WHEN $1::order_status = 'preparing' AND status <> 'preparing' THEN NOW()
+        WHEN $1::order_status IN ('pending_grace', 'not_started') THEN NULL
+        ELSE started_at END,
+    started_by = CASE
+        WHEN $1::order_status = 'preparing' AND status <> 'preparing' THEN $2::uuid
+        WHEN $1::order_status IN ('pending_grace', 'not_started') THEN NULL
+        ELSE started_by END,
+    ready_at = CASE
+        WHEN $1::order_status = 'ready' AND status <> 'ready' THEN NOW()
+        WHEN $1::order_status IN ('pending_grace', 'not_started', 'preparing') THEN NULL
+        ELSE ready_at END,
+    ready_by = CASE
+        WHEN $1::order_status = 'ready' AND status <> 'ready' THEN $2::uuid
+        WHEN $1::order_status IN ('pending_grace', 'not_started', 'preparing') THEN NULL
+        ELSE ready_by END,
+    served_at = CASE
+        WHEN $1::order_status = 'delivered' AND status <> 'delivered' THEN NOW()
+        WHEN $1::order_status <> 'delivered' THEN NULL
+        ELSE served_at END,
+    served_by = CASE
+        WHEN $1::order_status = 'delivered' AND status <> 'delivered' THEN $2::uuid
+        WHEN $1::order_status <> 'delivered' THEN NULL
+        ELSE served_by END
+WHERE id = $3 AND tenant_id = $4
+RETURNING id, tenant_id, table_id, table_number, status, updated_at
 `
 
 type UpdateOrderStatusParams struct {
+	Status   OrderStatus `json:"status"`
+	ActorID  pgtype.UUID `json:"actor_id"`
 	ID       pgtype.UUID `json:"id"`
 	TenantID pgtype.UUID `json:"tenant_id"`
-	Status   OrderStatus `json:"status"`
 }
 
 type UpdateOrderStatusRow struct {
-	ID        pgtype.UUID        `json:"id"`
-	TenantID  pgtype.UUID        `json:"tenant_id"`
-	Status    OrderStatus        `json:"status"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	ID          pgtype.UUID        `json:"id"`
+	TenantID    pgtype.UUID        `json:"tenant_id"`
+	TableID     pgtype.UUID        `json:"table_id"`
+	TableNumber string             `json:"table_number"`
+	Status      OrderStatus        `json:"status"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
+// Records who did each kitchen step and when. Moving an order back (undo) clears the later steps.
 func (q *Queries) UpdateOrderStatus(ctx context.Context, arg UpdateOrderStatusParams) (UpdateOrderStatusRow, error) {
-	row := q.db.QueryRow(ctx, updateOrderStatus, arg.ID, arg.TenantID, arg.Status)
+	row := q.db.QueryRow(ctx, updateOrderStatus,
+		arg.Status,
+		arg.ActorID,
+		arg.ID,
+		arg.TenantID,
+	)
 	var i UpdateOrderStatusRow
 	err := row.Scan(
 		&i.ID,
 		&i.TenantID,
+		&i.TableID,
+		&i.TableNumber,
 		&i.Status,
 		&i.UpdatedAt,
 	)

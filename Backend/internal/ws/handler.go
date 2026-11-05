@@ -53,6 +53,8 @@ func ServeWS(hub *Hub, tenantUsecase domain.TenantUsecase, jwtSecret string) gin
 			conn:     conn,
 			tenantID: claims.TenantID,
 			send:     make(chan []byte, 256),
+			userID:   claims.UserID,
+			role:     domain.NormalizeRole(claims.Role),
 		})
 	}
 }

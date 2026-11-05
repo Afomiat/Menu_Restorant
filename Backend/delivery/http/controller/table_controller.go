@@ -1,9 +1,11 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	"menu-backend/delivery/http/middleware"
 	"menu-backend/domain"
@@ -19,6 +21,54 @@ func NewTableController(tableUsecase domain.TableUsecase, tenantUsecase domain.T
 		tableUsecase:  tableUsecase,
 		tenantUsecase: tenantUsecase,
 	}
+}
+
+// AssignWaiter handles PATCH /api/v1/admin/tables/:id/waiter
+// Body {"waiter_id": "<uuid>"} gives the table to a waiter; {"waiter_id": null} to nobody
+func (ctrl *TableController) AssignWaiter(c *gin.Context) {
+	tenantID, ok := middleware.GetTenantIDFromContext(c)
+	claims, hasClaims := middleware.GetAuthClaims(c)
+	if !ok || !hasClaims {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+		return
+	}
+
+	tableID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid table id"})
+		return
+	}
+
+	var req struct {
+		WaiterID *string `json:"waiter_id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "waiter_id is required (or null for no waiter)"})
+		return
+	}
+	var waiterID *uuid.UUID
+	if req.WaiterID != nil && *req.WaiterID != "" {
+		id, err := uuid.Parse(*req.WaiterID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid waiter id"})
+			return
+		}
+		waiterID = &id
+	}
+
+	table, err := ctrl.tableUsecase.AssignWaiter(c.Request.Context(), claims.UserID, tenantID, tableID, waiterID)
+	switch {
+	case errors.Is(err, domain.ErrNotAWaiter):
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	case errors.Is(err, domain.ErrTableNotFound):
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	case err != nil:
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to assign waiter"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": table})
 }
 
 // ListTables handles GET /api/v1/admin/tables

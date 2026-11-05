@@ -14,7 +14,7 @@ import (
 const createTenant = `-- name: CreateTenant :one
 INSERT INTO tenants (slug, name, plan, currency, theme_config)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, slug, name, plan, currency, theme_config, is_active, created_at, updated_at
+RETURNING id, slug, name, plan, currency, theme_config, is_active, created_at, updated_at, settings
 `
 
 type CreateTenantParams struct {
@@ -44,12 +44,13 @@ func (q *Queries) CreateTenant(ctx context.Context, arg CreateTenantParams) (Ten
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Settings,
 	)
 	return i, err
 }
 
 const getTenantByID = `-- name: GetTenantByID :one
-SELECT id, slug, name, plan, currency, theme_config, is_active, created_at, updated_at
+SELECT id, slug, name, plan, currency, theme_config, is_active, created_at, updated_at, settings
 FROM tenants
 WHERE id = $1
 LIMIT 1
@@ -68,12 +69,13 @@ func (q *Queries) GetTenantByID(ctx context.Context, id pgtype.UUID) (Tenant, er
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Settings,
 	)
 	return i, err
 }
 
 const getTenantBySlug = `-- name: GetTenantBySlug :one
-SELECT id, slug, name, plan, currency, theme_config, is_active, created_at, updated_at
+SELECT id, slug, name, plan, currency, theme_config, is_active, created_at, updated_at, settings
 FROM tenants
 WHERE slug = $1 AND is_active = TRUE
 LIMIT 1
@@ -92,12 +94,13 @@ func (q *Queries) GetTenantBySlug(ctx context.Context, slug string) (Tenant, err
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Settings,
 	)
 	return i, err
 }
 
 const listActiveTenants = `-- name: ListActiveTenants :many
-SELECT id, slug, name, plan, currency, theme_config, is_active, created_at, updated_at
+SELECT id, slug, name, plan, currency, theme_config, is_active, created_at, updated_at, settings
 FROM tenants
 WHERE is_active = TRUE
 ORDER BY name ASC
@@ -122,6 +125,7 @@ func (q *Queries) ListActiveTenants(ctx context.Context) ([]Tenant, error) {
 			&i.IsActive,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Settings,
 		); err != nil {
 			return nil, err
 		}
@@ -137,7 +141,7 @@ const updateTenantPlan = `-- name: UpdateTenantPlan :one
 UPDATE tenants
 SET plan = $2, updated_at = NOW()
 WHERE id = $1
-RETURNING id, slug, name, plan, currency, theme_config, is_active, created_at, updated_at
+RETURNING id, slug, name, plan, currency, theme_config, is_active, created_at, updated_at, settings
 `
 
 type UpdateTenantPlanParams struct {
@@ -158,6 +162,37 @@ func (q *Queries) UpdateTenantPlan(ctx context.Context, arg UpdateTenantPlanPara
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Settings,
+	)
+	return i, err
+}
+
+const updateTenantSettings = `-- name: UpdateTenantSettings :one
+UPDATE tenants
+SET settings = $2, updated_at = NOW()
+WHERE id = $1
+RETURNING id, slug, name, plan, currency, theme_config, is_active, created_at, updated_at, settings
+`
+
+type UpdateTenantSettingsParams struct {
+	ID       pgtype.UUID `json:"id"`
+	Settings []byte      `json:"settings"`
+}
+
+func (q *Queries) UpdateTenantSettings(ctx context.Context, arg UpdateTenantSettingsParams) (Tenant, error) {
+	row := q.db.QueryRow(ctx, updateTenantSettings, arg.ID, arg.Settings)
+	var i Tenant
+	err := row.Scan(
+		&i.ID,
+		&i.Slug,
+		&i.Name,
+		&i.Plan,
+		&i.Currency,
+		&i.ThemeConfig,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Settings,
 	)
 	return i, err
 }
@@ -166,7 +201,7 @@ const updateTenantTheme = `-- name: UpdateTenantTheme :one
 UPDATE tenants
 SET theme_config = $2, updated_at = NOW()
 WHERE id = $1
-RETURNING id, slug, name, plan, currency, theme_config, is_active, created_at, updated_at
+RETURNING id, slug, name, plan, currency, theme_config, is_active, created_at, updated_at, settings
 `
 
 type UpdateTenantThemeParams struct {
@@ -187,6 +222,7 @@ func (q *Queries) UpdateTenantTheme(ctx context.Context, arg UpdateTenantThemePa
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Settings,
 	)
 	return i, err
 }

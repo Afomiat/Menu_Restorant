@@ -152,6 +152,7 @@ func SetupRouter(deps RouterDependencies) *gin.Engine {
 			adminRoutes.GET("/tenant", allStaff, tenantCtrl.GetTenantProfile)
 			adminRoutes.PATCH("/tenant/theme", manager, tenantCtrl.UpdateTheme)
 			adminRoutes.PATCH("/tenant/plan", middleware.RequireRole(domain.RoleSuperAdmin), tenantCtrl.UpdatePlan)
+			adminRoutes.PATCH("/tenant/settings", middleware.RequirePlan(deps.TenantUsecase, domain.PlanPro), manager, tenantCtrl.UpdateSettings)
 
 			// Kitchen Display System (KDS) live orders (Plus plan or higher)
 			kdsRoutes := adminRoutes.Group("")
@@ -161,6 +162,14 @@ func SetupRouter(deps RouterDependencies) *gin.Engine {
 				kdsRoutes.PATCH("/orders/:id/status", middleware.RequireRole(domain.RoleChef, domain.RoleManager, domain.RoleWaiter), orderCtrl.UpdateOrderStatus)
 				kdsRoutes.DELETE("/orders/table/:number", middleware.RequireRole(domain.RoleChef, domain.RoleManager), orderCtrl.CancelTableOrders)
 				kdsRoutes.DELETE("/orders", middleware.RequireRole(domain.RoleChef, domain.RoleManager), orderCtrl.CancelAllActiveOrders)
+			}
+
+			// Waiters' tables (Pro plan)
+			proRoutes := adminRoutes.Group("")
+			proRoutes.Use(middleware.RequirePlan(deps.TenantUsecase, domain.PlanPro))
+			{
+				proRoutes.GET("/my-tables", middleware.RequireRole(domain.RoleWaiter, domain.RoleManager), orderCtrl.MyTables)
+				proRoutes.PATCH("/tables/:id/waiter", manager, tableCtrl.AssignWaiter)
 			}
 
 			// Staff accounts (Pro plan, managers only)

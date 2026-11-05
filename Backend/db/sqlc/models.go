@@ -225,6 +225,7 @@ type MenuItem struct {
 	IsAvailable bool               `json:"is_available"`
 	IsSoldOut   bool               `json:"is_sold_out"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	PrepMinutes pgtype.Int4        `json:"prep_minutes"`
 }
 
 type Modifier struct {
@@ -254,6 +255,14 @@ type Order struct {
 	GracePeriodEndsAt    pgtype.Timestamptz `json:"grace_period_ends_at"`
 	CreatedAt            pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
+	TargetMinutes        pgtype.Int4        `json:"target_minutes"`
+	StartedAt            pgtype.Timestamptz `json:"started_at"`
+	StartedBy            pgtype.UUID        `json:"started_by"`
+	ReadyAt              pgtype.Timestamptz `json:"ready_at"`
+	ReadyBy              pgtype.UUID        `json:"ready_by"`
+	ServedAt             pgtype.Timestamptz `json:"served_at"`
+	ServedBy             pgtype.UUID        `json:"served_by"`
+	VeryLateAlertedAt    pgtype.Timestamptz `json:"very_late_alerted_at"`
 }
 
 type OrderItem struct {
@@ -275,11 +284,12 @@ type OrderItemModifier struct {
 }
 
 type RestaurantTable struct {
-	ID          pgtype.UUID `json:"id"`
-	TenantID    pgtype.UUID `json:"tenant_id"`
-	TableNumber string      `json:"table_number"`
-	QrSecret    string      `json:"qr_secret"`
-	IsActive    bool        `json:"is_active"`
+	ID               pgtype.UUID `json:"id"`
+	TenantID         pgtype.UUID `json:"tenant_id"`
+	TableNumber      string      `json:"table_number"`
+	QrSecret         string      `json:"qr_secret"`
+	IsActive         bool        `json:"is_active"`
+	AssignedWaiterID pgtype.UUID `json:"assigned_waiter_id"`
 }
 
 type Tenant struct {
@@ -292,6 +302,7 @@ type Tenant struct {
 	IsActive    bool               `json:"is_active"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	Settings    []byte             `json:"settings"`
 }
 
 type User struct {

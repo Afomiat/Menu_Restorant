@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -49,6 +50,54 @@ type Order struct {
 	CreatedAt            time.Time   `json:"created_at"`
 	UpdatedAt            time.Time   `json:"updated_at"`
 	Items                []OrderItem `json:"items"`
+
+	// TargetMinutes is the order's cooking target: its slowest dish, fixed when it was placed
+	TargetMinutes int        `json:"target_minutes"`
+	StartedAt     *time.Time `json:"started_at"`
+	StartedBy     *uuid.UUID `json:"started_by"`
+	ReadyAt       *time.Time `json:"ready_at"`
+	ReadyBy       *uuid.UUID `json:"ready_by"`
+	ServedAt      *time.Time `json:"served_at"`
+	ServedBy      *uuid.UUID `json:"served_by"`
+	// WaiterID is the waiter of the order's table when the order was changed (nil: none assigned)
+	WaiterID *uuid.UUID `json:"waiter_id,omitempty"`
+}
+
+// Actor is the signed-in staff member doing something
+type Actor struct {
+	ID   uuid.UUID
+	Role Role
+}
+
+var ErrStatusNotAllowed = errors.New("your role cannot move an order to this status")
+
+// CanSetOrderStatus says which role moves an order to which status: chefs cook, waiters serve,
+// managers (and the Azai team) can do everything
+func CanSetOrderStatus(role Role, status OrderStatus) bool {
+	switch role {
+	case RoleManager, RoleSuperAdmin:
+		return true
+	case RoleChef:
+		return status == StatusNotStarted || status == StatusPreparing || status == StatusReady || status == StatusCancelled
+	case RoleWaiter:
+		return status == StatusDelivered
+	}
+	return false
+}
+
+// LateOrder is a cooking order that has run past its target
+type LateOrder struct {
+	ID            uuid.UUID
+	TenantID      uuid.UUID
+	TableNumber   string
+	TargetMinutes int
+	StartedAt     time.Time
+}
+
+// TableOrders is one table with its waiter and its open orders, for the waiter's screen
+type TableOrders struct {
+	Table  RestaurantTable `json:"table"`
+	Orders []Order         `json:"orders"`
 }
 
 // Helper: Checks if the 60-second grace cancellation window is still active
@@ -78,7 +127,10 @@ type OrderRepository interface {
 	Create(ctx context.Context, order *Order) error
 	GetByID(ctx context.Context, tenantID, orderID uuid.UUID) (*Order, error)
 	ListActiveByTenant(ctx context.Context, tenantID uuid.UUID) ([]Order, error)
-	UpdateStatus(ctx context.Context, tenantID, orderID uuid.UUID, status OrderStatus) error
+	// UpdateStatus moves an order and records who did the step and when
+	UpdateStatus(ctx context.Context, tenantID, orderID uuid.UUID, status OrderStatus, actorID uuid.UUID) (*Order, error)
+	ListVeryLate(ctx context.Context, now time.Time) ([]LateOrder, error)
+	MarkVeryLateAlerted(ctx context.Context, orderID uuid.UUID) error
 	CancelInGrace(ctx context.Context, tenantID, orderID uuid.UUID, sessionToken string) error
 	// OrderRepository — add after CancelInGrace:
 	BulkCancelTableOrders(ctx context.Context, tenantID uuid.UUID, tableNumber string) error
@@ -90,7 +142,9 @@ type OrderUsecase interface {
 	PlaceOrder(ctx context.Context, input CreateOrderInput) (*Order, error)
 	GetOrderByID(ctx context.Context, tenantID, orderID uuid.UUID) (*Order, error)
 	UndoOrder(ctx context.Context, tenantID, orderID uuid.UUID, sessionToken string) error
-	UpdateKitchenStatus(ctx context.Context, tenantID, orderID uuid.UUID, status OrderStatus) error
+	UpdateKitchenStatus(ctx context.Context, actor Actor, tenantID, orderID uuid.UUID, status OrderStatus) (*Order, error)
+	// TablesWithOrders lists tables and their open orders: one waiter's tables, or all (uuid.Nil)
+	TablesWithOrders(ctx context.Context, tenantID, waiterID uuid.UUID) ([]TableOrders, error)
 	GetActiveKitchenOrders(ctx context.Context, tenantID uuid.UUID) ([]Order, error)
 	BulkCancelTableOrders(ctx context.Context, tenantID uuid.UUID, tableNumber string) error
 	BulkCancelAllActive(ctx context.Context, tenantID uuid.UUID) error

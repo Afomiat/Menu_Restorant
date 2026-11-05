@@ -46,15 +46,21 @@ type Querier interface {
 	ListOrderItemModifiersByItemID(ctx context.Context, orderItemID pgtype.UUID) ([]OrderItemModifier, error)
 	ListOrderItemsByOrderID(ctx context.Context, orderID pgtype.UUID) ([]OrderItem, error)
 	ListStaff(ctx context.Context, tenantID pgtype.UUID) ([]User, error)
-	ListTablesByTenant(ctx context.Context, tenantID pgtype.UUID) ([]RestaurantTable, error)
+	ListTablesByTenant(ctx context.Context, tenantID pgtype.UUID) ([]ListTablesByTenantRow, error)
+	// Pro orders cooking for twice their target that no manager has been alerted about yet
+	ListVeryLateOrders(ctx context.Context, now pgtype.Timestamptz) ([]ListVeryLateOrdersRow, error)
+	MarkOrderVeryLateAlerted(ctx context.Context, id pgtype.UUID) error
 	RecordActivity(ctx context.Context, arg RecordActivityParams) error
 	ToggleMenuItemSoldOut(ctx context.Context, arg ToggleMenuItemSoldOutParams) (ToggleMenuItemSoldOutRow, error)
 	UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (Category, error)
 	UpdateMenuItem(ctx context.Context, arg UpdateMenuItemParams) (MenuItem, error)
+	// Records who did each kitchen step and when. Moving an order back (undo) clears the later steps.
 	UpdateOrderStatus(ctx context.Context, arg UpdateOrderStatusParams) (UpdateOrderStatusRow, error)
 	UpdateStaff(ctx context.Context, arg UpdateStaffParams) (User, error)
 	UpdateTableQRSecret(ctx context.Context, arg UpdateTableQRSecretParams) (UpdateTableQRSecretRow, error)
+	UpdateTableWaiter(ctx context.Context, arg UpdateTableWaiterParams) (RestaurantTable, error)
 	UpdateTenantPlan(ctx context.Context, arg UpdateTenantPlanParams) (Tenant, error)
+	UpdateTenantSettings(ctx context.Context, arg UpdateTenantSettingsParams) (Tenant, error)
 	UpdateTenantTheme(ctx context.Context, arg UpdateTenantThemeParams) (Tenant, error)
 }
 

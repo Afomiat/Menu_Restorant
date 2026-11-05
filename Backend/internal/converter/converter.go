@@ -54,6 +54,49 @@ func StringToText(s string) pgtype.Text {
 	return pgtype.Text{String: s, Valid: s != ""}
 }
 
+// IntPtrToPg stores nil as NULL
+func IntPtrToPg(v *int) pgtype.Int4 {
+	if v == nil {
+		return pgtype.Int4{}
+	}
+	return pgtype.Int4{Int32: int32(*v), Valid: true}
+}
+
+// PgToIntPtr reads NULL as nil
+func PgToIntPtr(v pgtype.Int4) *int {
+	if !v.Valid {
+		return nil
+	}
+	n := int(v.Int32)
+	return &n
+}
+
+// PgToTimePtr reads NULL as nil
+func PgToTimePtr(t pgtype.Timestamptz) *time.Time {
+	if !t.Valid {
+		return nil
+	}
+	v := t.Time
+	return &v
+}
+
+// PgToUUIDPtr reads NULL as nil
+func PgToUUIDPtr(p pgtype.UUID) *uuid.UUID {
+	if !p.Valid {
+		return nil
+	}
+	id := uuid.UUID(p.Bytes)
+	return &id
+}
+
+// UUIDPtrToPg stores nil as NULL
+func UUIDPtrToPg(id *uuid.UUID) pgtype.UUID {
+	if id == nil {
+		return pgtype.UUID{}
+	}
+	return UUIDToPg(*id)
+}
+
 func TextToString(t pgtype.Text) string {
 	if !t.Valid {
 		return ""

@@ -12,6 +12,9 @@ const (
 	ActionPlanChanged  = "plan.changed"
 	ActionStaffCreated = "staff.created"
 	ActionStaffUpdated = "staff.updated"
+
+	ActionSettingsChanged = "settings.changed"
+	ActionWaiterAssigned  = "table.waiter_assigned"
 )
 
 // Activity is one entry of a restaurant's who-did-what log

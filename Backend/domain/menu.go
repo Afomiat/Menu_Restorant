@@ -27,12 +27,14 @@ type MenuItem struct {
 	IsAvailable bool      `json:"is_available"`
 	IsSoldOut   bool      `json:"is_sold_out"`
 	CreatedAt   time.Time `json:"created_at"`
+	// PrepMinutes is how long the dish takes; nil uses the restaurant's default prep time
+	PrepMinutes *int `json:"prep_minutes"`
 }
 
 type FullMenu struct {
-	Tenant     *Tenant     `json:"tenant"`
-	Categories []Category  `json:"categories"`
-	Items      []MenuItem  `json:"items"`
+	Tenant     *Tenant    `json:"tenant"`
+	Categories []Category `json:"categories"`
+	Items      []MenuItem `json:"items"`
 }
 
 type CreateCategoryInput struct {
@@ -57,6 +59,7 @@ type CreateItemInput struct {
 	Price       float64   `json:"price"`
 	ImageUrl    string    `json:"image_url"`
 	Tags        []string  `json:"tags"`
+	PrepMinutes *int      `json:"prep_minutes"`
 }
 
 type UpdateItemInput struct {
@@ -69,6 +72,7 @@ type UpdateItemInput struct {
 	ImageUrl    string    `json:"image_url"`
 	Tags        []string  `json:"tags"`
 	IsAvailable bool      `json:"is_available"`
+	PrepMinutes *int      `json:"prep_minutes"`
 }
 
 type Modifier struct {
