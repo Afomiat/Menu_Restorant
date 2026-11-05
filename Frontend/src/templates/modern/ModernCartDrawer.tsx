@@ -4,6 +4,7 @@ import { formatPrice } from '../../utils/currency';
 import { useCartDrawerLogic } from '../../hooks/useCartDrawerLogic';
 import { sizedImageUrl } from '../../utils/imageUrl';
 import OrderEstimate from '../../components/common/OrderEstimate';
+import AskBillButton from '../../components/common/AskBillButton';
 
 interface ModernCartDrawerProps {
   cart: CartItem[];
@@ -19,6 +20,10 @@ interface ModernCartDrawerProps {
   initialTab?: 'tray' | 'orders';
   tableNumber?: string | null;
   isTableVerified?: boolean;
+  /** Pro: the customer's "Ask for the bill" button on the orders tab. */
+  onAskBill?: () => void;
+  billAsked?: boolean;
+  billError?: string | null;
 }
 
 export default function ModernCartDrawer({
@@ -35,6 +40,9 @@ export default function ModernCartDrawer({
   initialTab = 'tray',
   tableNumber,
   isTableVerified = false,
+  onAskBill,
+  billAsked = false,
+  billError,
 }: ModernCartDrawerProps) {
   const {
     activeTab,
@@ -346,6 +354,8 @@ export default function ModernCartDrawer({
                     </div>
                   </div>
                 </div>
+
+                {onAskBill && <AskBillButton onAsk={onAskBill} asked={billAsked} error={billError} />}
 
                 {/* 2. Scrollable list of kitchen orders */}
                 <div

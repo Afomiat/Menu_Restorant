@@ -119,6 +119,9 @@ export default function ModernMenuPage({
     getItemCartQuantity,
     resolvedTable,
     isTableVerified,
+    billAsked,
+    billError,
+    handleRequestBill,
   } = useMenuCart({
     restaurantSlug,
     items,
@@ -545,6 +548,9 @@ export default function ModernMenuPage({
         initialTab={cartDrawerTab}
         tableNumber={resolvedTable || tableNumber}
         isTableVerified={isTableVerified}
+        onAskBill={hasPlan('pro') && isTableVerified ? handleRequestBill : undefined}
+        billAsked={billAsked}
+        billError={billError}
       />
 
       {/* Restaurant Information Modal */}

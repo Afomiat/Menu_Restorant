@@ -9,6 +9,20 @@ vi.mock('../services/orderService', () => ({
   updateAdminOrderStatus: (...a: unknown[]) => updateAdminOrderStatus(...a),
 }));
 
+const fetchBills = vi.fn();
+vi.mock('../services/billService', () => ({
+  fetchBills: () => fetchBills(),
+  fetchMyShift: vi.fn(async () => null),
+  startShift: vi.fn(),
+  endShift: vi.fn(),
+  requestBill: vi.fn(),
+  collectBill: vi.fn(),
+  confirmBill: vi.fn(),
+  moveBill: vi.fn(),
+  handoverBill: vi.fn(),
+  fetchColleagues: vi.fn(async () => []),
+}));
+
 import WaiterTablesScreen from './WaiterTablesScreen';
 
 const order = (id: string, status: OrderStatus, dish = 'Tibs'): BackendOrder => ({
@@ -31,6 +45,7 @@ const table = (n: string, orders: BackendOrder[]): TableOrders => ({
 beforeEach(() => {
   fetchMyTables.mockReset();
   updateAdminOrderStatus.mockReset().mockResolvedValue(true);
+  fetchBills.mockReset().mockResolvedValue([]);
 });
 afterEach(cleanup);
 
@@ -105,5 +120,38 @@ describe('WaiterTablesScreen', () => {
 
     fireEvent.click(screen.getByText('Tap to enable sound'));
     expect(enable).toHaveBeenCalled();
+  });
+});
+
+describe('WaiterTablesScreen bills', () => {
+  const bill = (status: string, table: string) => ({
+    id: `bill-${table}-${status}`,
+    tenant_id: 't',
+    table_id: null,
+    table_number: table,
+    waiter_id: 'w1',
+    waiter_name: 'Abebe',
+    status,
+    total_amount: 670,
+    amount_paid: 0,
+    amount_owed: 670,
+    requested_at: null,
+    collected_at: null,
+    confirmed_at: null,
+    created_at: '',
+    closed_at: null,
+    payments: [],
+  });
+
+  it("shows each table's bill still in the waiter's hands, with the shift bar", async () => {
+    fetchMyTables.mockResolvedValue([table('5', [order('a', 'preparing')]), table('6', [])]);
+    fetchBills.mockResolvedValue([bill('bill_requested', '5'), bill('confirmed', '6')]);
+    renderScreen();
+
+    const table5 = await screen.findByTestId('waiter-table-5');
+    await waitFor(() => expect(within(table5).getByTestId('bill-bill-5-bill_requested')).toBeTruthy());
+    expect(within(table5).getByText('Collect')).toBeTruthy();
+    expect(within(screen.getByTestId('waiter-table-6')).queryByTestId('bill-bill-6-confirmed')).toBeNull();
+    expect(screen.getByTestId('shift-status')).toBeTruthy();
   });
 });

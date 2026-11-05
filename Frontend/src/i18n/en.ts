@@ -95,6 +95,67 @@ export const en = {
     prepHint: (fallback: number) => `Leave empty to use the restaurant default (${fallback} min).`,
   },
 
+  bills: {
+    title: 'Bills',
+    navLabel: 'Bills',
+    status: {
+      open: 'Eating',
+      bill_requested: 'Bill asked',
+      collected: 'Collected',
+      confirmed: 'Confirmed',
+      walkout: 'Walkout',
+    } as Record<string, string>,
+    methods: { cash: 'Cash', telebirr: 'Telebirr', cbe_birr_bank: 'CBE Birr / bank' } as Record<string, string>,
+    total: 'Total',
+    paid: 'Paid',
+    owed: 'Owed',
+    askBill: 'Ask for bill',
+    collect: 'Collect',
+    collectTitle: (table: string) => `Collect for table ${table}`,
+    amount: 'Amount',
+    method: 'Paid by',
+    reference: 'Transaction reference',
+    referenceHint: 'From the Telebirr or CBE SMS, so the cashier can check it.',
+    save: 'Save',
+    cancel: 'Cancel',
+    confirm: 'Confirm money received',
+    move: 'Move or join table',
+    moveTo: 'To table',
+    handover: 'Hand over',
+    handoverTo: 'Hand to',
+    waiter: (name: string) => (name ? `Waiter: ${name}` : 'No waiter'),
+    sectionCollected: 'Collected, waiting for you to confirm',
+    sectionOpen: 'Open bills',
+    sectionConfirmed: 'Confirmed today',
+    none: 'Nothing here.',
+    collectedBy: (name: string, method: string) => `${name} · ${method}`,
+  },
+
+  shift: {
+    start: 'Start shift',
+    end: 'End shift',
+    onShift: (since: string) => `On shift since ${since}`,
+    offShift: 'Not on shift',
+  },
+
+  /** Banners for live alerts, by event. */
+  alerts: {
+    'bill:requested': (table: string) => `Table ${table} asks for the bill`,
+    'bill:reminder': (table: string) => `Table ${table}: the bill is still unpaid`,
+    'bill:escalated': (table: string) => `Table ${table}: the bill is unpaid for a long time`,
+    'bill:collected': (table: string) => `Table ${table}: money collected, please confirm`,
+    'bill:unconfirmed': (table: string) => `Table ${table}: collected money not confirmed yet`,
+    'bill:handed_over': (table: string) => `Table ${table}'s bill was handed to you`,
+    'table:long_open': (table: string) => `Table ${table} has been open a long time`,
+    'table:open_bill_rescanned': (table: string) => `New customers at table ${table}, but its bill is unpaid`,
+    'shift:open_bills': () => 'A waiter tried to end their shift with unpaid bills',
+  } as Record<string, (table: string) => string>,
+
+  customerBill: {
+    ask: 'Ask for the bill',
+    asked: 'Your waiter is bringing the bill',
+  },
+
   roleHome: {
     greeting: (name: string) => (name ? `Hello, ${name}` : 'Hello'),
     signedInAs: (role: string) => `Signed in as ${role}`,

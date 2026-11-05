@@ -35,6 +35,7 @@ import AdminStaffModal from './AdminStaffModal';
 import AdminRoleHome from './AdminRoleHome';
 import ProKitchenBoard from './ProKitchenBoard';
 import WaiterTablesScreen, { type ReadyAlert } from './WaiterTablesScreen';
+import BillsScreen from './BillsScreen';
 import { useBell } from '../hooks/useBell';
 import { hasPlan } from '../utils/plan';
 
@@ -44,6 +45,16 @@ function startedAtFor(row: CartItem, status: OrderStatus): number | undefined {
   if (status === 'not_started' || status === 'pending_grace') return undefined;
   return row.startedAt;
 }
+
+/** A live bill, table or shift alert shown as a banner until dismissed. */
+interface StaffAlert {
+  key: string;
+  event: string;
+  tableNumber: string;
+}
+
+// Alerts that ring the friendly bell; the rest use the alert sound
+const BELL_ALERTS = new Set(['bill:requested', 'bill:collected', 'bill:handed_over']);
 
 interface VeryLateAlert {
   orderId: string;
@@ -85,7 +96,7 @@ export default function AdminDashboardPage() {
   const planFromBackend: PlanTier = initialMeta?.plan || 'basic';
 
   // Active top-level view: 'menu' (Dashboard/Dishes) or 'kitchen' (Live KDS Orders)
-  const [activeView, setActiveView] = useState<'menu' | 'kitchen'>('menu');
+  const [activeView, setActiveView] = useState<'menu' | 'kitchen' | 'bills'>('menu');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Local editable state
@@ -184,13 +195,14 @@ export default function AdminDashboardPage() {
   // Each role sees its own screen. The backend enforces the same rules on every request.
   const staffRole = adminToken ? normalizeRole(staffUser?.role) ?? 'manager' : null;
   const isManager = canManage(staffRole);
-  const viewToShow: 'menu' | 'kitchen' = staffRole === 'chef' ? 'kitchen' : activeView;
+  const viewToShow: 'menu' | 'kitchen' | 'bills' = staffRole === 'chef' ? 'kitchen' : activeView;
 
   // Pro screens: the kitchen board, the waiter's tables, bells and alerts
   const isPro = hasPlan(planFromBackend, 'pro');
   const bell = useBell();
   const [readyAlerts, setReadyAlerts] = useState<ReadyAlert[]>([]);
   const [veryLateAlerts, setVeryLateAlerts] = useState<VeryLateAlert[]>([]);
+  const [staffAlerts, setStaffAlerts] = useState<StaffAlert[]>([]);
   const [ordersChanged, setOrdersChanged] = useState(0);
   const markOrdersChanged = () => setOrdersChanged((n) => n + 1);
 
@@ -205,6 +217,14 @@ export default function AdminDashboardPage() {
         prev.some((a) => a.orderId === data.order_id) ? prev : [...prev, { orderId: data.order_id, tableNumber: data.table_number }]
       );
       bell.ring('bell');
+      markOrdersChanged();
+    },
+    onStaffAlert: (event, data) => {
+      const key = `${event}:${data.bill_id || data.table_number || Date.now()}`;
+      setStaffAlerts((prev) =>
+        prev.some((a) => a.key === key) ? prev : [...prev, { key, event, tableNumber: data.table_number || '' }]
+      );
+      bell.ring(BELL_ALERTS.has(event) ? 'bell' : 'alert');
       markOrdersChanged();
     },
     onOrderVeryLate: (data) => {
@@ -798,8 +818,29 @@ export default function AdminDashboardPage() {
               </button>
             </div>
           ))}
-        {staffRole === 'waiter' && isPro ? (
+        {staffAlerts.map((alert) => (
+          <div
+            key={alert.key}
+            role="alert"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: BELL_ALERTS.has(alert.event) ? '#2563eb' : '#b45309', color: '#fff', borderRadius: '12px', padding: '12px 16px', margin: '0 0 10px', fontWeight: 700 }}
+          >
+            <span>{(t.alerts[alert.event] || ((table: string) => `${alert.event} ${table}`))(alert.tableNumber)}</span>
+            <button
+              type="button"
+              className="admin-sec-pill-btn"
+              onClick={() => setStaffAlerts((prev) => prev.filter((a) => a.key !== alert.key))}
+            >
+              {t.kitchen.dismiss}
+            </button>
+          </div>
+        ))}
+        {staffRole === 'cashier' && isPro ? (
+          <BillsScreen role={staffRole} currency={meta.currency || 'ETB'} refreshSignal={ordersChanged} showShift />
+        ) : isManager && isPro && viewToShow === 'bills' ? (
+          <BillsScreen role={staffRole} currency={meta.currency || 'ETB'} refreshSignal={ordersChanged} />
+        ) : staffRole === 'waiter' && isPro ? (
           <WaiterTablesScreen
+            currency={meta.currency || 'ETB'}
             fullName={staffUser?.full_name}
             onLogout={handleLogout}
             bell={bell}

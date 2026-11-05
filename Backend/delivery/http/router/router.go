@@ -184,6 +184,7 @@ func SetupRouter(deps RouterDependencies) *gin.Engine {
 				proRoutes.POST("/bills/:id/confirm", middleware.RequireRole(domain.RoleCashier, domain.RoleManager), billCtrl.Confirm)
 				proRoutes.POST("/bills/:id/move", waiter, billCtrl.Move)
 				proRoutes.POST("/bills/:id/handover", waiter, billCtrl.Handover)
+				proRoutes.GET("/colleagues", waiter, staffCtrl.ListColleagues)
 
 				// Shifts
 				proRoutes.GET("/shifts/me", allStaff, billCtrl.MyShift)

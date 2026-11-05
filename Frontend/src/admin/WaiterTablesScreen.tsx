@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { BellRing, CheckCircle2, LogOut, Volume2, X } from 'lucide-react';
-import type { BackendOrder, TableOrders } from '../types';
+import type { BackendOrder, Bill, TableOrders } from '../types';
 import { fetchMyTables, updateAdminOrderStatus } from '../services/orderService';
+import { fetchBills } from '../services/billService';
+import BillCard from './BillCard';
+import ShiftBar from './ShiftBar';
 import { t } from '../i18n/en';
 import { tableState, type TableState } from '../utils/orderBoards';
 
@@ -19,6 +22,7 @@ interface WaiterTablesScreenProps {
   onDismissAlert: (orderId: string) => void;
   /** Changes whenever an order changes, so the screen reloads its tables. */
   refreshSignal: number;
+  currency?: string;
 }
 
 const STATE_STYLE: Record<TableState, { label: string; color: string; bg: string }> = {
@@ -36,8 +40,10 @@ export default function WaiterTablesScreen({
   readyAlerts,
   onDismissAlert,
   refreshSignal,
+  currency,
 }: WaiterTablesScreenProps) {
   const [tables, setTables] = useState<TableOrders[] | null>(null);
+  const [bills, setBills] = useState<Bill[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busyOrder, setBusyOrder] = useState<string | null>(null);
 
@@ -48,6 +54,9 @@ export default function WaiterTablesScreen({
         setError(null);
       })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Failed to load tables'));
+    fetchBills()
+      .then(setBills)
+      .catch(() => setBills([]));
   }, []);
 
   useEffect(() => {
@@ -92,6 +101,8 @@ export default function WaiterTablesScreen({
         </div>
       </div>
 
+      <ShiftBar />
+
       {readyAlerts.map((alert) => (
         <div
           key={alert.orderId}
@@ -114,6 +125,10 @@ export default function WaiterTablesScreen({
       <div className="admin-kitchen-tickets-grid">
         {(tables || []).map(({ table, orders }) => {
           const state = STATE_STYLE[tableState(orders)];
+          // The table's bill still in the waiter's hands (taking orders, or collected and not confirmed)
+          const bill = bills.find(
+            (b) => b.table_number === table.table_number && (b.status === 'open' || b.status === 'bill_requested' || b.status === 'collected')
+          );
           return (
             <div key={table.id} className="admin-kitchen-table-card" data-testid={`waiter-table-${table.table_number}`}>
               <div className="admin-kitchen-card-header">
@@ -146,6 +161,7 @@ export default function WaiterTablesScreen({
                     )}
                   </div>
                 ))}
+                {bill && <BillCard bill={bill} role="waiter" currency={currency} onChanged={load} />}
               </div>
             </div>
           );

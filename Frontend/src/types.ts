@@ -215,3 +215,50 @@ export interface TableOrders {
 }
 
 
+
+/** Pro bills: one per table visit; the waiter collects, the cashier confirms. */
+export type BillStatus = 'open' | 'bill_requested' | 'collected' | 'confirmed' | 'walkout';
+export type PaymentMethod = 'cash' | 'telebirr' | 'cbe_birr_bank';
+
+export interface BillPayment {
+  id: string;
+  amount: number;
+  method: PaymentMethod;
+  reference: string;
+  collected_by: string | null;
+  collected_by_name: string;
+  collected_at: string;
+}
+
+export interface Bill {
+  id: string;
+  tenant_id: string;
+  table_id: string | null;
+  table_number: string;
+  waiter_id: string | null;
+  waiter_name: string;
+  status: BillStatus;
+  total_amount: number;
+  amount_paid: number;
+  amount_owed: number;
+  requested_at: string | null;
+  collected_at: string | null;
+  confirmed_at: string | null;
+  created_at: string;
+  closed_at: string | null;
+  payments: BillPayment[];
+}
+
+export interface Shift {
+  id: string;
+  user_id: string;
+  started_at: string;
+  ended_at: string | null;
+}
+
+/** A waiter or manager a bill can be handed to. */
+export interface Colleague {
+  id: string;
+  full_name: string;
+  role: StaffRole;
+}

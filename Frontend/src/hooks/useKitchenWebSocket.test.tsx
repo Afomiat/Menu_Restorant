@@ -77,3 +77,19 @@ describe('useKitchenWebSocket', () => {
     expect(onOrderCreated).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('useKitchenWebSocket staff alerts', () => {
+  it('passes bill, table and shift events to onStaffAlert and ignores others', () => {
+    const onStaffAlert = vi.fn();
+    renderHook(() => useKitchenWebSocket({ token: 'jwt', onStaffAlert }));
+    const socket = FakeSocket.last!;
+
+    socket.receive('bill:requested', { bill_id: 'b1', table_number: '5' });
+    socket.receive('table:open_bill_rescanned', { bill_id: 'b1', table_number: '5' });
+    socket.receive('shift:open_bills', { count: 2 });
+    socket.receive('menu:updated', null);
+
+    expect(onStaffAlert.mock.calls.map((c) => c[0])).toEqual(['bill:requested', 'table:open_bill_rescanned', 'shift:open_bills']);
+    expect(onStaffAlert.mock.calls[0][1]).toEqual({ bill_id: 'b1', table_number: '5' });
+  });
+});

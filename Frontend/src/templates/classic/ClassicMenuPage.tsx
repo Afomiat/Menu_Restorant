@@ -72,6 +72,9 @@ export default function ClassicMenuPage({
     totalCartItems,
     resolvedTable,
     isTableVerified,
+    billAsked,
+    billError,
+    handleRequestBill,
   } = useMenuCart({
     restaurantSlug,
     items,
@@ -294,6 +297,9 @@ export default function ClassicMenuPage({
           placedOrders={placedOrders}
           onUndoOrder={handleUndoOrder}
           orderError={orderError}
+          onAskBill={hasPlan('pro') && isTableVerified ? handleRequestBill : undefined}
+          billAsked={billAsked}
+          billError={billError}
         />
       )}
 

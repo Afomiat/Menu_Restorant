@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"bytes"
 	"encoding/json"
 	"net/http"
@@ -233,5 +234,37 @@ func TestAPI_PlanChangeIsRecordedWithTheSuperAdmin(t *testing.T) {
 	}
 	if len(activity.records) != 1 || activity.records[0].ActorID != superAdmin || activity.records[0].TenantID != tenant.ID {
 		t.Fatalf("expected the change recorded under the super admin, got %+v", activity.records)
+	}
+}
+
+func TestAPI_ColleaguesForHandover(t *testing.T) {
+	api := newStaffAPI(domain.PlanPro)
+	abebe := api.env.repo.add(api.env.tenant.ID, "Abebe", "+251911000002", "", "secret123", domain.RoleWaiter)
+	api.env.repo.add(api.env.tenant.ID, "Tsion", "+251911000003", "", "secret123", domain.RoleChef)
+	gone := api.env.repo.add(api.env.tenant.ID, "Gone", "+251911000004", "", "secret123", domain.RoleWaiter)
+	off := false
+	if _, err := api.env.uc.Update(context.Background(), api.env.manager.ID, api.env.tenant.ID, gone.ID, domain.UpdateStaffInput{IsActive: &off}); err != nil {
+		t.Fatal(err)
+	}
+
+	w, res := api.do(http.MethodGet, "/api/v1/admin/colleagues", api.token(abebe), nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	names := map[string]string{}
+	for _, c := range res["data"].([]interface{}) {
+		m := c.(map[string]interface{})
+		names[m["full_name"].(string)] = m["role"].(string)
+		if _, leaked := m["phone"]; leaked {
+			t.Fatal("colleagues must not include phone numbers")
+		}
+	}
+	if len(names) != 2 || names["Abebe"] != "waiter" || names["Hana Manager"] != "manager" {
+		t.Fatalf("expected the active waiters and managers only, got %v", names)
+	}
+
+	chef := api.env.repo.add(api.env.tenant.ID, "Chef2", "+251911000007", "", "secret123", domain.RoleChef)
+	if w, _ := api.do(http.MethodGet, "/api/v1/admin/colleagues", api.token(chef), nil); w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for a chef, got %d", w.Code)
 	}
 }

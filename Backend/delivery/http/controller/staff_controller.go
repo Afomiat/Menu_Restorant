@@ -51,6 +51,28 @@ func (ctrl *StaffController) ListStaff(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": staff, "roles": domain.StaffRoles})
 }
 
+// ListColleagues handles GET /api/v1/admin/colleagues: the active waiters and managers a bill
+// can be handed to, with only their name and role
+func (ctrl *StaffController) ListColleagues(c *gin.Context) {
+	tenantID, ok := middleware.GetTenantIDFromContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "restaurant tenant identification missing"})
+		return
+	}
+	staff, err := ctrl.staffUsecase.List(c.Request.Context(), tenantID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load staff"})
+		return
+	}
+	colleagues := []gin.H{}
+	for _, s := range staff {
+		if s.IsActive && (s.Role == domain.RoleWaiter || s.Role == domain.RoleManager) {
+			colleagues = append(colleagues, gin.H{"id": s.ID, "full_name": s.FullName, "role": s.Role})
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"data": colleagues})
+}
+
 // CreateStaff handles POST /api/v1/admin/staff
 func (ctrl *StaffController) CreateStaff(c *gin.Context) {
 	tenantID, actorID, ok := staffContext(c)

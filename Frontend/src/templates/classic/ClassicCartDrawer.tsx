@@ -3,6 +3,7 @@ import type { CartItem } from '../../types';
 import { formatPrice } from '../../utils/currency';
 import { useCartDrawerLogic } from '../../hooks/useCartDrawerLogic';
 import OrderEstimate from '../../components/common/OrderEstimate';
+import AskBillButton from '../../components/common/AskBillButton';
 
 interface ClassicCartDrawerProps {
   cart: CartItem[];
@@ -17,6 +18,10 @@ interface ClassicCartDrawerProps {
   onUndoOrder: (orderId: string) => void;
   orderError?: string | null;
   isTableVerified?: boolean;
+  /** Pro: the customer's "Ask for the bill" button on the orders tab. */
+  onAskBill?: () => void;
+  billAsked?: boolean;
+  billError?: string | null;
 }
 
 export default function ClassicCartDrawer({
@@ -32,6 +37,9 @@ export default function ClassicCartDrawer({
   onUndoOrder,
   orderError,
   isTableVerified = false,
+  onAskBill,
+  billAsked = false,
+  billError,
 }: ClassicCartDrawerProps) {
   const {
     activeTab,
@@ -726,6 +734,8 @@ export default function ClassicCartDrawer({
                     </div>
                   </div>
                 </div>
+
+                {onAskBill && <AskBillButton onAsk={onAskBill} asked={billAsked} error={billError} />}
 
                 {/* Placed Items List (Matches Screenshot 1) */}
                 <div

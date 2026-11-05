@@ -13,6 +13,9 @@ vi.mock('../services/orderService', async () => {
   };
 });
 
+const customerRequestBill = vi.fn();
+vi.mock('../services/billService', () => ({ customerRequestBill: (...a: unknown[]) => customerRequestBill(...a) }));
+
 import useMenuCart from './useMenuCart';
 
 const dish = (id: string, price: number): MenuItem => ({ id, name: id, price, imageUrl: '', description: '', tags: [], available: true, categoryId: 'all' });
@@ -103,5 +106,34 @@ describe('useMenuCart sending orders', () => {
       ['Tibs', 2],
       ['Shiro', 1],
     ]);
+  });
+});
+
+describe('useMenuCart asking for the bill', () => {
+  it("asks with the table's QR token and remembers it was asked", async () => {
+    window.history.pushState({}, '', '/m/demo-pro?table=5&token=tok123');
+    customerRequestBill.mockReset().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useMenuCart({ restaurantSlug: 'demo-pro', items: MENU, loading: false, tableNumber: '5' }));
+
+    await act(async () => {
+      await result.current.handleRequestBill();
+    });
+
+    expect(customerRequestBill).toHaveBeenCalledWith('demo-pro', '5', 'tok123');
+    expect(result.current.billAsked).toBe(true);
+    expect(result.current.billError).toBeNull();
+  });
+
+  it('keeps the reason when asking fails', async () => {
+    window.history.pushState({}, '', '/m/demo-pro?table=5&token=tok123');
+    customerRequestBill.mockReset().mockRejectedValue(new Error('this table has no open bill'));
+    const { result } = renderHook(() => useMenuCart({ restaurantSlug: 'demo-pro', items: MENU, loading: false, tableNumber: '5' }));
+
+    await act(async () => {
+      await result.current.handleRequestBill();
+    });
+
+    expect(result.current.billAsked).toBe(false);
+    expect(result.current.billError).toBe('this table has no open bill');
   });
 });

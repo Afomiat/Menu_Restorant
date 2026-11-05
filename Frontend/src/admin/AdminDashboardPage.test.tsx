@@ -82,6 +82,20 @@ vi.mock('../services/staffService', () => ({
   updateStaff: vi.fn(),
 }));
 
+const fetchBills = vi.fn(async () => [] as unknown[]);
+vi.mock('../services/billService', () => ({
+  fetchBills: () => fetchBills(),
+  fetchMyShift: vi.fn(async () => null),
+  startShift: vi.fn(),
+  endShift: vi.fn(),
+  requestBill: vi.fn(),
+  collectBill: vi.fn(),
+  confirmBill: vi.fn(),
+  moveBill: vi.fn(),
+  handoverBill: vi.fn(),
+  fetchColleagues: vi.fn(async () => []),
+}));
+
 import AdminDashboardPage from './AdminDashboardPage';
 
 /** Signs in as a staff member with this role, the way a successful login stores it. */
@@ -178,6 +192,7 @@ describe('AdminDashboardPage screens by role', () => {
   });
 
   it('shows a cashier their own screen', () => {
+    currentPlan = 'plus';
     signedInAs('cashier', 'Liya');
     renderDashboard();
 
@@ -268,5 +283,50 @@ describe('AdminDashboardPage Pro screens', () => {
     signedInAs('chef');
     renderDashboard();
     expect(wsOptions.chimeOnNewOrder).toBe(true);
+  });
+});
+
+describe('AdminDashboardPage bills (Pro)', () => {
+  it('gives a cashier the Bills screen with the shift bar', async () => {
+    signedInAs('cashier', 'Liya');
+    renderDashboard();
+
+    expect(await screen.findByText('Collected, waiting for you to confirm (0)')).toBeTruthy();
+    expect(screen.getByTestId('shift-status')).toBeTruthy();
+    expect(fetchAdminActiveOrders).not.toHaveBeenCalled();
+  });
+
+  it('keeps a Plus cashier on the home screen', () => {
+    currentPlan = 'plus';
+    signedInAs('cashier', 'Liya');
+    renderDashboard();
+
+    expect(screen.getByText('Signed in as Cashier')).toBeTruthy();
+  });
+
+  it('lets a manager open Bills from the sidebar', async () => {
+    signedInAs('manager');
+    renderDashboard();
+
+    fireEvent.click(screen.getByText('Bills', { selector: '.admin-nav-item span' }));
+
+    expect(await screen.findByText('Open bills (0)')).toBeTruthy();
+    expect(fetchBills).toHaveBeenCalled();
+  });
+
+  it('shows bill alerts as banners until dismissed', async () => {
+    signedInAs('waiter', 'Abebe');
+    renderDashboard();
+
+    act(() => wsOptions.onStaffAlert?.('bill:requested' as never, { bill_id: 'b1', table_number: '5' } as never));
+    act(() => wsOptions.onStaffAlert?.('table:long_open' as never, { bill_id: 'b2', table_number: '7' } as never));
+
+    const alerts = await screen.findAllByRole('alert');
+    expect(alerts.map((a) => a.textContent)).toEqual([
+      expect.stringContaining('Table 5 asks for the bill'),
+      expect.stringContaining('Table 7 has been open a long time'),
+    ]);
+    fireEvent.click(within(alerts[0]).getByText('Dismiss'));
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
   });
 });

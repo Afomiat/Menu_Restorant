@@ -95,3 +95,20 @@ describe('AdminSidebar by role', () => {
     expect(navItems()).toEqual(['Sign Out']);
   });
 });
+
+describe('AdminSidebar Bills (Pro managers)', () => {
+  it('shows Bills to managers on Pro only', () => {
+    const onSelectView = vi.fn();
+    render(<AdminSidebar meta={{ ...baseMeta, plan: 'pro' }} slug="aura" onSelectView={onSelectView} role="manager" />);
+    fireEvent.click(screen.getByText('Bills'));
+    expect(onSelectView).toHaveBeenCalledWith('bills');
+    cleanup();
+
+    render(<AdminSidebar meta={{ ...baseMeta, plan: 'plus' }} slug="aura" onSelectView={vi.fn()} role="manager" />);
+    expect(screen.queryByText('Bills')).toBeNull();
+    cleanup();
+
+    render(<AdminSidebar meta={{ ...baseMeta, plan: 'pro' }} slug="aura" onSelectView={vi.fn()} role="chef" />);
+    expect(screen.queryByText('Bills')).toBeNull();
+  });
+});

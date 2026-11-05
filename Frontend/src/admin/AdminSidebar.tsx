@@ -1,4 +1,4 @@
-import { UtensilsCrossed, Sparkles, ChefHat, X, QrCode, LogOut, Settings, LayoutGrid, Rows3, Users } from 'lucide-react';
+import { UtensilsCrossed, Sparkles, ChefHat, X, QrCode, LogOut, Settings, LayoutGrid, Rows3, Users, Receipt } from 'lucide-react';
 import type { RestaurantMeta, StaffRole } from '../types';
 import { PLAN_INFO, hasPlan } from '../utils/plan';
 import { canManage, canUseKitchen } from '../utils/roles';
@@ -15,8 +15,8 @@ const MENU_DESIGNS: { id: MenuDesign; label: string; Icon: typeof LayoutGrid }[]
 interface AdminSidebarProps {
   meta: RestaurantMeta;
   slug: string;
-  activeView?: 'menu' | 'kitchen';
-  onSelectView?: (view: 'menu' | 'kitchen') => void;
+  activeView?: 'menu' | 'kitchen' | 'bills';
+  onSelectView?: (view: 'menu' | 'kitchen' | 'bills') => void;
   activeOrdersCount?: number;
   onOpenKitchen?: () => void;
   onOpenTables?: () => void;
@@ -172,6 +172,20 @@ export default function AdminSidebar({
                 ) : null}
               </span>
             </button>
+            )}
+
+            {isManager && onSelectView && meta?.plan && hasPlan(meta.plan, 'pro') && (
+              <button
+                type="button"
+                className={`admin-nav-item ${activeView === 'bills' ? 'active' : ''}`}
+                onClick={() => {
+                  onSelectView('bills');
+                  if (onCloseMobile) onCloseMobile();
+                }}
+              >
+                <Receipt size={18} />
+                <span>{t.bills.navLabel}</span>
+              </button>
             )}
 
             {isManager && onOpenStaff && (

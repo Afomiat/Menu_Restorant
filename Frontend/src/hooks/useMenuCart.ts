@@ -9,6 +9,7 @@ import {
   undoLiveOrder,
   fetchLiveOrderStatus,
 } from '../services/orderService';
+import { customerRequestBill } from '../services/billService';
 
 function mapBackendStatusToFrontend(backendStatus?: string): OrderStatus {
   if (!backendStatus || backendStatus === 'pending_grace' || backendStatus === 'received' || backendStatus === 'not_started') {
@@ -431,6 +432,19 @@ export default function useMenuCart({
   };
 
   // Undo an order within 60-second grace period
+  // Pro: "Ask for the bill" tells the table's waiter, proven by the table's QR token
+  const [billAsked, setBillAsked] = useState(false);
+  const [billError, setBillError] = useState<string | null>(null);
+  const handleRequestBill = async () => {
+    setBillError(null);
+    try {
+      await customerRequestBill(slug, resolvedTable || '', resolvedToken);
+      setBillAsked(true);
+    } catch (err: any) {
+      setBillError(err?.message || 'Could not ask for the bill. Please call your waiter.');
+    }
+  };
+
   const handleUndoOrder = async (orderId: string): Promise<boolean> => {
     try {
       await undoLiveOrder(slug, orderId);
@@ -520,6 +534,9 @@ const handleClearOrders = () => {
     resolvedTable,
     isTableVerified,
     tableToken: resolvedToken,
+    billAsked,
+    billError,
+    handleRequestBill,
   };
 }
 
