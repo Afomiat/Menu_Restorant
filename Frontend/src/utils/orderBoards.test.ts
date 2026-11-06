@@ -49,3 +49,16 @@ describe('tableState', () => {
     expect(tableState([])).toBe('none');
   });
 });
+
+describe('remakes', () => {
+  it('puts remakes first, then the oldest orders', () => {
+    const tickets = groupTickets([
+      row('old', 'Shiro', 'not_started', { placedAt: 1000 }),
+      row('remake', 'Tibs', 'not_started', { placedAt: 5000, remakeOf: 'first-tibs' }),
+      row('new', 'Buna', 'not_started', { placedAt: 3000 }),
+    ]);
+
+    expect(tickets.map((tk) => tk.orderId)).toEqual(['remake', 'old', 'new']);
+    expect(tickets[0].remakeOf).toBe('first-tibs');
+  });
+});

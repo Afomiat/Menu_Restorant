@@ -155,3 +155,13 @@ describe('WaiterTablesScreen bills', () => {
     expect(screen.getByTestId('shift-status')).toBeTruthy();
   });
 });
+
+describe('WaiterTablesScreen problems', () => {
+  it('offers Report problem on each dish', async () => {
+    fetchMyTables.mockResolvedValue([table('5', [order('a', 'delivered' as OrderStatus), order('b', 'ready', 'Shiro')])]);
+    renderScreen();
+
+    const card = await screen.findByTestId('waiter-table-5');
+    expect(within(card).getAllByText('Report problem')).toHaveLength(2);
+  });
+});

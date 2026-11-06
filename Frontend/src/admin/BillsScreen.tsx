@@ -3,6 +3,7 @@ import type { Bill, StaffRole } from '../types';
 import { fetchBills } from '../services/billService';
 import BillCard from './BillCard';
 import ShiftBar from './ShiftBar';
+import PushButton from './PushButton';
 import { t } from '../i18n/en';
 
 interface BillsScreenProps {
@@ -46,7 +47,8 @@ export default function BillsScreen({ role, currency, refreshSignal, showShift =
   return (
     <section className="admin-kitchen-page-view" aria-label={t.bills.title}>
       <h1 className="admin-top-title" style={{ margin: '0 0 12px' }}>{t.bills.title}</h1>
-      {showShift && <ShiftBar />}
+      {showShift && <ShiftBar role={role} currency={currency} />}
+      <PushButton />
       {error && <p role="status" style={{ color: '#dc2626', fontSize: '13px' }}>{error}</p>}
       {sections.map((section) => (
         <div key={section.title} style={{ marginBottom: '20px' }}>

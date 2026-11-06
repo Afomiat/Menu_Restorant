@@ -5,6 +5,8 @@ import { fetchMyTables, updateAdminOrderStatus } from '../services/orderService'
 import { fetchBills } from '../services/billService';
 import BillCard from './BillCard';
 import ShiftBar from './ShiftBar';
+import DishProblemButton from './DishProblemButton';
+import PushButton from './PushButton';
 import { t } from '../i18n/en';
 import { tableState, type TableState } from '../utils/orderBoards';
 
@@ -101,7 +103,8 @@ export default function WaiterTablesScreen({
         </div>
       </div>
 
-      <ShiftBar />
+      <ShiftBar role="waiter" currency={currency} />
+      <PushButton />
 
       {readyAlerts.map((alert) => (
         <div
@@ -143,8 +146,11 @@ export default function WaiterTablesScreen({
                     <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>{t.waiter.order(i + 1)}</div>
                     <ul style={{ listStyle: 'none', margin: 0, padding: 0, fontSize: '14px' }}>
                       {(order.items || []).map((it) => (
-                        <li key={it.id}>
-                          <strong>{it.quantity}×</strong> {it.item_name}
+                        <li key={it.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+                          <span>
+                            <strong>{it.quantity}×</strong> {it.item_name}
+                          </span>
+                          <DishProblemButton orderId={order.id} itemId={it.id} dishName={it.item_name} />
                         </li>
                       ))}
                     </ul>

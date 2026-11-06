@@ -60,6 +60,7 @@ export const en = {
     veryLate: (table: string, minutes: number, target: number) =>
       `Table ${table}: cooking for ${minutes} min (target ${target} min)`,
     dismiss: 'Dismiss',
+    remake: 'REMAKE',
   },
 
   waiter: {
@@ -149,7 +150,79 @@ export const en = {
     'table:long_open': (table: string) => `Table ${table} has been open a long time`,
     'table:open_bill_rescanned': (table: string) => `New customers at table ${table}, but its bill is unpaid`,
     'shift:open_bills': () => 'A waiter tried to end their shift with unpaid bills',
+    'problem:reported': (table: string) => `Table ${table} reported a problem with a dish`,
+    'walkout:marked': (table: string) => `Table ${table} left without paying`,
   } as Record<string, (table: string) => string>,
+
+  problems: {
+    report: 'Report problem',
+    reportTitle: (dish: string) => `What is wrong with ${dish}?`,
+    reasons: {
+      cold: 'Cold',
+      wrong_dish: 'Wrong dish',
+      undercooked: 'Undercooked',
+      too_slow: 'Too slow',
+      foreign_object: 'Foreign object',
+      other: 'Other',
+    } as Record<string, string>,
+    note: 'Note',
+    send: 'Send to manager',
+    sent: 'Sent to the manager',
+    decisions: { remake: 'Remake', remove_from_bill: 'Remove from bill' } as Record<string, string>,
+    faults: { kitchen: 'Kitchen', waiter: 'Waiter', none: 'No one' } as Record<string, string>,
+    fault: 'Who was at fault',
+    people: (ready: string, served: string, reported: string) =>
+      `Readied by ${ready || '—'} · served by ${served || '—'} · reported by ${reported || '—'}`,
+  },
+
+  walkouts: {
+    mark: 'Left without paying',
+    confirmMark: (table: string, amount: string) => `Mark table ${table} as a walkout of ${amount}?`,
+    summary: (table: string, amount: string, waiter: string) =>
+      `Table ${table} left without paying ${amount}${waiter ? `, waiter ${waiter}` : ''}`,
+    decisions: { waiter_pays: 'Waiter pays', restaurant_loss: 'Restaurant takes the loss' } as Record<string, string>,
+    note: 'Note (optional)',
+  },
+
+  decisionsScreen: {
+    title: 'Alerts',
+    navLabel: 'Alerts',
+    problems: 'Problems with dishes',
+    walkouts: 'Walkouts',
+    none: 'Nothing waiting for you.',
+    decide: 'Decide',
+  },
+
+  reports: {
+    title: 'Reports',
+    navLabel: 'Reports',
+    date: 'Day',
+    sales: 'Sales by payment method',
+    salesTotal: 'Total collected',
+    waiters: 'Waiters',
+    waiterColumns: ['Waiter', 'Bills', 'Sales', 'Collected', 'Confirmed', 'Not confirmed', 'Walkouts'],
+    losses: 'Losses',
+    walkouts: 'Walkouts',
+    removed: 'Dishes removed from bills',
+    kitchen: 'Kitchen times',
+    kitchenColumns: ['Dish', 'Orders', 'Average', 'Target', 'Late'],
+    openBills: 'Bills still open',
+    minutes: (m: number) => `${m.toFixed(1)} min`,
+    nothing: 'Nothing for this day.',
+    noWaiter: 'No waiter',
+  },
+
+  myShift: {
+    collected: (amount: string, notConfirmed: string) => `This shift: collected ${amount} · not confirmed yet ${notConfirmed}`,
+    confirmed: (amount: string, bills: number) => `This shift: confirmed ${amount} on ${bills} bill(s)`,
+  },
+
+  push: {
+    enable: 'Turn on phone alerts',
+    enabled: 'Phone alerts are on',
+    blocked: 'Alerts are blocked in this browser. Allow notifications for this site in the browser settings.',
+    unsupported: 'This browser cannot show alerts. On iPhone, add this page to the home screen first.',
+  },
 
   customerBill: {
     ask: 'Ask for the bill',

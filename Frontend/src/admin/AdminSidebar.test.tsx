@@ -112,3 +112,19 @@ describe('AdminSidebar Bills (Pro managers)', () => {
     expect(screen.queryByText('Bills')).toBeNull();
   });
 });
+
+describe('AdminSidebar Alerts and Reports (Pro managers)', () => {
+  it('opens Alerts and Reports', () => {
+    const onSelectView = vi.fn();
+    render(<AdminSidebar meta={{ ...baseMeta, plan: 'pro' }} slug="aura" onSelectView={onSelectView} role="manager" />);
+
+    fireEvent.click(screen.getByText('Alerts'));
+    fireEvent.click(screen.getByText('Reports'));
+    expect(onSelectView.mock.calls.map((c) => c[0])).toEqual(['alerts', 'reports']);
+    cleanup();
+
+    render(<AdminSidebar meta={{ ...baseMeta, plan: 'plus' }} slug="aura" onSelectView={vi.fn()} role="manager" />);
+    expect(screen.queryByText('Alerts')).toBeNull();
+    expect(screen.queryByText('Reports')).toBeNull();
+  });
+});

@@ -17,7 +17,7 @@ interface UseKitchenWebSocketOptions {
   onOrderReady?: (data: { order_id: string; table_number: string }) => void;
   /** Pro: an order has cooked for twice its target (sent to managers). */
   onOrderVeryLate?: (data: { order_id: string; table_number: string; target_minutes: number; cooking_minutes: number }) => void;
-  /** Pro staff alerts: every "bill:*", "table:*" and "shift:*" event (already sent only to the right people). */
+  /** Pro staff alerts: every "bill:*", "table:*", "shift:*", "problem:*" and "walkout:*" event (already sent only to the right people). */
   onStaffAlert?: (event: string, data: { bill_id?: string; table_number?: string }) => void;
   /** Play the built-in chime for new orders (default). Screens with their own bell turn it off. */
   chimeOnNewOrder?: boolean;
@@ -119,7 +119,7 @@ export function useKitchenWebSocket(options: UseKitchenWebSocketOptions = {}) {
               optionsRef.current.onOrderVeryLate?.(parsed.data);
               break;
             default:
-              if (/^(bill|table|shift):/.test(parsed.event)) {
+              if (/^(bill|table|shift|problem|walkout):/.test(parsed.event)) {
                 optionsRef.current.onStaffAlert?.(parsed.event, parsed.data || {});
               }
               break;

@@ -51,6 +51,23 @@ Other commands in `Backend/`: `make db-up` / `make db-down` start and stop the d
 
 Remove the two `.env.local` files to go back to Supabase and Render.
 
+### Phone notifications (optional, Pro)
+
+Staff can turn on phone notifications (Bills screen or My tables → "Turn on phone alerts") for new bills,
+bill reminders, dish problems and walkouts. They stay off until the server has VAPID keys:
+
+1. In `Backend/`, run `make vapid` and copy the two printed lines into `Backend/.env.local`
+   (`VAPID_PUBLIC_KEY=...`, `VAPID_PRIVATE_KEY=...`; optionally `VAPID_SUBJECT=mailto:you@example.com`).
+2. Restart `make run`.
+
+Keep the same keys once staff have subscribed: new keys mean everyone has to turn alerts on again.
+Browsers only allow notifications on `localhost` or HTTPS.
+
+### Pro manager screens
+
+- **Alerts**: dish problems (remake or remove from the bill) and walkouts (waiter pays or restaurant loss) waiting for a decision.
+- **Reports**: the day's sales by payment method, each waiter's bills, walkouts and removed dishes (Ethiopian time).
+
 ---
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.

@@ -145,3 +145,12 @@ describe('ProKitchenBoard', () => {
     expect(bell.ring).toHaveBeenCalledWith('alert');
   });
 });
+
+describe('ProKitchenBoard remakes', () => {
+  it('marks a remake ticket', () => {
+    renderBoard([row('r', 'Tibs', 'not_started', { remakeOf: 'first' }), row('a', 'Shiro', 'not_started')]);
+
+    expect(within(screen.getByTestId('ticket-r')).getByText('REMAKE')).toBeTruthy();
+    expect(within(screen.getByTestId('ticket-a')).queryByText('REMAKE')).toBeNull();
+  });
+});

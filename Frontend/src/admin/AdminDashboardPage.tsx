@@ -36,6 +36,9 @@ import AdminRoleHome from './AdminRoleHome';
 import ProKitchenBoard from './ProKitchenBoard';
 import WaiterTablesScreen, { type ReadyAlert } from './WaiterTablesScreen';
 import BillsScreen from './BillsScreen';
+import DecisionsScreen from './DecisionsScreen';
+import ReportsScreen from './ReportsScreen';
+import type { AdminView } from './AdminSidebar';
 import { useBell } from '../hooks/useBell';
 import { hasPlan } from '../utils/plan';
 
@@ -96,7 +99,7 @@ export default function AdminDashboardPage() {
   const planFromBackend: PlanTier = initialMeta?.plan || 'basic';
 
   // Active top-level view: 'menu' (Dashboard/Dishes) or 'kitchen' (Live KDS Orders)
-  const [activeView, setActiveView] = useState<'menu' | 'kitchen' | 'bills'>('menu');
+  const [activeView, setActiveView] = useState<AdminView>('menu');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Local editable state
@@ -195,7 +198,7 @@ export default function AdminDashboardPage() {
   // Each role sees its own screen. The backend enforces the same rules on every request.
   const staffRole = adminToken ? normalizeRole(staffUser?.role) ?? 'manager' : null;
   const isManager = canManage(staffRole);
-  const viewToShow: 'menu' | 'kitchen' | 'bills' = staffRole === 'chef' ? 'kitchen' : activeView;
+  const viewToShow: AdminView = staffRole === 'chef' ? 'kitchen' : activeView;
 
   // Pro screens: the kitchen board, the waiter's tables, bells and alerts
   const isPro = hasPlan(planFromBackend, 'pro');
@@ -836,6 +839,10 @@ export default function AdminDashboardPage() {
         ))}
         {staffRole === 'cashier' && isPro ? (
           <BillsScreen role={staffRole} currency={meta.currency || 'ETB'} refreshSignal={ordersChanged} showShift />
+        ) : isManager && isPro && viewToShow === 'alerts' ? (
+          <DecisionsScreen currency={meta.currency || 'ETB'} refreshSignal={ordersChanged} />
+        ) : isManager && isPro && viewToShow === 'reports' ? (
+          <ReportsScreen currency={meta.currency || 'ETB'} />
         ) : isManager && isPro && viewToShow === 'bills' ? (
           <BillsScreen role={staffRole} currency={meta.currency || 'ETB'} refreshSignal={ordersChanged} />
         ) : staffRole === 'waiter' && isPro ? (

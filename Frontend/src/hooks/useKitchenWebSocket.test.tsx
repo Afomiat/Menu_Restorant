@@ -93,3 +93,15 @@ describe('useKitchenWebSocket staff alerts', () => {
     expect(onStaffAlert.mock.calls[0][1]).toEqual({ bill_id: 'b1', table_number: '5' });
   });
 });
+
+describe('useKitchenWebSocket problem and walkout alerts', () => {
+  it('passes problem and walkout events to onStaffAlert', () => {
+    const onStaffAlert = vi.fn();
+    renderHook(() => useKitchenWebSocket({ token: 'jwt', onStaffAlert }));
+
+    FakeSocket.last!.receive('problem:reported', { table_number: '5' });
+    FakeSocket.last!.receive('walkout:marked', { bill_id: 'b7', table_number: '7' });
+
+    expect(onStaffAlert.mock.calls.map((c) => c[0])).toEqual(['problem:reported', 'walkout:marked']);
+  });
+});

@@ -1,10 +1,12 @@
-import { UtensilsCrossed, Sparkles, ChefHat, X, QrCode, LogOut, Settings, LayoutGrid, Rows3, Users, Receipt } from 'lucide-react';
+import { UtensilsCrossed, Sparkles, ChefHat, X, QrCode, LogOut, Settings, LayoutGrid, Rows3, Users, Receipt, AlertTriangle, BarChart3 } from 'lucide-react';
 import type { RestaurantMeta, StaffRole } from '../types';
 import { PLAN_INFO, hasPlan } from '../utils/plan';
 import { canManage, canUseKitchen } from '../utils/roles';
 import { t } from '../i18n/en';
 
 type MenuDesign = NonNullable<RestaurantMeta['template']>;
+
+export type AdminView = 'menu' | 'kitchen' | 'bills' | 'alerts' | 'reports';
 
 // The two customer menu designs a restaurant can switch between
 const MENU_DESIGNS: { id: MenuDesign; label: string; Icon: typeof LayoutGrid }[] = [
@@ -15,8 +17,8 @@ const MENU_DESIGNS: { id: MenuDesign; label: string; Icon: typeof LayoutGrid }[]
 interface AdminSidebarProps {
   meta: RestaurantMeta;
   slug: string;
-  activeView?: 'menu' | 'kitchen' | 'bills';
-  onSelectView?: (view: 'menu' | 'kitchen' | 'bills') => void;
+  activeView?: AdminView;
+  onSelectView?: (view: AdminView) => void;
   activeOrdersCount?: number;
   onOpenKitchen?: () => void;
   onOpenTables?: () => void;
@@ -186,6 +188,33 @@ export default function AdminSidebar({
                 <Receipt size={18} />
                 <span>{t.bills.navLabel}</span>
               </button>
+            )}
+
+            {isManager && onSelectView && meta?.plan && hasPlan(meta.plan, 'pro') && (
+              <>
+                <button
+                  type="button"
+                  className={`admin-nav-item ${activeView === 'alerts' ? 'active' : ''}`}
+                  onClick={() => {
+                    onSelectView('alerts');
+                    if (onCloseMobile) onCloseMobile();
+                  }}
+                >
+                  <AlertTriangle size={18} />
+                  <span>{t.decisionsScreen.navLabel}</span>
+                </button>
+                <button
+                  type="button"
+                  className={`admin-nav-item ${activeView === 'reports' ? 'active' : ''}`}
+                  onClick={() => {
+                    onSelectView('reports');
+                    if (onCloseMobile) onCloseMobile();
+                  }}
+                >
+                  <BarChart3 size={18} />
+                  <span>{t.reports.navLabel}</span>
+                </button>
+              </>
             )}
 
             {isManager && onOpenStaff && (

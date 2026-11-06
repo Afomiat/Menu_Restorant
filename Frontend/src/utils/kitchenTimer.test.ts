@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { customerEstimate, formatDuration, formatWaited, parsePrepMinutes, timerState } from './kitchenTimer';
+import { customerEstimate, formatDuration, formatWaited, parsePrepMinutes, timerState, todayInEthiopia } from './kitchenTimer';
 
 const MIN = 60_000;
 const start = 1_000_000;
@@ -60,5 +60,12 @@ describe('parsePrepMinutes', () => {
     expect(parsePrepMinutes(null)).toBeNull();
     expect(parsePrepMinutes(0)).toBeNull();
     expect(parsePrepMinutes(241)).toBeNull();
+  });
+});
+
+describe('todayInEthiopia', () => {
+  it('uses Ethiopian time (UTC+3) for the day', () => {
+    expect(todayInEthiopia(new Date('2026-11-05T20:59:00Z'))).toBe('2026-11-05');
+    expect(todayInEthiopia(new Date('2026-11-05T21:00:00Z'))).toBe('2026-11-06');
   });
 });

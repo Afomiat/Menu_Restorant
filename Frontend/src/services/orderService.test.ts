@@ -135,3 +135,18 @@ describe('Pro orders and tables', () => {
     expect(get).toHaveBeenCalledWith('/admin/my-tables');
   });
 });
+
+describe('remake orders', () => {
+  it('keeps the order a remake replaces on every row', () => {
+    const rows = mapBackendOrderToCartItems({
+      id: 'r1',
+      table_number: '5',
+      status: 'not_started',
+      created_at: '',
+      total_amount: 0,
+      remake_of: 'o1',
+      items: [{ id: 'i', order_id: 'r1', menu_item_id: 'tibs', item_name: 'Tibs', unit_price: 0, quantity: 1 }],
+    } as unknown as BackendOrder);
+    expect(rows[0].remakeOf).toBe('o1');
+  });
+});

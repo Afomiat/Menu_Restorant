@@ -101,6 +101,8 @@ export interface CartItem {
   targetMinutes?: number;
   /** When the chef started the order (ms), for the timer and the customer's estimate. */
   startedAt?: number;
+  /** Pro: this order cooks a dish again after a problem. */
+  remakeOf?: string;
 }
 
 /** A restaurant's Pro timings, in minutes. */
@@ -196,6 +198,8 @@ export interface BackendOrder {
   ready_by?: string | null;
   served_at?: string | null;
   served_by?: string | null;
+  /** The order this one cooks again after a problem; the kitchen shows remakes first. */
+  remake_of?: string | null;
 }
 
 /** A dining table as staff screens see it (Pro adds its waiter). */
@@ -261,4 +265,76 @@ export interface Colleague {
   id: string;
   full_name: string;
   role: StaffRole;
+}
+
+/** Pro: problems with dishes and walkouts, decided by the manager. */
+export type ProblemReason = 'cold' | 'wrong_dish' | 'undercooked' | 'too_slow' | 'foreign_object' | 'other';
+export type ProblemDecision = 'remake' | 'remove_from_bill';
+export type Fault = 'kitchen' | 'waiter' | 'none';
+export type WalkoutDecision = 'waiter_pays' | 'restaurant_loss';
+
+export interface Problem {
+  id: string;
+  order_id: string;
+  order_item_id: string;
+  item_name: string;
+  quantity: number;
+  table_number: string;
+  reason: ProblemReason;
+  note: string;
+  reported_at: string;
+  reported_by_name: string;
+  ready_by_name: string;
+  served_by_name: string;
+  decision: ProblemDecision | null;
+  fault: Fault | null;
+  decided_by_name: string;
+  removed_amount: number | null;
+}
+
+export interface Walkout {
+  bill_id: string;
+  table_number: string;
+  amount: number;
+  waiter_name: string;
+  marked_by_name: string;
+  walkout_at: string;
+  decision: WalkoutDecision | null;
+  note: string;
+  decided_by_name: string;
+}
+
+export interface Decisions {
+  problems: Problem[];
+  walkouts: Walkout[];
+}
+
+export interface DailyReport {
+  date: string;
+  sales_by_method: { method: PaymentMethod; payments: number; amount: number }[];
+  sales_total: number;
+  waiters: {
+    waiter_id: string | null;
+    waiter_name: string;
+    bills: number;
+    sales: number;
+    collected: number;
+    confirmed: number;
+    collected_not_confirmed: number;
+    walkouts: number;
+  }[];
+  walkouts: Walkout[];
+  removed_dishes: Problem[];
+  kitchen: { item_name: string; orders: number; avg_minutes: number; target_minutes: number; late: number }[];
+  open_bills: { bill_id: string; table_number: string; status: BillStatus; waiter_name: string; total_amount: number; amount_paid: number }[];
+}
+
+export interface ShiftReport {
+  role: StaffRole;
+  started_at: string;
+  ended_at: string | null;
+  bills: number;
+  collected: number;
+  not_confirmed: number;
+  confirmed: number;
 }

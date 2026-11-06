@@ -128,6 +128,11 @@ function Ticket({
       data-timer={timer?.color}
       style={{ border: `2px solid ${borderColor}`, borderRadius: '12px', padding: '12px', background: '#fff' }}
     >
+      {ticket.remakeOf && (
+        <span style={{ display: 'inline-block', marginBottom: '6px', fontSize: '11px', fontWeight: 800, color: '#fff', background: '#b91c1c', padding: '2px 8px', borderRadius: '999px' }}>
+          {t.kitchen.remake}
+        </span>
+      )}
       <ul style={{ listStyle: 'none', margin: '0 0 10px', padding: 0, display: 'grid', gap: '4px' }}>
         {ticket.items.map((row, i) => (
           <li key={`${row.item.id}-${i}`} style={{ fontSize: '14px', color: '#0f172a' }}>

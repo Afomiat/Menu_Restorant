@@ -8,6 +8,8 @@ export interface KitchenTicket {
   startedAt?: number;
   targetMinutes: number;
   items: CartItem[];
+  /** Set when this ticket cooks a dish again after a problem; remakes come first. */
+  remakeOf?: string;
 }
 
 /** Groups the kitchen's dish rows into one ticket per open order. */
@@ -26,12 +28,13 @@ export function groupTickets(orders: CartItem[], defaultPrepMinutes = 15): Kitch
         startedAt: row.startedAt,
         targetMinutes: row.targetMinutes || defaultPrepMinutes,
         items: [],
+        remakeOf: row.remakeOf,
       };
       byOrder.set(row.orderId, ticket);
     }
     ticket.items.push(row);
   }
-  return [...byOrder.values()].sort((a, b) => a.placedAt - b.placedAt);
+  return [...byOrder.values()].sort((a, b) => Number(!!b.remakeOf) - Number(!!a.remakeOf) || a.placedAt - b.placedAt);
 }
 
 /** What a waiter's table is waiting for. */

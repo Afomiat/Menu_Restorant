@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Bill, Colleague, PaymentMethod, StaffRole } from '../types';
 import { collectBill, confirmBill, fetchColleagues, handoverBill, moveBill, requestBill } from '../services/billService';
+import { markWalkout } from '../services/problemService';
 import { formatPrice } from '../utils/currency';
 import { t } from '../i18n/en';
 
@@ -12,7 +13,7 @@ interface BillCardProps {
   onChanged: (bill?: Bill) => void;
 }
 
-type Panel = 'none' | 'collect' | 'move' | 'handover';
+type Panel = 'none' | 'collect' | 'move' | 'handover' | 'walkout';
 
 const METHODS: PaymentMethod[] = ['cash', 'telebirr', 'cbe_birr_bank'];
 
@@ -112,6 +113,11 @@ export default function BillCard({ bill, role, currency = 'ETB', onChanged }: Bi
             {t.bills.handover}
           </button>
         )}
+        {serves && takesOrders && bill.amount_owed > 0 && (
+          <button type="button" className="admin-sec-pill-btn" style={{ color: '#b91c1c' }} disabled={busy} onClick={() => openPanel('walkout')}>
+            {t.walkouts.mark}
+          </button>
+        )}
         {confirms && bill.status === 'collected' && (
           <button type="button" className="admin-save-pill-btn" disabled={busy} onClick={() => run(() => confirmBill(bill.id))}>
             {t.bills.confirm}
@@ -155,6 +161,31 @@ export default function BillCard({ bill, role, currency = 'ETB', onChanged }: Bi
             {t.bills.save}
           </button>
         </form>
+      )}
+
+      {panel === 'walkout' && (
+        <div role="group" aria-label={t.walkouts.mark} style={{ display: 'grid', gap: '6px' }}>
+          <span style={{ fontSize: '13px' }}>{t.walkouts.confirmMark(bill.table_number, money(bill.amount_owed))}</span>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button
+              type="button"
+              className="admin-save-pill-btn"
+              style={{ backgroundColor: '#b91c1c' }}
+              disabled={busy}
+              onClick={() =>
+                run(async () => {
+                  await markWalkout(bill.id);
+                  return { ...bill, status: 'walkout' };
+                })
+              }
+            >
+              {t.walkouts.mark}
+            </button>
+            <button type="button" className="admin-sec-pill-btn" onClick={() => setPanel('none')}>
+              {t.bills.cancel}
+            </button>
+          </div>
+        </div>
       )}
 
       {panel === 'move' && (

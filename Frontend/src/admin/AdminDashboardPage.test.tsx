@@ -96,6 +96,17 @@ vi.mock('../services/billService', () => ({
   fetchColleagues: vi.fn(async () => []),
 }));
 
+const problemSvc = { markWalkout: vi.fn(), fetchMyShiftReport: vi.fn(), fetchDecisions: vi.fn(), fetchDailyReport: vi.fn() };
+vi.mock('../services/problemService', () => ({
+  markWalkout: (...a: unknown[]) => problemSvc.markWalkout(...a),
+  fetchMyShiftReport: () => problemSvc.fetchMyShiftReport(),
+  fetchDecisions: () => problemSvc.fetchDecisions(),
+  fetchDailyReport: (...a: unknown[]) => problemSvc.fetchDailyReport(...a),
+  reportProblem: vi.fn(),
+  decideProblem: vi.fn(),
+  decideWalkout: vi.fn(),
+}));
+
 import AdminDashboardPage from './AdminDashboardPage';
 
 /** Signs in as a staff member with this role, the way a successful login stores it. */
@@ -328,5 +339,36 @@ describe('AdminDashboardPage bills (Pro)', () => {
     ]);
     fireEvent.click(within(alerts[0]).getByText('Dismiss'));
     expect(screen.getAllByRole('alert')).toHaveLength(1);
+  });
+});
+
+describe('AdminDashboardPage problems and reports (Pro)', () => {
+  it('lets a manager open Alerts and Reports', async () => {
+    problemSvc.fetchDecisions.mockResolvedValue({ problems: [], walkouts: [] });
+    problemSvc.fetchDailyReport.mockResolvedValue({
+      date: '2026-11-05', sales_by_method: [], sales_total: 0, waiters: [], walkouts: [], removed_dishes: [], kitchen: [], open_bills: [],
+    });
+    signedInAs('manager');
+    renderDashboard();
+
+    fireEvent.click(screen.getByText('Alerts', { selector: '.admin-nav-item span' }));
+    expect(await screen.findByText('Nothing waiting for you.')).toBeTruthy();
+
+    fireEvent.click(screen.getByText('Reports', { selector: '.admin-nav-item span' }));
+    expect(await screen.findByRole('region', { name: 'Sales by payment method' })).toBeTruthy();
+  });
+
+  it('shows problem and walkout alerts to the manager', async () => {
+    signedInAs('manager');
+    renderDashboard();
+
+    act(() => wsOptions.onStaffAlert?.('problem:reported' as never, { table_number: '5' } as never));
+    act(() => wsOptions.onStaffAlert?.('walkout:marked' as never, { bill_id: 'b7', table_number: '7' } as never));
+
+    const alerts = await screen.findAllByRole('alert');
+    expect(alerts.map((a) => a.textContent)).toEqual([
+      expect.stringContaining('Table 5 reported a problem with a dish'),
+      expect.stringContaining('Table 7 left without paying'),
+    ]);
   });
 });

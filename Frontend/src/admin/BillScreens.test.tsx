@@ -27,6 +27,17 @@ vi.mock('../services/billService', () => ({
   endShift: () => svc.endShift(),
 }));
 
+const problemSvc = { markWalkout: vi.fn(), fetchMyShiftReport: vi.fn(), fetchDecisions: vi.fn(), fetchDailyReport: vi.fn() };
+vi.mock('../services/problemService', () => ({
+  markWalkout: (...a: unknown[]) => problemSvc.markWalkout(...a),
+  fetchMyShiftReport: () => problemSvc.fetchMyShiftReport(),
+  fetchDecisions: () => problemSvc.fetchDecisions(),
+  fetchDailyReport: (...a: unknown[]) => problemSvc.fetchDailyReport(...a),
+  reportProblem: vi.fn(),
+  decideProblem: vi.fn(),
+  decideWalkout: vi.fn(),
+}));
+
 import BillCard from './BillCard';
 import BillsScreen from './BillsScreen';
 import ShiftBar from './ShiftBar';
@@ -54,6 +65,8 @@ const bill = (id: string, status: BillStatus, extra: Partial<Bill> = {}): Bill =
 beforeEach(() => {
   Object.values(svc).forEach((f) => f.mockReset());
   svc.fetchMyShift.mockResolvedValue(null);
+  Object.values(problemSvc).forEach((f) => f.mockReset());
+  problemSvc.fetchMyShiftReport.mockRejectedValue(new Error('no shift yet'));
 });
 afterEach(cleanup);
 
@@ -210,5 +223,59 @@ describe('ShiftBar', () => {
     fireEvent.click(await screen.findByText('End shift'));
     expect((await screen.findByRole('alert')).textContent).toContain('1 unpaid bill');
     expect(screen.getByText('End shift')).toBeTruthy();
+  });
+});
+
+describe('Walkouts on the bill card', () => {
+  it('marks a walkout only after confirming', async () => {
+    problemSvc.markWalkout.mockResolvedValue({ bill_id: 'b1' });
+    const onChanged = vi.fn();
+    render(<BillCard bill={bill('b1', 'bill_requested')} role="waiter" onChanged={onChanged} />);
+
+    fireEvent.click(screen.getByText('Left without paying'));
+    const group = screen.getByRole('group', { name: 'Left without paying' });
+    expect(group.textContent).toContain('Mark table 5 as a walkout of');
+    expect(problemSvc.markWalkout).not.toHaveBeenCalled();
+
+    fireEvent.click(within(group).getByText('Left without paying'));
+    await waitFor(() => expect(problemSvc.markWalkout).toHaveBeenCalledWith('b1'));
+    expect(onChanged).toHaveBeenCalled();
+  });
+
+  it('is not offered on a paid or closed bill, nor to a cashier', () => {
+    render(<BillCard bill={bill('b1', 'collected', { amount_owed: 0 })} role="waiter" onChanged={vi.fn()} />);
+    expect(screen.queryByText('Left without paying')).toBeNull();
+    cleanup();
+
+    render(<BillCard bill={bill('b2', 'open')} role="cashier" onChanged={vi.fn()} />);
+    expect(screen.queryByText('Left without paying')).toBeNull();
+  });
+});
+
+describe('ShiftBar totals', () => {
+  const onShift = { id: 's1', user_id: 'w1', started_at: '2026-11-05T09:00:00Z', ended_at: null };
+
+  it("shows a waiter's collected money and what is not confirmed yet", async () => {
+    svc.fetchMyShift.mockResolvedValue(onShift);
+    problemSvc.fetchMyShiftReport.mockResolvedValue({ role: 'waiter', started_at: '', ended_at: null, bills: 3, collected: 1470, not_confirmed: 270, confirmed: 0 });
+    render(<ShiftBar role="waiter" />);
+
+    const totals = await screen.findByTestId('shift-totals');
+    expect(totals.textContent).toMatch(/^This shift: collected .*1,?470.* not confirmed yet .*270/);
+  });
+
+  it("shows a cashier's confirmed money", async () => {
+    svc.fetchMyShift.mockResolvedValue(onShift);
+    problemSvc.fetchMyShiftReport.mockResolvedValue({ role: 'cashier', started_at: '', ended_at: null, bills: 2, collected: 0, not_confirmed: 0, confirmed: 900 });
+    render(<ShiftBar role="cashier" />);
+
+    expect((await screen.findByTestId('shift-totals')).textContent).toMatch(/^This shift: confirmed .*900.* on 2 bill\(s\)$/);
+  });
+
+  it('shows no totals off shift or for a manager', async () => {
+    render(<ShiftBar role="waiter" />);
+    await screen.findByText('Start shift');
+    expect(screen.queryByTestId('shift-totals')).toBeNull();
+    expect(problemSvc.fetchMyShiftReport).not.toHaveBeenCalled();
   });
 });

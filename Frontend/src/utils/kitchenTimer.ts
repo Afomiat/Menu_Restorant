@@ -62,6 +62,11 @@ export function customerEstimate(
   return null;
 }
 
+/** Today in Ethiopian time (UTC+3), as YYYY-MM-DD, for reports. */
+export function todayInEthiopia(now = new Date()): string {
+  return new Date(now.getTime() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
 /** A typed prep time as whole minutes (1 to 240), or null for the restaurant default. */
 export function parsePrepMinutes(value: unknown): number | null {
   const n = typeof value === 'number' ? value : parseInt(String(value ?? ''), 10);

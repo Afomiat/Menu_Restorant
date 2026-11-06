@@ -124,9 +124,10 @@ export function mapBackendOrderToCartItems(order: BackendOrder, menuItems: any[]
   const status = mapBackendStatusToFrontend(order.status);
   const placedAt = order.created_at ? new Date(order.created_at).getTime() : Date.now();
   // Pro timing: the order's target and when cooking started
-  const timing: Pick<CartItem, 'targetMinutes' | 'startedAt'> = {
+  const timing: Pick<CartItem, 'targetMinutes' | 'startedAt' | 'remakeOf'> = {
     targetMinutes: order.target_minutes || undefined,
     startedAt: order.started_at ? new Date(order.started_at).getTime() : undefined,
+    remakeOf: order.remake_of || undefined,
   };
 
   if (!order.items || order.items.length === 0) {
