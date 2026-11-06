@@ -31,3 +31,7 @@ Frontend/.env
 *.sw?
 scratch/
 *.exe~
+
+# Build output
+Backend/bin/
+*.exe
