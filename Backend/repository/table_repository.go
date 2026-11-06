@@ -2,8 +2,10 @@ package repository
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"menu-backend/db/sqlc"
 	"menu-backend/domain"
@@ -27,11 +29,12 @@ func (r *tableRepository) GetByNumber(ctx context.Context, tenantID uuid.UUID, t
 		return nil, err
 	}
 	return &domain.RestaurantTable{
-		ID:          converter.PgToUUID(t.ID),
-		TenantID:    converter.PgToUUID(t.TenantID),
-		TableNumber: t.TableNumber,
-		QrSecret:    t.QrSecret,
-		IsActive:    t.IsActive,
+		ID:               converter.PgToUUID(t.ID),
+		TenantID:         converter.PgToUUID(t.TenantID),
+		TableNumber:      t.TableNumber,
+		QrSecret:         t.QrSecret,
+		IsActive:         t.IsActive,
+		AssignedWaiterID: converter.PgToUUIDPtr(t.AssignedWaiterID),
 	}, nil
 }
 
@@ -43,11 +46,13 @@ func (r *tableRepository) ListByTenant(ctx context.Context, tenantID uuid.UUID) 
 	tables := make([]domain.RestaurantTable, len(rows))
 	for i, t := range rows {
 		tables[i] = domain.RestaurantTable{
-			ID:          converter.PgToUUID(t.ID),
-			TenantID:    converter.PgToUUID(t.TenantID),
-			TableNumber: t.TableNumber,
-			QrSecret:    t.QrSecret,
-			IsActive:    t.IsActive,
+			ID:                 converter.PgToUUID(t.ID),
+			TenantID:           converter.PgToUUID(t.TenantID),
+			TableNumber:        t.TableNumber,
+			QrSecret:           t.QrSecret,
+			IsActive:           t.IsActive,
+			AssignedWaiterID:   converter.PgToUUIDPtr(t.AssignedWaiterID),
+			AssignedWaiterName: t.AssignedWaiterName,
 		}
 	}
 	return tables, nil
@@ -65,6 +70,28 @@ func (r *tableRepository) Create(ctx context.Context, table *domain.RestaurantTa
 	}
 	table.ID = converter.PgToUUID(t.ID)
 	return nil
+}
+
+func (r *tableRepository) UpdateWaiter(ctx context.Context, tenantID, tableID uuid.UUID, waiterID *uuid.UUID) (*domain.RestaurantTable, error) {
+	t, err := r.q.UpdateTableWaiter(ctx, sqlc.UpdateTableWaiterParams{
+		ID:               converter.UUIDToPg(tableID),
+		TenantID:         converter.UUIDToPg(tenantID),
+		AssignedWaiterID: converter.UUIDPtrToPg(waiterID),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, domain.ErrTableNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &domain.RestaurantTable{
+		ID:               converter.PgToUUID(t.ID),
+		TenantID:         converter.PgToUUID(t.TenantID),
+		TableNumber:      t.TableNumber,
+		QrSecret:         t.QrSecret,
+		IsActive:         t.IsActive,
+		AssignedWaiterID: converter.PgToUUIDPtr(t.AssignedWaiterID),
+	}, nil
 }
 
 func (r *tableRepository) UpdateQRSecret(ctx context.Context, id, tenantID uuid.UUID, qrSecret string) error {

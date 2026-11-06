@@ -9,7 +9,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"menu-backend/config"
-	"menu-backend/db/sqlc"
 	"menu-backend/delivery/http/controller"
 	"menu-backend/delivery/http/middleware"
 	"menu-backend/domain"
@@ -17,15 +16,21 @@ import (
 )
 
 type RouterDependencies struct {
-	Config        *config.Config
-	TenantUsecase domain.TenantUsecase
-	MenuUsecase   domain.MenuUsecase
-	OrderUsecase  domain.OrderUsecase
-	TableUsecase  domain.TableUsecase
-	UploadUsecase domain.UploadUsecase
-	Hub           *ws.Hub
-	Queries       *sqlc.Queries
-	Pool          *pgxpool.Pool
+	Config         *config.Config
+	TenantUsecase  domain.TenantUsecase
+	MenuUsecase    domain.MenuUsecase
+	OrderUsecase   domain.OrderUsecase
+	TableUsecase   domain.TableUsecase
+	UploadUsecase  domain.UploadUsecase
+	StaffUsecase   domain.StaffUsecase
+	BillUsecase    domain.BillUsecase
+	ProblemUsecase domain.ProblemUsecase
+	ReportUsecase  domain.ReportUsecase
+	PushRepo       domain.PushRepository
+	// Notifier sends targeted alerts (live screens, plus web push when it is on); defaults to the hub
+	Notifier domain.Notifier
+	Hub      *ws.Hub
+	Pool     *pgxpool.Pool
 }
 
 // SetupRouter configures routes, middlewares, security headers, rate limiters, and CORS
@@ -84,10 +89,17 @@ func SetupRouter(deps RouterDependencies) *gin.Engine {
 
 	// Initialize Controllers
 	menuCtrl := controller.NewMenuController(deps.MenuUsecase, deps.OrderUsecase, deps.Hub)
-	tableCtrl := controller.NewTableController(deps.TableUsecase, deps.TenantUsecase)
-	orderCtrl := controller.NewOrderController(deps.OrderUsecase, deps.Hub)
+	tableCtrl := controller.NewTableController(deps.TableUsecase, deps.TenantUsecase, deps.BillUsecase)
+	var notifier domain.Notifier = deps.Notifier
+	if notifier == nil && deps.Hub != nil {
+		notifier = deps.Hub
+	}
+	orderCtrl := controller.NewOrderController(deps.OrderUsecase, deps.BillUsecase, deps.Hub, notifier)
+	problemCtrl := controller.NewProblemController(deps.ProblemUsecase, deps.ReportUsecase, deps.PushRepo, deps.Config.VAPIDPublicKey)
+	billCtrl := controller.NewBillController(deps.BillUsecase, deps.Config.QRSecretKey)
 	tenantCtrl := controller.NewTenantController(deps.TenantUsecase, deps.Hub)
-	authCtrl := controller.NewAuthController(deps.Queries, deps.Config.JWTSecret)
+	authCtrl := controller.NewAuthController(deps.StaffUsecase, deps.Config.JWTSecret)
+	staffCtrl := controller.NewStaffController(deps.StaffUsecase)
 	uploadCtrl := controller.NewUploadController(deps.UploadUsecase)
 
 	// API v1 Group
@@ -117,57 +129,124 @@ func SetupRouter(deps RouterDependencies) *gin.Engine {
 
 			// 3. Smart Ordering (STRICTLY VIP PLAN ONLY + Protected by Order Rate Limiter)
 			orderRoutes := menuRoutes.Group("/orders")
-			orderRoutes.Use(middleware.RequireVIPPlan(deps.TenantUsecase))
+			orderRoutes.Use(middleware.RequirePlan(deps.TenantUsecase, domain.PlanPlus))
 			{
 				orderRoutes.POST("", orderLimiter.Limit(), orderCtrl.PlaceOrder)
 				orderRoutes.GET("/:id", orderCtrl.GetOrder)
 				orderRoutes.POST("/:id/undo", orderCtrl.UndoOrder)
 			}
+
+			// 4. "Ask for the bill" (Pro plan, proven by the table QR token)
+			menuRoutes.POST("/bills/request", middleware.RequirePlan(deps.TenantUsecase, domain.PlanPro), orderLimiter.Limit(), billCtrl.RequestBillByCustomer)
+		}
+
+		// -------------------------------------------------------------
+		// AZAI TEAM ROUTES (super_admin only, across all restaurants)
+		// -------------------------------------------------------------
+		superAdminRoutes := apiV1.Group("/superadmin")
+		superAdminRoutes.Use(
+			middleware.AuthMiddleware(deps.Config.JWTSecret),
+			middleware.RequireActiveStaff(deps.StaffUsecase),
+			middleware.RequireRole(domain.RoleSuperAdmin),
+		)
+		{
+			superAdminRoutes.GET("/plans", tenantCtrl.ListPlans)
+			superAdminRoutes.PATCH("/tenants/:id/plan", tenantCtrl.SetTenantPlan)
 		}
 
 		// -------------------------------------------------------------
 		// STAFF / KITCHEN / ADMIN ROUTES (Protected by JWT Auth & RBAC)
 		// -------------------------------------------------------------
+		manager := middleware.RequireRole(domain.RoleManager)
+		allStaff := middleware.RequireRole(domain.RoleManager, domain.RoleCashier, domain.RoleWaiter, domain.RoleChef)
+
 		adminRoutes := apiV1.Group("/admin")
-		adminRoutes.Use(middleware.AuthMiddleware(deps.Config.JWTSecret))
+		adminRoutes.Use(middleware.AuthMiddleware(deps.Config.JWTSecret), middleware.RequireActiveStaff(deps.StaffUsecase))
 		{
-			// Restaurant Profile, Theme Customization & VIP License Upgrade
-			adminRoutes.GET("/tenant", middleware.RequireRole("manager", "owner", "super_admin"), tenantCtrl.GetTenantProfile)
-			adminRoutes.PATCH("/tenant/theme", middleware.RequireRole("manager", "owner", "super_admin"), tenantCtrl.UpdateTheme)
-			adminRoutes.PATCH("/tenant/plan", middleware.RequireRole("super_admin"), tenantCtrl.UpdatePlan)
+			// Restaurant Profile, Theme Customization & Plan Change
+			adminRoutes.GET("/tenant", allStaff, tenantCtrl.GetTenantProfile)
+			adminRoutes.PATCH("/tenant/theme", manager, tenantCtrl.UpdateTheme)
+			adminRoutes.PATCH("/tenant/plan", middleware.RequireRole(domain.RoleSuperAdmin), tenantCtrl.UpdatePlan)
+			adminRoutes.PATCH("/tenant/settings", middleware.RequirePlan(deps.TenantUsecase, domain.PlanPro), manager, tenantCtrl.UpdateSettings)
 
-			// Kitchen Display System (KDS) live orders (STRICTLY VIP PLAN ONLY)
+			// Kitchen Display System (KDS) live orders (Plus plan or higher)
 			kdsRoutes := adminRoutes.Group("")
-			kdsRoutes.Use(middleware.RequireVIPPlan(deps.TenantUsecase))
+			kdsRoutes.Use(middleware.RequirePlan(deps.TenantUsecase, domain.PlanPlus))
 			{
-				kdsRoutes.GET("/orders", middleware.RequireRole("kitchen", "manager", "owner", "super_admin"), orderCtrl.ListActiveOrders)
-				kdsRoutes.PATCH("/orders/:id/status", middleware.RequireRole("kitchen", "manager", "owner", "waiter", "super_admin"), orderCtrl.UpdateOrderStatus)
-				kdsRoutes.DELETE("/orders/table/:number", middleware.RequireRole("kitchen", "manager", "owner", "super_admin"), orderCtrl.CancelTableOrders)
-				kdsRoutes.DELETE("/orders", middleware.RequireRole("kitchen", "manager", "owner", "super_admin"), orderCtrl.CancelAllActiveOrders)
+				kdsRoutes.GET("/orders", middleware.RequireRole(domain.RoleChef, domain.RoleManager), orderCtrl.ListActiveOrders)
+				kdsRoutes.PATCH("/orders/:id/status", middleware.RequireRole(domain.RoleChef, domain.RoleManager, domain.RoleWaiter), orderCtrl.UpdateOrderStatus)
+				kdsRoutes.DELETE("/orders/table/:number", middleware.RequireRole(domain.RoleChef, domain.RoleManager), orderCtrl.CancelTableOrders)
+				kdsRoutes.DELETE("/orders", middleware.RequireRole(domain.RoleChef, domain.RoleManager), orderCtrl.CancelAllActiveOrders)
+			}
 
+			// Waiters' tables (Pro plan)
+			proRoutes := adminRoutes.Group("")
+			proRoutes.Use(middleware.RequirePlan(deps.TenantUsecase, domain.PlanPro))
+			{
+				proRoutes.GET("/my-tables", middleware.RequireRole(domain.RoleWaiter, domain.RoleManager), orderCtrl.MyTables)
+				proRoutes.PATCH("/tables/:id/waiter", manager, tableCtrl.AssignWaiter)
+
+				// Bills: waiters collect, cashiers confirm, managers do everything
+				waiter := middleware.RequireRole(domain.RoleWaiter, domain.RoleManager)
+				proRoutes.GET("/bills", middleware.RequireRole(domain.RoleWaiter, domain.RoleCashier, domain.RoleManager), billCtrl.ListBills)
+				proRoutes.POST("/bills/:id/request", waiter, billCtrl.RequestBill)
+				proRoutes.POST("/bills/:id/collect", waiter, billCtrl.Collect)
+				proRoutes.POST("/bills/:id/confirm", middleware.RequireRole(domain.RoleCashier, domain.RoleManager), billCtrl.Confirm)
+				proRoutes.POST("/bills/:id/move", waiter, billCtrl.Move)
+				proRoutes.POST("/bills/:id/handover", waiter, billCtrl.Handover)
+				proRoutes.GET("/colleagues", waiter, staffCtrl.ListColleagues)
+
+				// Problems with dishes and walkouts: waiters report, managers decide
+				proRoutes.POST("/orders/:id/problems", waiter, problemCtrl.ReportProblem)
+				proRoutes.POST("/problems/:id/decision", manager, problemCtrl.DecideProblem)
+				proRoutes.POST("/bills/:id/walkout", waiter, problemCtrl.MarkWalkout)
+				proRoutes.POST("/bills/:id/walkout-decision", manager, problemCtrl.DecideWalkout)
+				proRoutes.GET("/decisions", manager, problemCtrl.Pending)
+
+				// Reports
+				proRoutes.GET("/reports/daily", manager, problemCtrl.DailyReport)
+				proRoutes.GET("/reports/my-shift", middleware.RequireRole(domain.RoleWaiter, domain.RoleCashier), problemCtrl.MyShiftReport)
+
+				// Web push for locked phones
+				proRoutes.GET("/push/key", allStaff, problemCtrl.PushKey)
+				proRoutes.POST("/push/subscribe", allStaff, problemCtrl.SubscribePush)
+
+				// Shifts
+				proRoutes.GET("/shifts/me", allStaff, billCtrl.MyShift)
+				proRoutes.POST("/shifts/start", allStaff, billCtrl.StartShift)
+				proRoutes.POST("/shifts/end", allStaff, billCtrl.EndShift)
+			}
+
+			// Staff accounts (Pro plan, managers only)
+			staffRoutes := adminRoutes.Group("/staff")
+			staffRoutes.Use(middleware.RequirePlan(deps.TenantUsecase, domain.PlanPro), manager)
+			{
+				staffRoutes.GET("", staffCtrl.ListStaff)
+				staffRoutes.POST("", staffCtrl.CreateStaff)
+				staffRoutes.PATCH("/:id", staffCtrl.UpdateStaff)
 			}
 
 			// Instant 86 / Sold-out toggle
-			adminRoutes.PATCH("/items/:id/sold-out", middleware.RequireRole("kitchen", "manager", "owner", "waiter", "super_admin"), menuCtrl.ToggleSoldOut)
+			adminRoutes.PATCH("/items/:id/sold-out", middleware.RequireRole(domain.RoleChef, domain.RoleManager, domain.RoleWaiter), menuCtrl.ToggleSoldOut)
 
 			// Menu Categories Management (CRUD)
-			adminRoutes.GET("/categories", middleware.RequireRole("manager", "owner", "super_admin"), menuCtrl.ListCategories)
-			adminRoutes.POST("/categories", middleware.RequireRole("manager", "owner", "super_admin"), menuCtrl.CreateCategory)
-			adminRoutes.PUT("/categories/:id", middleware.RequireRole("manager", "owner", "super_admin"), menuCtrl.UpdateCategory)
-			adminRoutes.DELETE("/categories/:id", middleware.RequireRole("manager", "owner", "super_admin"), menuCtrl.DeleteCategory)
+			adminRoutes.GET("/categories", manager, menuCtrl.ListCategories)
+			adminRoutes.POST("/categories", manager, menuCtrl.CreateCategory)
+			adminRoutes.PUT("/categories/:id", manager, menuCtrl.UpdateCategory)
+			adminRoutes.DELETE("/categories/:id", manager, menuCtrl.DeleteCategory)
 
 			// Menu Items Management (CRUD)
-			adminRoutes.POST("/items", middleware.RequireRole("manager", "owner", "super_admin"), menuCtrl.CreateItem)
-			adminRoutes.PUT("/items/:id", middleware.RequireRole("manager", "owner", "super_admin"), menuCtrl.UpdateItem)
-			adminRoutes.DELETE("/items/:id", middleware.RequireRole("manager", "owner", "super_admin"), menuCtrl.DeleteItem)
+			adminRoutes.POST("/items", manager, menuCtrl.CreateItem)
+			adminRoutes.PUT("/items/:id", manager, menuCtrl.UpdateItem)
+			adminRoutes.DELETE("/items/:id", manager, menuCtrl.DeleteItem)
 
 			// Dining Tables Management & QR Link generation
-			adminRoutes.GET("/tables", middleware.RequireRole("manager", "owner", "super_admin"), tableCtrl.ListTables)
-			adminRoutes.POST("/tables", middleware.RequireRole("manager", "owner", "super_admin"), tableCtrl.CreateTable)
-			adminRoutes.POST("/tables/qr", middleware.RequireRole("manager", "owner", "super_admin"), tableCtrl.GenerateTableQR)
+			adminRoutes.GET("/tables", manager, tableCtrl.ListTables)
+			adminRoutes.POST("/tables", manager, tableCtrl.CreateTable)
+			adminRoutes.POST("/tables/qr", manager, tableCtrl.GenerateTableQR)
 
 			// Cloudinary Secure Signed Direct Upload (Protected by Rate Limiter)
-			adminRoutes.POST("/uploads/cloudinary-sign", uploadLimiter.Limit(), middleware.RequireRole("kitchen", "manager", "owner", "super_admin"), uploadCtrl.SignCloudinaryUpload)
+			adminRoutes.POST("/uploads/cloudinary-sign", uploadLimiter.Limit(), middleware.RequireRole(domain.RoleChef, domain.RoleManager), uploadCtrl.SignCloudinaryUpload)
 		}
 	}
 

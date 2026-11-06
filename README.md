@@ -1,4 +1,74 @@
-# React + TypeScript + Vite
+# Azai Menu
+
+## Local development
+
+Runs everything on your machine with a local database in Docker, so Supabase and Render are not touched.
+
+1. Create `Backend/.env.local` (not committed; it overrides `Backend/.env`):
+
+   ```
+   DB_URL=postgres://azai:azai@localhost:5433/azai?sslmode=disable
+   ENVIRONMENT=development
+   FRONTEND_URL=http://localhost:5173
+   ```
+
+2. Create `Frontend/.env.local` (not committed; it overrides `Frontend/.env`):
+
+   ```
+   VITE_API_URL=http://localhost:8080/api/v1
+   VITE_WS_URL=ws://localhost:8080/ws/kitchen
+   ```
+
+3. In `Backend/`, build the database with sample data, then start the API:
+
+   ```
+   make db-reset
+   make run
+   ```
+
+4. In `Frontend/`: `npm run dev`, then open http://localhost:5173
+
+Sample restaurants, one per plan: `demo-basic`, `demo-plus`, `demo-pro` (admin at `/<slug>/admin`).
+Staff sign in on their restaurant's admin page with their phone number (or their email).
+All passwords are `password123`:
+
+| Restaurant | Name | Role | Phone | Email |
+|---|---|---|---|---|
+| `demo-basic` | Meron Tadesse | Manager | 0911 300 001 | `manager@basic.azai.local` |
+| `demo-plus` | Dawit Bekele | Manager | 0911 100 001 | `manager@plus.azai.local` |
+| `demo-plus` | Selam Girma | Chef | 0911 100 002 | `chef@plus.azai.local` |
+| `demo-plus` | Yonas Haile | Waiter | 0911 100 003 | `waiter@plus.azai.local` |
+| `demo-pro` | Hana Alemu | Manager | 0911 200 001 | `manager@pro.azai.local` |
+| `demo-pro` | Liya Mekonnen | Cashier | 0911 200 002 | `cashier@pro.azai.local` |
+| `demo-pro` | Abebe Kebede | Waiter | 0911 200 003 | `waiter@pro.azai.local` |
+| `demo-pro` | Tigist Worku | Chef | 0911 200 004 | `chef@pro.azai.local` |
+| `demo-pro` | Bereket Assefa | Waiter | 0911 200 005 | `waiter2@pro.azai.local` |
+| (none) | Azai Team | Super admin | | `superadmin@azai.local` (only the `/api/v1/superadmin` endpoints; it cannot open a restaurant dashboard) |
+
+Other commands in `Backend/`: `make db-up` / `make db-down` start and stop the database (data is kept),
+`make seed` reloads the sample data, `make migrate-up` applies new migrations,
+`make test-db` runs all tests including the ones that use the local database.
+
+Remove the two `.env.local` files to go back to Supabase and Render.
+
+### Phone notifications (optional, Pro)
+
+Staff can turn on phone notifications (Bills screen or My tables → "Turn on phone alerts") for new bills,
+bill reminders, dish problems and walkouts. They stay off until the server has VAPID keys:
+
+1. In `Backend/`, run `make vapid` and copy the two printed lines into `Backend/.env.local`
+   (`VAPID_PUBLIC_KEY=...`, `VAPID_PRIVATE_KEY=...`; optionally `VAPID_SUBJECT=mailto:you@example.com`).
+2. Restart `make run`.
+
+Keep the same keys once staff have subscribed: new keys mean everyone has to turn alerts on again.
+Browsers only allow notifications on `localhost` or HTTPS.
+
+### Pro manager screens
+
+- **Alerts**: dish problems (remake or remove from the bill) and walkouts (waiter pays or restaurant loss) waiting for a decision.
+- **Reports**: the day's sales by payment method, each waiter's bills, walkouts and removed dishes (Ethiopian time).
+
+---
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 

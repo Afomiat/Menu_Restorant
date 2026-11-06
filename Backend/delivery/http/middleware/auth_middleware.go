@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"menu-backend/domain"
 	"menu-backend/internal/security"
 )
 
@@ -39,7 +40,7 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 		// If the route is scoped to a specific restaurant tenant, verify that
 		// the user's token belongs to THAT restaurant (super_admin can bypass).
 		routeTenantID, exists := GetTenantIDFromContext(c)
-		if exists && claims.Role != "super_admin" {
+		if exists && domain.NormalizeRole(claims.Role) != domain.RoleSuperAdmin {
 			if claims.TenantID != routeTenantID {
 				c.JSON(http.StatusForbidden, gin.H{
 					"error":   "CROSS_TENANT_ACCESS_DENIED",
@@ -57,31 +58,65 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 	}
 }
 
-// RequireRole enforces role-based permissions (e.g. only "kitchen", "manager", "owner")
-func RequireRole(allowedRoles ...string) gin.HandlerFunc {
+// GetAuthClaims returns the logged-in staff member's token claims set by AuthMiddleware
+func GetAuthClaims(c *gin.Context) (*security.JWTClaims, bool) {
+	val, exists := c.Get(AuthClaimsKey)
+	if !exists {
+		return nil, false
+	}
+	claims, ok := val.(*security.JWTClaims)
+	return claims, ok
+}
+
+// RequireActiveStaff refuses accounts a manager has turned off, even if their login has not expired
+func RequireActiveStaff(staffUsecase domain.StaffUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		val, exists := c.Get(AuthClaimsKey)
-		if !exists {
+		claims, ok := GetAuthClaims(c)
+		if !ok {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
 			c.Abort()
 			return
 		}
 
-		claims, ok := val.(*security.JWTClaims)
+		active, err := staffUsecase.IsActive(c.Request.Context(), claims.UserID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check staff account"})
+			c.Abort()
+			return
+		}
+		if !active {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error":   "STAFF_INACTIVE",
+				"message": domain.ErrStaffInactive.Error(),
+			})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// RequireRole enforces role-based permissions (e.g. only "chef", "manager").
+// Roles from logins issued before the Pro roles (owner, kitchen) count as manager and chef.
+func RequireRole(allowedRoles ...domain.Role) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		claims, ok := GetAuthClaims(c)
 		if !ok {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid auth context"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
 			c.Abort()
 			return
 		}
 
+		role := domain.NormalizeRole(claims.Role)
+
 		// Super admin has access to everything
-		if claims.Role == "super_admin" {
+		if role == domain.RoleSuperAdmin {
 			c.Next()
 			return
 		}
 
-		for _, role := range allowedRoles {
-			if claims.Role == role {
+		for _, allowed := range allowedRoles {
+			if role == allowed {
 				c.Next()
 				return
 			}

@@ -13,7 +13,7 @@ interface FeatureGateProps {
    */
   children: ReactNode;
   /**
-   * Optional: Rendered when the feature is NOT enabled (Standard tier).
+   * Optional: Rendered when the feature is NOT enabled (Basic plan).
    * If not provided, nothing is rendered for unavailable features.
    */
   fallback?: ReactNode;
@@ -31,7 +31,7 @@ interface FeatureGateProps {
  * Must be inside a <PlanProvider>.
  *
  * @example
- * // Only render cart button for VIP
+ * // Only render cart button for Plus and Pro
  * <FeatureGate feature="ordering">
  *   <CartButton />
  * </FeatureGate>

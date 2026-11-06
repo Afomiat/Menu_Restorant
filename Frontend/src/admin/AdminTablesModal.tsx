@@ -1,18 +1,28 @@
 import { useState, useEffect } from 'react';
 import { X, QrCode, Plus, Check, Copy, ExternalLink, Printer, Loader2 } from 'lucide-react';
-import { fetchAdminTables, createAdminTable, generateAdminTableQR, type AdminTable } from '../services/orderService';
+import { fetchAdminTables, createAdminTable, generateAdminTableQR, assignTableWaiter, type AdminTable } from '../services/orderService';
+import { fetchStaff } from '../services/staffService';
+import type { PlanTier, StaffMember } from '../types';
+import { hasPlan } from '../utils/plan';
+import { t as text } from '../i18n/en';
 
 interface AdminTablesModalProps {
   isOpen: boolean;
   onClose: () => void;
   restaurantSlug: string;
+  /** Pro restaurants give each table a waiter. */
+  plan?: PlanTier;
 }
 
 export default function AdminTablesModal({
   isOpen,
   onClose,
   restaurantSlug: _restaurantSlug,
+  plan = 'basic',
 }: AdminTablesModalProps) {
+  const isPro = hasPlan(plan, 'pro');
+  const [waiters, setWaiters] = useState<StaffMember[]>([]);
+  const [waiterError, setWaiterError] = useState<string | null>(null);
   const [tables, setTables] = useState<AdminTable[]>([]);
   const [loading, setLoading] = useState(false);
   const [newTableNumber, setNewTableNumber] = useState('');
@@ -37,6 +47,11 @@ export default function AdminTablesModal({
         })
         .catch((err) => console.warn('Failed to load tables:', err))
         .finally(() => setLoading(false));
+      if (isPro) {
+        fetchStaff()
+          .then((staff) => setWaiters(staff.filter((s) => s.role === 'waiter' && s.is_active)))
+          .catch((err) => console.warn('Failed to load waiters:', err));
+      }
     } else {
       setSelectedTable(null);
       setQrUrl(null);
@@ -84,6 +99,18 @@ export default function AdminTablesModal({
       setCreateError(msg);
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleAssignWaiter = async (waiterId: string) => {
+    if (!selectedTable) return;
+    setWaiterError(null);
+    try {
+      const updated = await assignTableWaiter(selectedTable.id, waiterId || null);
+      setTables((prev) => prev.map((tb) => (tb.id === updated.id ? { ...tb, ...updated } : tb)));
+      setSelectedTable((prev) => (prev && prev.id === updated.id ? { ...prev, ...updated } : prev));
+    } catch (err: unknown) {
+      setWaiterError(err instanceof Error ? err.message : 'Failed to assign waiter');
     }
   };
 
@@ -216,6 +243,29 @@ export default function AdminTablesModal({
                 gap: '12px',
               }}
             >
+              {isPro && (
+                <label className="admin-input-label" style={{ width: '100%', textAlign: 'left' }}>
+                  {text.tables.waiter}
+                  <select
+                    className="admin-input-control"
+                    value={selectedTable.assigned_waiter_id || ''}
+                    onChange={(e) => handleAssignWaiter(e.target.value)}
+                  >
+                    <option value="">{text.tables.noWaiter}</option>
+                    {waiters.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.full_name}
+                      </option>
+                    ))}
+                  </select>
+                  {waiterError && (
+                    <span role="alert" style={{ color: 'var(--admin-danger)', fontSize: '12px' }}>
+                      {waiterError}
+                    </span>
+                  )}
+                </label>
+              )}
+
               <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--admin-text-main)' }}>
                 QR Code for Table {selectedTable.table_number}
               </div>

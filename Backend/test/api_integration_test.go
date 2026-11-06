@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -27,18 +28,24 @@ func (m *mockFullTenantUsecase) GetTenantBySlug(ctx context.Context, slug string
 	return m.tenant, nil
 }
 func (m *mockFullTenantUsecase) GetTenantByID(ctx context.Context, id uuid.UUID) (*domain.Tenant, error) {
+	if m.tenant == nil || m.tenant.ID != id {
+		return nil, errors.New("tenant not found")
+	}
 	return m.tenant, nil
 }
-func (m *mockFullTenantUsecase) UpdatePlan(ctx context.Context, id uuid.UUID, plan domain.PlanTier) error {
+func (m *mockFullTenantUsecase) UpdatePlan(ctx context.Context, actorID, id uuid.UUID, plan domain.PlanTier) error {
 	m.tenant.Plan = plan
 	return nil
+}
+func (m *mockFullTenantUsecase) UpdateSettings(ctx context.Context, actorID, tenantID uuid.UUID, changes domain.TenantSettingsChanges) (*domain.TenantSettings, error) {
+	return usecase.NewTenantUsecase(&mockTenantRepo{tenant: m.tenant}, &mockActivityRepo{}).UpdateSettings(ctx, actorID, tenantID, changes)
 }
 func (m *mockFullTenantUsecase) UpdateTheme(ctx context.Context, id uuid.UUID, themeConfig map[string]interface{}) (*domain.Tenant, error) {
 	m.tenant.ThemeConfig = themeConfig
 	return m.tenant, nil
 }
-func (m *mockFullTenantUsecase) VerifyVIPAccess(ctx context.Context, tenantID uuid.UUID) (bool, error) {
-	return m.tenant.HasVIPFeatures(), nil
+func (m *mockFullTenantUsecase) VerifyPlanAccess(ctx context.Context, tenantID uuid.UUID, min domain.PlanTier) (bool, error) {
+	return m.tenant.HasPlan(min), nil
 }
 func (m *mockFullTenantUsecase) ListActive(ctx context.Context) ([]domain.Tenant, error) {
 	if m.tenant != nil {
@@ -48,6 +55,11 @@ func (m *mockFullTenantUsecase) ListActive(ctx context.Context) ([]domain.Tenant
 }
 
 func setupTestRouter(tenant *domain.Tenant, qrSecret, jwtSecret string) (*gin.Engine, *domain.Order) {
+	return setupTestRouterWithBills(tenant, qrSecret, jwtSecret, nil)
+}
+
+// setupTestRouterWithBills also wires a bill usecase (nil: no bills, as below Pro)
+func setupTestRouterWithBills(tenant *domain.Tenant, qrSecret, jwtSecret string, bills domain.BillUsecase, extra ...func(*router.RouterDependencies)) (*gin.Engine, *domain.Order) {
 	cfg := &config.Config{
 		Environment: "test",
 		QRSecretKey: qrSecret,
@@ -88,17 +100,22 @@ func setupTestRouter(tenant *domain.Tenant, qrSecret, jwtSecret string) (*gin.En
 
 	orderUc := usecase.NewOrderUsecase(orderRepo, &mockTenantRepo{tenant: tenant}, tableRepo, menuRepo, qrSecret)
 	menuUc := usecase.NewMenuUsecase(&mockTenantRepo{tenant: tenant}, menuRepo)
-	tableUc := usecase.NewTableUsecase(tableRepo, qrSecret)
+	tableUc := usecase.NewTableUsecase(tableRepo, newMemStaffRepo(), &mockActivityRepo{}, qrSecret)
 
-	r := router.SetupRouter(router.RouterDependencies{
+	deps := router.RouterDependencies{
 		Config:        cfg,
 		TenantUsecase: tenantUc,
 		MenuUsecase:   menuUc,
 		OrderUsecase:  orderUc,
 		TableUsecase:  tableUc,
 		Hub:           nil,
-		Queries:       nil,
-	})
+		StaffUsecase:  allActiveStaff{},
+		BillUsecase:   bills,
+	}
+	for _, apply := range extra {
+		apply(&deps)
+	}
+	r := router.SetupRouter(deps)
 
 	return r, testOrder
 }
@@ -113,7 +130,7 @@ func TestAPI_CustomerLiveOrderTracking(t *testing.T) {
 		ID:       tenantID,
 		Slug:     slug,
 		Name:     "Azai Burger",
-		Plan:     domain.PlanVIP,
+		Plan:     domain.PlanPlus,
 		IsActive: true,
 	}
 
@@ -149,7 +166,7 @@ func TestAPI_CustomerLiveOrderTracking(t *testing.T) {
 	}
 }
 
-func TestAPI_AdminUpgradeToVIP(t *testing.T) {
+func TestAPI_AdminUpgradeToPlus(t *testing.T) {
 	tenantID := uuid.New()
 	userID := uuid.New()
 	slug := "bistro-test"
@@ -160,7 +177,7 @@ func TestAPI_AdminUpgradeToVIP(t *testing.T) {
 		ID:       tenantID,
 		Slug:     slug,
 		Name:     "Bistro Test",
-		Plan:     domain.PlanStandard, // Starts on Standard
+		Plan:     domain.PlanBasic, // Starts on Basic
 		IsActive: true,
 	}
 
@@ -169,8 +186,8 @@ func TestAPI_AdminUpgradeToVIP(t *testing.T) {
 	ownerToken, _ := security.GenerateJWT(userID, tenantID, "owner", jwtSecret, time.Hour)
 	superAdminToken, _ := security.GenerateJWT(userID, tenantID, "super_admin", jwtSecret, time.Hour)
 
-	// 1. Security Check: Owner cannot self-upgrade restaurant to VIP (Privilege Escalation Prevention)
-	body, _ := json.Marshal(map[string]string{"plan": "vip"})
+	// 1. Security Check: Owner cannot self-upgrade restaurant to Plus (Privilege Escalation Prevention)
+	body, _ := json.Marshal(map[string]string{"plan": "plus"})
 	req := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/tenant/plan", bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+ownerToken)
 	req.Header.Set("Content-Type", "application/json")
@@ -181,7 +198,7 @@ func TestAPI_AdminUpgradeToVIP(t *testing.T) {
 		t.Fatalf("expected 403 for owner trying to self-upgrade plan, got %d: %s", w.Code, w.Body.String())
 	}
 
-	// 2. Super Admin can upgrade restaurant to VIP
+	// 2. Super Admin can upgrade restaurant to Plus
 	req = httptest.NewRequest(http.MethodPatch, "/api/v1/admin/tenant/plan", bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+superAdminToken)
 	req.Header.Set("Content-Type", "application/json")
@@ -189,11 +206,11 @@ func TestAPI_AdminUpgradeToVIP(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200 for super_admin VIP upgrade, got %d: %s", w.Code, w.Body.String())
+		t.Fatalf("expected 200 for super_admin Plus upgrade, got %d: %s", w.Code, w.Body.String())
 	}
 
-	if tenant.Plan != domain.PlanVIP {
-		t.Fatalf("expected tenant plan to be updated to VIP, got %s", tenant.Plan)
+	if tenant.Plan != domain.PlanPlus {
+		t.Fatalf("expected tenant plan to be updated to Plus, got %s", tenant.Plan)
 	}
 
 	// 3. Kitchen staff attempts to upgrade plan -> 403 INSUFFICIENT PERMISSIONS

@@ -91,8 +91,8 @@ func (u *orderUsecase) PlaceOrder(ctx context.Context, input domain.CreateOrderI
 		u.cacheMu.Unlock()
 	}
 
-	if !tenant.HasVIPFeatures() {
-		return nil, errors.New("digital ordering is disabled; this restaurant requires a VIP plan upgrade")
+	if !tenant.HasPlan(domain.PlanPlus) {
+		return nil, errors.New("digital ordering is disabled; this restaurant requires a Plus plan upgrade")
 	}
 
 	// 2. SECURITY CHECK: Verify cryptographic HMAC signature for table orders
@@ -132,6 +132,9 @@ func (u *orderUsecase) PlaceOrder(ctx context.Context, input domain.CreateOrderI
 
 	// 4. SECURITY & FINANCIAL CHECK: Server-side price calculation & stock verification
 	var totalAmount float64
+	// The order's cooking target is its slowest dish
+	defaultPrep := tenant.Settings.WithDefaults().DefaultPrepMinutes
+	targetMinutes := 0
 	orderItems := make([]domain.OrderItem, len(input.Items))
 
 	for i, itemInput := range input.Items {
@@ -170,6 +173,14 @@ func (u *orderUsecase) PlaceOrder(ctx context.Context, input domain.CreateOrderI
 
 		if dbItem.IsSoldOut {
 			return nil, fmt.Errorf("item '%s' is currently sold out (86'd)", dbItem.Name)
+		}
+
+		prep := defaultPrep
+		if dbItem.PrepMinutes != nil {
+			prep = *dbItem.PrepMinutes
+		}
+		if prep > targetMinutes {
+			targetMinutes = prep
 		}
 
 		// Use the server-side price (never trust client-supplied unit_price)
@@ -248,6 +259,7 @@ func (u *orderUsecase) PlaceOrder(ctx context.Context, input domain.CreateOrderI
 		CreatedAt:            now,
 		UpdatedAt:            now,
 		Items:                orderItems,
+		TargetMinutes:        targetMinutes,
 	}
 
 	// 6. Persist atomically
@@ -266,8 +278,49 @@ func (u *orderUsecase) UndoOrder(ctx context.Context, tenantID, orderID uuid.UUI
 	return nil
 }
 
-func (u *orderUsecase) UpdateKitchenStatus(ctx context.Context, tenantID, orderID uuid.UUID, status domain.OrderStatus) error {
-	return u.orderRepo.UpdateStatus(ctx, tenantID, orderID, status)
+func (u *orderUsecase) UpdateKitchenStatus(ctx context.Context, actor domain.Actor, tenantID, orderID uuid.UUID, status domain.OrderStatus) (*domain.Order, error) {
+	if !domain.CanSetOrderStatus(actor.Role, status) {
+		return nil, domain.ErrStatusNotAllowed
+	}
+	order, err := u.orderRepo.UpdateStatus(ctx, tenantID, orderID, status, actor.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	// The table's waiter hears about the order (food ready); without one, the managers do
+	if table, err := u.tableRepo.GetByNumber(ctx, tenantID, order.TableNumber); err == nil && table != nil {
+		order.WaiterID = table.AssignedWaiterID
+	}
+	return order, nil
+}
+
+func (u *orderUsecase) TablesWithOrders(ctx context.Context, tenantID, waiterID uuid.UUID) ([]domain.TableOrders, error) {
+	tables, err := u.tableRepo.ListByTenant(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	orders, err := u.orderRepo.ListActiveByTenant(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+
+	byTable := make(map[string][]domain.Order)
+	for _, o := range orders {
+		byTable[o.TableNumber] = append(byTable[o.TableNumber], o)
+	}
+
+	result := []domain.TableOrders{}
+	for _, t := range tables {
+		if waiterID != uuid.Nil && (t.AssignedWaiterID == nil || *t.AssignedWaiterID != waiterID) {
+			continue
+		}
+		tableOrders := byTable[t.TableNumber]
+		if tableOrders == nil {
+			tableOrders = []domain.Order{}
+		}
+		result = append(result, domain.TableOrders{Table: t, Orders: tableOrders})
+	}
+	return result, nil
 }
 
 func (u *orderUsecase) GetOrderByID(ctx context.Context, tenantID, orderID uuid.UUID) (*domain.Order, error) {

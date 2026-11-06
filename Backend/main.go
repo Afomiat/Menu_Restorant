@@ -14,6 +14,8 @@ import (
 	"menu-backend/db"
 	"menu-backend/db/sqlc"
 	"menu-backend/delivery/http/router"
+	"menu-backend/domain"
+	"menu-backend/internal/push"
 	"menu-backend/internal/ws"
 	"menu-backend/repository"
 	"menu-backend/usecase"
@@ -53,25 +55,53 @@ func main() {
 	tableRepo := repository.NewTableRepository(queries)
 	orderRepo := repository.NewOrderRepository(pool, queries)
 	uploadRepo := repository.NewCloudinaryUploadRepository(cfg)
+	staffRepo := repository.NewStaffRepository(queries)
+	activityRepo := repository.NewActivityRepository(queries)
+	billRepo := repository.NewBillRepository(pool, queries)
+	problemRepo := repository.NewProblemRepository(pool, queries)
+	pushRepo := repository.NewPushRepository(queries)
+	reportRepo := repository.NewReportRepository(queries)
+
+	// Targeted alerts go to live screens, and with VAPID keys set, to locked phones as web push
+	var notifier domain.Notifier = hub
+	if cfg.VAPIDPublicKey != "" && cfg.VAPIDPrivateKey != "" {
+		notifier = push.NewNotifier(hub, pushRepo, push.WebPushSender(cfg.VAPIDPublicKey, cfg.VAPIDPrivateKey, cfg.VAPIDSubject))
+		log.Println("📲 Web push for staff phones is on")
+	}
 
 	// 6. Initialize Usecases (Business Rules Layer)
-	tenantUsecase := usecase.NewTenantUsecase(tenantRepo)
+	tenantUsecase := usecase.NewTenantUsecase(tenantRepo, activityRepo)
+	staffUsecase := usecase.NewStaffUsecase(staffRepo, tenantRepo, activityRepo)
 	menuUsecase := usecase.NewMenuUsecase(tenantRepo, menuRepo)
-	tableUsecase := usecase.NewTableUsecase(tableRepo, cfg.QRSecretKey)
+	tableUsecase := usecase.NewTableUsecase(tableRepo, staffRepo, activityRepo, cfg.QRSecretKey)
 	orderUsecase := usecase.NewOrderUsecase(orderRepo, tenantRepo, tableRepo, menuRepo, cfg.QRSecretKey)
 	uploadUsecase := usecase.NewUploadUsecase(tenantRepo, uploadRepo)
+	billUsecase := usecase.NewBillUsecase(billRepo, tableRepo, staffRepo, activityRepo, notifier)
+	problemUsecase := usecase.NewProblemUsecase(problemRepo, billRepo, orderRepo, activityRepo, notifier)
+	reportUsecase := usecase.NewReportUsecase(reportRepo, problemRepo, billRepo)
+
+	// Background checks (late orders, unpaid bills) run on the server, so alerts go out with no screen open
+	watchCtx, stopWatching := context.WithCancel(context.Background())
+	defer stopWatching()
+	go usecase.NewKitchenWatcher(orderRepo, notifier).Run(watchCtx)
+	go usecase.NewBillWatcher(billRepo, notifier).Run(watchCtx)
 
 	// 7. Initialize Delivery Router (Gin HTTP Server)
 	r := router.SetupRouter(router.RouterDependencies{
-		Config:        cfg,
-		TenantUsecase: tenantUsecase,
-		MenuUsecase:   menuUsecase,
-		OrderUsecase:  orderUsecase,
-		TableUsecase:  tableUsecase,
-		UploadUsecase: uploadUsecase,
-		Hub:           hub,
-		Queries:       queries,
-		Pool:          pool,
+		Config:         cfg,
+		TenantUsecase:  tenantUsecase,
+		MenuUsecase:    menuUsecase,
+		OrderUsecase:   orderUsecase,
+		TableUsecase:   tableUsecase,
+		UploadUsecase:  uploadUsecase,
+		StaffUsecase:   staffUsecase,
+		BillUsecase:    billUsecase,
+		ProblemUsecase: problemUsecase,
+		ReportUsecase:  reportUsecase,
+		PushRepo:       pushRepo,
+		Notifier:       notifier,
+		Hub:            hub,
+		Pool:           pool,
 	})
 
 	// 8. Start HTTP Server with Graceful Shutdown

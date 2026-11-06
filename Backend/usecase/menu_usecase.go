@@ -131,6 +131,9 @@ func (u *menuUsecase) CreateItem(ctx context.Context, input domain.CreateItemInp
 	if input.CategoryID == uuid.Nil {
 		return nil, errors.New("category ID is required")
 	}
+	if err := validatePrepMinutes(input.PrepMinutes); err != nil {
+		return nil, err
+	}
 
 	// Verify category exists and belongs to this tenant to prevent cross-tenant data leakage
 	_, err := u.menuRepo.GetCategoryByID(ctx, input.TenantID, input.CategoryID)
@@ -148,6 +151,7 @@ func (u *menuUsecase) CreateItem(ctx context.Context, input domain.CreateItemInp
 		Tags:        input.Tags,
 		IsAvailable: true,
 		IsSoldOut:   false,
+		PrepMinutes: input.PrepMinutes,
 	}
 
 	if err := u.menuRepo.CreateItem(ctx, item); err != nil {
@@ -164,6 +168,9 @@ func (u *menuUsecase) UpdateItem(ctx context.Context, input domain.UpdateItemInp
 	}
 	if input.Price < 0 {
 		return nil, errors.New("item price cannot be negative")
+	}
+	if err := validatePrepMinutes(input.PrepMinutes); err != nil {
+		return nil, err
 	}
 
 	// Verify item exists and belongs to this tenant
@@ -185,12 +192,21 @@ func (u *menuUsecase) UpdateItem(ctx context.Context, input domain.UpdateItemInp
 	existing.ImageUrl = input.ImageUrl
 	existing.Tags = input.Tags
 	existing.IsAvailable = input.IsAvailable
+	existing.PrepMinutes = input.PrepMinutes
 
 	if err := u.menuRepo.UpdateItem(ctx, existing); err != nil {
 		return nil, fmt.Errorf("failed to update menu item: %w", err)
 	}
 
 	return existing, nil
+}
+
+// validatePrepMinutes accepts no prep time (the restaurant default) or 1 to 240 minutes
+func validatePrepMinutes(minutes *int) error {
+	if minutes != nil && (*minutes < 1 || *minutes > 240) {
+		return errors.New("prep time must be between 1 and 240 minutes")
+	}
+	return nil
 }
 
 // DeleteItem removes a dish from the menu

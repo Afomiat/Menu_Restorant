@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -47,6 +48,7 @@ func (r *orderRepository) Create(ctx context.Context, order *domain.Order) error
 		PaymentStatus:        sqlc.PaymentStatusUnpaid,
 		TotalAmount:          converter.FloatToNumeric(order.TotalAmount),
 		GracePeriodEndsAt:    converter.TimeToPg(order.GracePeriodEndsAt),
+		TargetMinutes:        converter.IntPtrToPg(&order.TargetMinutes),
 	})
 	if err != nil {
 		return err
@@ -115,6 +117,14 @@ func (r *orderRepository) GetByID(ctx context.Context, tenantID, orderID uuid.UU
 		TotalAmount:          converter.NumericToFloat(row.TotalAmount),
 		GracePeriodEndsAt:    converter.PgToTime(row.GracePeriodEndsAt),
 		CreatedAt:            converter.PgToTime(row.CreatedAt),
+		TargetMinutes:        int(row.TargetMinutes.Int32),
+		StartedAt:            converter.PgToTimePtr(row.StartedAt),
+		StartedBy:            converter.PgToUUIDPtr(row.StartedBy),
+		ReadyAt:              converter.PgToTimePtr(row.ReadyAt),
+		ReadyBy:              converter.PgToUUIDPtr(row.ReadyBy),
+		ServedAt:             converter.PgToTimePtr(row.ServedAt),
+		ServedBy:             converter.PgToUUIDPtr(row.ServedBy),
+		RemakeOf:             converter.PgToUUIDPtr(row.RemakeOf),
 	}
 
 	items, err := r.loadOrderItems(ctx, order.ID)
@@ -156,6 +166,14 @@ func (r *orderRepository) ListActiveByTenant(ctx context.Context, tenantID uuid.
 			GracePeriodEndsAt: converter.PgToTime(row.GracePeriodEndsAt),
 			CreatedAt:         converter.PgToTime(row.CreatedAt),
 			Items:             []domain.OrderItem{},
+			TargetMinutes:     int(row.TargetMinutes.Int32),
+			StartedAt:         converter.PgToTimePtr(row.StartedAt),
+			StartedBy:         converter.PgToUUIDPtr(row.StartedBy),
+			ReadyAt:           converter.PgToTimePtr(row.ReadyAt),
+			ReadyBy:           converter.PgToUUIDPtr(row.ReadyBy),
+			ServedAt:          converter.PgToTimePtr(row.ServedAt),
+			ServedBy:          converter.PgToUUIDPtr(row.ServedBy),
+			RemakeOf:          converter.PgToUUIDPtr(row.RemakeOf),
 		}
 		orderMap[id] = &orders[i]
 	}
@@ -274,13 +292,46 @@ func (r *orderRepository) loadOrderItems(ctx context.Context, orderID uuid.UUID)
 	return items, nil
 }
 
-func (r *orderRepository) UpdateStatus(ctx context.Context, tenantID, orderID uuid.UUID, status domain.OrderStatus) error {
-	_, err := r.q.UpdateOrderStatus(ctx, sqlc.UpdateOrderStatusParams{
+func (r *orderRepository) UpdateStatus(ctx context.Context, tenantID, orderID uuid.UUID, status domain.OrderStatus, actorID uuid.UUID) (*domain.Order, error) {
+	row, err := r.q.UpdateOrderStatus(ctx, sqlc.UpdateOrderStatusParams{
 		ID:       converter.UUIDToPg(orderID),
 		TenantID: converter.UUIDToPg(tenantID),
 		Status:   sqlc.OrderStatus(status),
+		ActorID:  converter.UUIDToPg(actorID),
 	})
-	return err
+	if err != nil {
+		return nil, err
+	}
+	return &domain.Order{
+		ID:          converter.PgToUUID(row.ID),
+		TenantID:    converter.PgToUUID(row.TenantID),
+		TableID:     converter.PgToUUIDPtr(row.TableID),
+		TableNumber: row.TableNumber,
+		Status:      domain.OrderStatus(row.Status),
+		UpdatedAt:   converter.PgToTime(row.UpdatedAt),
+	}, nil
+}
+
+func (r *orderRepository) ListVeryLate(ctx context.Context, now time.Time) ([]domain.LateOrder, error) {
+	rows, err := r.q.ListVeryLateOrders(ctx, converter.TimeToPg(now))
+	if err != nil {
+		return nil, err
+	}
+	late := make([]domain.LateOrder, len(rows))
+	for i, row := range rows {
+		late[i] = domain.LateOrder{
+			ID:            converter.PgToUUID(row.ID),
+			TenantID:      converter.PgToUUID(row.TenantID),
+			TableNumber:   row.TableNumber,
+			TargetMinutes: int(row.TargetMinutes.Int32),
+			StartedAt:     converter.PgToTime(row.StartedAt),
+		}
+	}
+	return late, nil
+}
+
+func (r *orderRepository) MarkVeryLateAlerted(ctx context.Context, orderID uuid.UUID) error {
+	return r.q.MarkOrderVeryLateAlerted(ctx, converter.UUIDToPg(orderID))
 }
 
 func (r *orderRepository) CancelInGrace(ctx context.Context, tenantID, orderID uuid.UUID, sessionToken string) error {

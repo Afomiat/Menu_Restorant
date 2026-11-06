@@ -2,6 +2,8 @@ import { ShoppingBag, X, Plus, Minus, Trash2, CheckCircle2, ChefHat, RotateCcw }
 import type { CartItem } from '../../types';
 import { formatPrice } from '../../utils/currency';
 import { useCartDrawerLogic } from '../../hooks/useCartDrawerLogic';
+import OrderEstimate from '../../components/common/OrderEstimate';
+import AskBillButton from '../../components/common/AskBillButton';
 
 interface ClassicCartDrawerProps {
   cart: CartItem[];
@@ -16,6 +18,10 @@ interface ClassicCartDrawerProps {
   onUndoOrder: (orderId: string) => void;
   orderError?: string | null;
   isTableVerified?: boolean;
+  /** Pro: the customer's "Ask for the bill" button on the orders tab. */
+  onAskBill?: () => void;
+  billAsked?: boolean;
+  billError?: string | null;
 }
 
 export default function ClassicCartDrawer({
@@ -31,6 +37,9 @@ export default function ClassicCartDrawer({
   onUndoOrder,
   orderError,
   isTableVerified = false,
+  onAskBill,
+  billAsked = false,
+  billError,
 }: ClassicCartDrawerProps) {
   const {
     activeTab,
@@ -726,6 +735,8 @@ export default function ClassicCartDrawer({
                   </div>
                 </div>
 
+                {onAskBill && <AskBillButton onAsk={onAskBill} asked={billAsked} error={billError} />}
+
                 {/* Placed Items List (Matches Screenshot 1) */}
                 <div
                   style={{
@@ -798,7 +809,7 @@ export default function ClassicCartDrawer({
 
                             {/* Action / Live Status Badge */}
                             {order.orderId && (
-                              <div style={{ flexShrink: 0 }}>
+                              <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
                                 {(!status || status === 'not_started') ? (
                                   <button
                                     type="button"
@@ -874,6 +885,7 @@ export default function ClassicCartDrawer({
                                     Delivered
                                   </span>
                                 )}
+                                <OrderEstimate order={order} color="rgba(255, 255, 255, 0.75)" />
                               </div>
                             )}
                           </div>

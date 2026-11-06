@@ -89,7 +89,7 @@ export default function ModernMenuPage({
   restaurantSlug,
   tableNumber,
 }: ModernMenuPageProps) {
-  const { can } = useFeatureGate();
+  const { can, hasPlan } = useFeatureGate();
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
@@ -119,11 +119,15 @@ export default function ModernMenuPage({
     getItemCartQuantity,
     resolvedTable,
     isTableVerified,
+    billAsked,
+    billError,
+    handleRequestBill,
   } = useMenuCart({
     restaurantSlug,
     items,
     loading: false,
     tableNumber,
+    oneOrderPerCart: hasPlan('pro'),
   });
 
   const [cartDrawerTab, setCartDrawerTab] = useState<'tray' | 'orders'>('tray');
@@ -544,6 +548,9 @@ export default function ModernMenuPage({
         initialTab={cartDrawerTab}
         tableNumber={resolvedTable || tableNumber}
         isTableVerified={isTableVerified}
+        onAskBill={hasPlan('pro') && isTableVerified ? handleRequestBill : undefined}
+        billAsked={billAsked}
+        billError={billError}
       />
 
       {/* Restaurant Information Modal */}

@@ -5,6 +5,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+
+	"menu-backend/domain"
 )
 
 const (
@@ -21,6 +23,9 @@ type Client struct {
 	send     chan []byte
 	// guest clients are customers' menu pages: they receive public events only
 	guest bool
+	// userID and role of the signed-in staff member (staff clients only)
+	userID uuid.UUID
+	role   domain.Role
 }
 
 func (c *Client) ReadPump() {

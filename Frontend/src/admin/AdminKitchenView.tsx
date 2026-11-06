@@ -23,6 +23,7 @@ import {
 } from '../services/orderService';
 
 import { formatPrice } from '../utils/currency';
+import { hasPlan } from '../utils/plan';
 import AdminConfirmModal from './AdminConfirmModal';
 import SearchBar from '../components/common/SearchBar';
 
@@ -254,7 +255,7 @@ const confirmClearHistory = () => {
 };
 
 
-  if (meta?.plan === 'standard') {
+  if (meta?.plan && !hasPlan(meta.plan, 'plus')) {
     return (
       <div className="admin-kitchen-page-view" style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 20px' }}>
         <div
@@ -314,7 +315,7 @@ const confirmClearHistory = () => {
               marginBottom: '12px',
             }}
           >
-            VIP License Feature
+            Plus Plan Feature
           </span>
 
           <h2
@@ -338,7 +339,7 @@ const confirmClearHistory = () => {
               margin: '0 auto 28px auto',
             }}
           >
-            <strong>{meta.name || 'Your restaurant'}</strong> is currently on the <strong>Standard Plan (Digital QR Menu)</strong>. Upgrade to VIP to activate full contactless table ordering and kitchen dispatch tablets.
+            <strong>{meta.name || 'Your restaurant'}</strong> is currently on the <strong>Basic Plan (Digital QR Menu)</strong>. Upgrade to Plus to activate full contactless table ordering and kitchen dispatch tablets.
           </p>
 
           {/* Feature Comparison Grid */}
@@ -411,7 +412,7 @@ const confirmClearHistory = () => {
                 }}
               >
                 <span>🚀</span>
-                <span>Upgrade to VIP Tier (Instant Activation)</span>
+                <span>Upgrade to Plus (Instant Activation)</span>
               </button>
             )}
 

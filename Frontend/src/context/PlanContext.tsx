@@ -1,4 +1,6 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import type { PlanTier } from '../types';
+import { hasPlan } from '../utils/plan';
 
 // ─── Plan Feature Matrix ─────────────────────────────────────────────────────
 
@@ -9,57 +11,57 @@ import { createContext, useContext, useMemo, type ReactNode } from 'react';
 export interface PlanFeatures {
   /**
    * Customer: Can add items to cart and place orders to the kitchen.
-   * VIP only.
+   * Plus and Pro.
    */
   ordering: boolean;
 
   /**
    * Customer: Can view live order status after placing an order.
-   * VIP only.
+   * Plus and Pro.
    */
   orderStatus: boolean;
 
   /**
    * Admin: Can view and manage the Kitchen Display System (KDS) board.
-   * VIP only.
+   * Plus and Pro.
    */
   liveKDS: boolean;
 
   /**
    * Admin: Can manage dine-in tables and generate QR codes.
-   * VIP only.
+   * Plus and Pro.
    */
   tables: boolean;
 
   /**
    * Shared: Dietary tags (spicy, vegetarian, gluten-free, etc.) and
-   * allergen information are always shown — on both Standard and VIP.
+   * allergen information are always shown — on every plan.
    * This is here for explicitness, not gating.
    */
   dietaryInfo: boolean;
 
   /**
-   * Shared: Weight labels, item variants (read-only for Standard),
+   * Shared: Weight labels, item variants (read-only for Basic),
    * and item detail modals are available on both tiers.
    */
   itemDetails: boolean;
 }
 
 export interface PlanContextValue {
-  plan: 'standard' | 'vip';
+  plan: PlanTier;
   features: PlanFeatures;
 }
 
 // ─── Feature Matrix per Plan ──────────────────────────────────────────────────
 
-function buildFeatures(plan: 'standard' | 'vip'): PlanFeatures {
-  const isVIP = plan === 'vip';
+function buildFeatures(plan: PlanTier): PlanFeatures {
+  const hasOrdering = hasPlan(plan, 'plus');
   return {
-    // VIP-only features
-    ordering: isVIP,
-    orderStatus: isVIP,
-    liveKDS: isVIP,
-    tables: isVIP,
+    // Plus and Pro features
+    ordering: hasOrdering,
+    orderStatus: hasOrdering,
+    liveKDS: hasOrdering,
+    tables: hasOrdering,
     // Shared features — always enabled
     dietaryInfo: true,
     itemDetails: true,
@@ -75,7 +77,7 @@ PlanContext.displayName = 'PlanContext';
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 interface PlanProviderProps {
-  plan: 'standard' | 'vip';
+  plan: PlanTier;
   children: ReactNode;
 }
 
@@ -86,7 +88,7 @@ interface PlanProviderProps {
  * or localStorage.
  *
  * Usage:
- *   <PlanProvider plan={menu.plan ?? 'standard'}>
+ *   <PlanProvider plan={menu.plan ?? 'basic'}>
  *     <ModernMenuPage ... />
  *   </PlanProvider>
  */

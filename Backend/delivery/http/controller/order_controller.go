@@ -1,11 +1,14 @@
 package controller
 
 import (
+	"errors"
+	"log"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"menu-backend/delivery/http/middleware"
 	"menu-backend/domain"
@@ -14,13 +17,21 @@ import (
 
 type OrderController struct {
 	orderUsecase domain.OrderUsecase
+	billUsecase  domain.BillUsecase
 	hub          *ws.Hub
+	// notifier sends targeted alerts to live screens and, with push on, to locked phones
+	notifier domain.Notifier
 }
 
-func NewOrderController(orderUsecase domain.OrderUsecase, hub *ws.Hub) *OrderController {
+func NewOrderController(orderUsecase domain.OrderUsecase, billUsecase domain.BillUsecase, hub *ws.Hub, notifier domain.Notifier) *OrderController {
+	if notifier == nil && hub != nil {
+		notifier = hub
+	}
 	return &OrderController{
 		orderUsecase: orderUsecase,
+		billUsecase:  billUsecase,
 		hub:          hub,
+		notifier:     notifier,
 	}
 }
 
@@ -44,7 +55,6 @@ type PlaceOrderRequest struct {
 	TableToken  string             `json:"table_token" binding:"max=128"`
 	Items       []OrderItemRequest `json:"items" binding:"required,min=1,max=50"`
 }
-
 
 // PlaceOrder handles POST /api/v1/menus/:slug/orders
 // Customers place an order. Initiates the 60-second Undo window.
@@ -100,6 +110,13 @@ func (ctrl *OrderController) PlaceOrder(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	// Pro: the order goes on its table's bill (opening one for the table's first order)
+	if ctrl.billUsecase != nil {
+		if err := ctrl.billUsecase.AttachOrder(c.Request.Context(), tenant, order); err != nil {
+			log.Printf("order %s: could not put it on the table's bill: %v", order.ID, err)
+		}
 	}
 
 	// Broadcast real-time order to the restaurant's private kitchen tablet room
@@ -202,7 +219,6 @@ func (ctrl *OrderController) ListActiveOrders(c *gin.Context) {
 		return
 	}
 
-
 	orders, err := ctrl.orderUsecase.GetActiveKitchenOrders(c.Request.Context(), tenantID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch kitchen orders"})
@@ -253,7 +269,22 @@ func (ctrl *OrderController) UpdateOrderStatus(c *gin.Context) {
 		return
 	}
 
-	if err := ctrl.orderUsecase.UpdateKitchenStatus(c.Request.Context(), tenantID, orderID, orderStatus); err != nil {
+	claims, ok := middleware.GetAuthClaims(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+		return
+	}
+	actor := domain.Actor{ID: claims.UserID, Role: domain.NormalizeRole(claims.Role)}
+
+	order, err := ctrl.orderUsecase.UpdateKitchenStatus(c.Request.Context(), actor, tenantID, orderID, orderStatus)
+	switch {
+	case errors.Is(err, domain.ErrStatusNotAllowed):
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	case errors.Is(err, pgx.ErrNoRows):
+		c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
+		return
+	case err != nil:
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update order status"})
 		return
 	}
@@ -261,9 +292,17 @@ func (ctrl *OrderController) UpdateOrderStatus(c *gin.Context) {
 	// Broadcast status update event to all staff tablets in this restaurant
 	if ctrl.hub != nil {
 		ctrl.hub.BroadcastToTenant(tenantID, "order:status_updated", gin.H{
-			"order_id": orderID,
-			"status":   orderStatus,
+			"order_id":     orderID,
+			"status":       orderStatus,
+			"table_number": order.TableNumber,
 		})
+		// Food ready rings a bell for the table's waiter only (or the managers without one)
+		if orderStatus == domain.StatusReady {
+			ctrl.notifier.NotifyStaff(tenantID, domain.WaiterOrManagers(order.WaiterID), "order:ready", gin.H{
+				"order_id":     orderID,
+				"table_number": order.TableNumber,
+			})
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -271,6 +310,29 @@ func (ctrl *OrderController) UpdateOrderStatus(c *gin.Context) {
 		"order_id": orderID,
 		"status":   orderStatus,
 	})
+}
+
+// MyTables handles GET /api/v1/admin/my-tables
+// A waiter gets the tables they look after with their open orders; a manager gets every table
+func (ctrl *OrderController) MyTables(c *gin.Context) {
+	tenantID, ok := middleware.GetTenantIDFromContext(c)
+	claims, hasClaims := middleware.GetAuthClaims(c)
+	if !ok || !hasClaims {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+		return
+	}
+
+	waiterID := uuid.Nil
+	if domain.NormalizeRole(claims.Role) == domain.RoleWaiter {
+		waiterID = claims.UserID
+	}
+
+	tables, err := ctrl.orderUsecase.TablesWithOrders(c.Request.Context(), tenantID, waiterID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load tables"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": tables})
 }
 
 // CancelTableOrders handles DELETE /api/v1/admin/orders/table/:number

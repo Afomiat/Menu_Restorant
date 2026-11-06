@@ -6,7 +6,7 @@ import type { RestaurantMeta } from '../types';
 let currentMeta: RestaurantMeta;
 
 vi.mock('../hooks/useRestaurantMenu', () => ({
-  default: () => ({ meta: currentMeta, categories: [], items: [], loading: false, error: null, plan: 'standard' }),
+  default: () => ({ meta: currentMeta, categories: [], items: [], loading: false, error: null, plan: 'basic' }),
 }));
 vi.mock('../templates/modern/ModernMenuPage', () => ({ default: () => <div>Modern design</div> }));
 vi.mock('../templates/classic/ClassicMenuPage', () => ({ default: () => <div>Classic design</div> }));

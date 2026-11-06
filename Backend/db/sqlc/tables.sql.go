@@ -14,7 +14,7 @@ import (
 const createTable = `-- name: CreateTable :one
 INSERT INTO restaurant_tables (tenant_id, table_number, qr_secret, is_active)
 VALUES ($1, $2, $3, $4)
-RETURNING id, tenant_id, table_number, qr_secret, is_active
+RETURNING id, tenant_id, table_number, qr_secret, is_active, assigned_waiter_id
 `
 
 type CreateTableParams struct {
@@ -38,12 +38,13 @@ func (q *Queries) CreateTable(ctx context.Context, arg CreateTableParams) (Resta
 		&i.TableNumber,
 		&i.QrSecret,
 		&i.IsActive,
+		&i.AssignedWaiterID,
 	)
 	return i, err
 }
 
 const getTableByNumber = `-- name: GetTableByNumber :one
-SELECT id, tenant_id, table_number, qr_secret, is_active
+SELECT id, tenant_id, table_number, qr_secret, is_active, assigned_waiter_id
 FROM restaurant_tables
 WHERE tenant_id = $1 AND table_number = $2 AND is_active = TRUE
 LIMIT 1
@@ -63,32 +64,47 @@ func (q *Queries) GetTableByNumber(ctx context.Context, arg GetTableByNumberPara
 		&i.TableNumber,
 		&i.QrSecret,
 		&i.IsActive,
+		&i.AssignedWaiterID,
 	)
 	return i, err
 }
 
 const listTablesByTenant = `-- name: ListTablesByTenant :many
-SELECT id, tenant_id, table_number, qr_secret, is_active
-FROM restaurant_tables
-WHERE tenant_id = $1 AND is_active = TRUE
-ORDER BY table_number ASC
+SELECT t.id, t.tenant_id, t.table_number, t.qr_secret, t.is_active, t.assigned_waiter_id,
+       COALESCE(u.full_name, '')::text AS assigned_waiter_name
+FROM restaurant_tables t
+LEFT JOIN users u ON u.id = t.assigned_waiter_id
+WHERE t.tenant_id = $1 AND t.is_active = TRUE
+ORDER BY t.table_number ASC
 `
 
-func (q *Queries) ListTablesByTenant(ctx context.Context, tenantID pgtype.UUID) ([]RestaurantTable, error) {
+type ListTablesByTenantRow struct {
+	ID                 pgtype.UUID `json:"id"`
+	TenantID           pgtype.UUID `json:"tenant_id"`
+	TableNumber        string      `json:"table_number"`
+	QrSecret           string      `json:"qr_secret"`
+	IsActive           bool        `json:"is_active"`
+	AssignedWaiterID   pgtype.UUID `json:"assigned_waiter_id"`
+	AssignedWaiterName string      `json:"assigned_waiter_name"`
+}
+
+func (q *Queries) ListTablesByTenant(ctx context.Context, tenantID pgtype.UUID) ([]ListTablesByTenantRow, error) {
 	rows, err := q.db.Query(ctx, listTablesByTenant, tenantID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []RestaurantTable{}
+	items := []ListTablesByTenantRow{}
 	for rows.Next() {
-		var i RestaurantTable
+		var i ListTablesByTenantRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.TenantID,
 			&i.TableNumber,
 			&i.QrSecret,
 			&i.IsActive,
+			&i.AssignedWaiterID,
+			&i.AssignedWaiterName,
 		); err != nil {
 			return nil, err
 		}
@@ -128,6 +144,33 @@ func (q *Queries) UpdateTableQRSecret(ctx context.Context, arg UpdateTableQRSecr
 		&i.TenantID,
 		&i.TableNumber,
 		&i.QrSecret,
+	)
+	return i, err
+}
+
+const updateTableWaiter = `-- name: UpdateTableWaiter :one
+UPDATE restaurant_tables
+SET assigned_waiter_id = $3
+WHERE id = $1 AND tenant_id = $2
+RETURNING id, tenant_id, table_number, qr_secret, is_active, assigned_waiter_id
+`
+
+type UpdateTableWaiterParams struct {
+	ID               pgtype.UUID `json:"id"`
+	TenantID         pgtype.UUID `json:"tenant_id"`
+	AssignedWaiterID pgtype.UUID `json:"assigned_waiter_id"`
+}
+
+func (q *Queries) UpdateTableWaiter(ctx context.Context, arg UpdateTableWaiterParams) (RestaurantTable, error) {
+	row := q.db.QueryRow(ctx, updateTableWaiter, arg.ID, arg.TenantID, arg.AssignedWaiterID)
+	var i RestaurantTable
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.TableNumber,
+		&i.QrSecret,
+		&i.IsActive,
+		&i.AssignedWaiterID,
 	)
 	return i, err
 }

@@ -102,7 +102,7 @@ export default function ClassicHeader({
             variant="classic"
           />
 
-          {/* Shopping Bag Icon with Count Badge (VIP Only) */}
+          {/* Shopping Bag Icon with Count Badge (Plus and Pro) */}
           {can('ordering') ? (
             <button
               onClick={onCartClick}

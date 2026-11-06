@@ -12,9 +12,9 @@ import (
 )
 
 const createMenuItem = `-- name: CreateMenuItem :one
-INSERT INTO menu_items (tenant_id, category_id, name, description, price, image_url, tags, is_available, is_sold_out)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING id, tenant_id, category_id, name, description, price, image_url, tags, is_available, is_sold_out, created_at
+INSERT INTO menu_items (tenant_id, category_id, name, description, price, image_url, tags, is_available, is_sold_out, prep_minutes)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+RETURNING id, tenant_id, category_id, name, description, price, image_url, tags, is_available, is_sold_out, created_at, prep_minutes
 `
 
 type CreateMenuItemParams struct {
@@ -27,6 +27,7 @@ type CreateMenuItemParams struct {
 	Tags        []string       `json:"tags"`
 	IsAvailable bool           `json:"is_available"`
 	IsSoldOut   bool           `json:"is_sold_out"`
+	PrepMinutes pgtype.Int4    `json:"prep_minutes"`
 }
 
 func (q *Queries) CreateMenuItem(ctx context.Context, arg CreateMenuItemParams) (MenuItem, error) {
@@ -40,6 +41,7 @@ func (q *Queries) CreateMenuItem(ctx context.Context, arg CreateMenuItemParams) 
 		arg.Tags,
 		arg.IsAvailable,
 		arg.IsSoldOut,
+		arg.PrepMinutes,
 	)
 	var i MenuItem
 	err := row.Scan(
@@ -54,6 +56,7 @@ func (q *Queries) CreateMenuItem(ctx context.Context, arg CreateMenuItemParams) 
 		&i.IsAvailable,
 		&i.IsSoldOut,
 		&i.CreatedAt,
+		&i.PrepMinutes,
 	)
 	return i, err
 }
@@ -74,7 +77,7 @@ func (q *Queries) DeleteMenuItem(ctx context.Context, arg DeleteMenuItemParams) 
 }
 
 const getMenuItemByID = `-- name: GetMenuItemByID :one
-SELECT id, tenant_id, category_id, name, description, price, image_url, tags, is_available, is_sold_out, created_at
+SELECT id, tenant_id, category_id, name, description, price, image_url, tags, is_available, is_sold_out, created_at, prep_minutes
 FROM menu_items
 WHERE id = $1 AND tenant_id = $2
 LIMIT 1
@@ -100,6 +103,7 @@ func (q *Queries) GetMenuItemByID(ctx context.Context, arg GetMenuItemByIDParams
 		&i.IsAvailable,
 		&i.IsSoldOut,
 		&i.CreatedAt,
+		&i.PrepMinutes,
 	)
 	return i, err
 }
@@ -175,7 +179,7 @@ func (q *Queries) GetModifierByIDAndMenuItemID(ctx context.Context, arg GetModif
 }
 
 const listMenuItemsByCategory = `-- name: ListMenuItemsByCategory :many
-SELECT id, tenant_id, category_id, name, description, price, image_url, tags, is_available, is_sold_out, created_at
+SELECT id, tenant_id, category_id, name, description, price, image_url, tags, is_available, is_sold_out, created_at, prep_minutes
 FROM menu_items
 WHERE tenant_id = $1 AND category_id = $2 AND is_available = TRUE
 ORDER BY name ASC
@@ -207,6 +211,7 @@ func (q *Queries) ListMenuItemsByCategory(ctx context.Context, arg ListMenuItems
 			&i.IsAvailable,
 			&i.IsSoldOut,
 			&i.CreatedAt,
+			&i.PrepMinutes,
 		); err != nil {
 			return nil, err
 		}
@@ -219,7 +224,7 @@ func (q *Queries) ListMenuItemsByCategory(ctx context.Context, arg ListMenuItems
 }
 
 const listMenuItemsByTenant = `-- name: ListMenuItemsByTenant :many
-SELECT id, tenant_id, category_id, name, description, price, image_url, tags, is_available, is_sold_out, created_at
+SELECT id, tenant_id, category_id, name, description, price, image_url, tags, is_available, is_sold_out, created_at, prep_minutes
 FROM menu_items
 WHERE tenant_id = $1 AND is_available = TRUE
 ORDER BY name ASC
@@ -246,6 +251,7 @@ func (q *Queries) ListMenuItemsByTenant(ctx context.Context, tenantID pgtype.UUI
 			&i.IsAvailable,
 			&i.IsSoldOut,
 			&i.CreatedAt,
+			&i.PrepMinutes,
 		); err != nil {
 			return nil, err
 		}
@@ -291,9 +297,9 @@ func (q *Queries) ToggleMenuItemSoldOut(ctx context.Context, arg ToggleMenuItemS
 
 const updateMenuItem = `-- name: UpdateMenuItem :one
 UPDATE menu_items
-SET category_id = $3, name = $4, description = $5, price = $6, image_url = $7, tags = $8, is_available = $9
+SET category_id = $3, name = $4, description = $5, price = $6, image_url = $7, tags = $8, is_available = $9, prep_minutes = $10
 WHERE id = $1 AND tenant_id = $2
-RETURNING id, tenant_id, category_id, name, description, price, image_url, tags, is_available, is_sold_out, created_at
+RETURNING id, tenant_id, category_id, name, description, price, image_url, tags, is_available, is_sold_out, created_at, prep_minutes
 `
 
 type UpdateMenuItemParams struct {
@@ -306,6 +312,7 @@ type UpdateMenuItemParams struct {
 	ImageUrl    string         `json:"image_url"`
 	Tags        []string       `json:"tags"`
 	IsAvailable bool           `json:"is_available"`
+	PrepMinutes pgtype.Int4    `json:"prep_minutes"`
 }
 
 func (q *Queries) UpdateMenuItem(ctx context.Context, arg UpdateMenuItemParams) (MenuItem, error) {
@@ -319,6 +326,7 @@ func (q *Queries) UpdateMenuItem(ctx context.Context, arg UpdateMenuItemParams) 
 		arg.ImageUrl,
 		arg.Tags,
 		arg.IsAvailable,
+		arg.PrepMinutes,
 	)
 	var i MenuItem
 	err := row.Scan(
@@ -333,6 +341,7 @@ func (q *Queries) UpdateMenuItem(ctx context.Context, arg UpdateMenuItemParams) 
 		&i.IsAvailable,
 		&i.IsSoldOut,
 		&i.CreatedAt,
+		&i.PrepMinutes,
 	)
 	return i, err
 }

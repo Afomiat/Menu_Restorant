@@ -53,7 +53,7 @@ export default function ClassicMenuPage({
   restaurantSlug,
   tableNumber,
 }: ClassicMenuPageProps) {
-  const { can } = useFeatureGate();
+  const { can, hasPlan } = useFeatureGate();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('');
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
@@ -72,11 +72,15 @@ export default function ClassicMenuPage({
     totalCartItems,
     resolvedTable,
     isTableVerified,
+    billAsked,
+    billError,
+    handleRequestBill,
   } = useMenuCart({
     restaurantSlug,
     items,
     loading: false,
     tableNumber,
+    oneOrderPerCart: hasPlan('pro'),
   });
 
   // Set initial active category once data loads
@@ -278,7 +282,7 @@ export default function ClassicMenuPage({
         }}
       />
 
-      {/* Bottom Cart Drawer (VIP Only) */}
+      {/* Bottom Cart Drawer (Plus and Pro) */}
       {can('ordering') && (
         <ClassicCartDrawer
           cart={cart}
@@ -293,6 +297,9 @@ export default function ClassicMenuPage({
           placedOrders={placedOrders}
           onUndoOrder={handleUndoOrder}
           orderError={orderError}
+          onAskBill={hasPlan('pro') && isTableVerified ? handleRequestBill : undefined}
+          billAsked={billAsked}
+          billError={billError}
         />
       )}
 

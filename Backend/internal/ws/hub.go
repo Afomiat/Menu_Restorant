@@ -6,6 +6,8 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
+
+	"menu-backend/domain"
 )
 
 type TenantMessage struct {
@@ -14,6 +16,29 @@ type TenantMessage struct {
 	Data     interface{} `json:"data"`
 	// public messages also reach customers' menu pages; all others go to staff screens only
 	public bool
+	// audience, when set, limits a staff message to these roles and people
+	audience *domain.Audience
+}
+
+// reaches reports whether a message goes to this client
+func (m TenantMessage) reaches(c *Client) bool {
+	if c.guest {
+		return m.public
+	}
+	if m.audience == nil {
+		return true
+	}
+	for _, role := range m.audience.Roles {
+		if c.role == role {
+			return true
+		}
+	}
+	for _, id := range m.audience.UserIDs {
+		if c.userID == id {
+			return true
+		}
+	}
+	return false
 }
 
 // maxGuestsPerRestaurant caps how many customer menu pages one restaurant room holds
@@ -79,7 +104,7 @@ func (h *Hub) Run() {
 				payload, err := json.Marshal(msg)
 				if err == nil {
 					for client := range clients {
-						if client.guest && !msg.public {
+						if !msg.reaches(client) {
 							continue
 						}
 						select {
@@ -105,6 +130,17 @@ func (h *Hub) BroadcastToTenant(tenantID uuid.UUID, event string, data interface
 		TenantID: tenantID,
 		Event:    event,
 		Data:     data,
+	}
+}
+
+// NotifyStaff sends an event only to the staff screens in the audience, for example the
+// waiter of one table or the restaurant's managers
+func (h *Hub) NotifyStaff(tenantID uuid.UUID, to domain.Audience, event string, data interface{}) {
+	h.broadcast <- TenantMessage{
+		TenantID: tenantID,
+		Event:    event,
+		Data:     data,
+		audience: &to,
 	}
 }
 

@@ -1,4 +1,6 @@
 import type {
+  PlanTier,
+  TenantSettings,
   RestaurantMenu,
   MenuItem,
   Category,
@@ -10,6 +12,7 @@ import type {
 } from '../types';
 import { CANONICAL_MODERN_CATEGORIES, CANONICAL_MODERN_ITEMS } from '../data/modernMenuDefaults';
 import { apiClient, ApiError } from './apiClient';
+import { normalizePlan } from '../utils/plan';
 
 export class MenuServiceError extends Error {
   code: 'not-found' | 'network' | 'invalid-data';
@@ -53,7 +56,7 @@ function mapBackendToRestaurantMenu(data: BackendFullMenuResponse['data']): Rest
     deliveryAddress: rawTheme.address ? String(rawTheme.address) : undefined,
     logoUrl: rawTheme.logoUrl ? String(rawTheme.logoUrl) : undefined,
     openingHours: rawTheme.openingHours ? String(rawTheme.openingHours) : undefined,
-    plan: getEffectiveTenantPlan(tenant.slug, tenant.plan),
+    plan: normalizePlan(tenant.plan),
     slug: tenant.slug,
   };
 
@@ -76,9 +79,10 @@ function mapBackendToRestaurantMenu(data: BackendFullMenuResponse['data']): Rest
       ? (item.tags as string).toLowerCase().split(/[\s,]+/).filter(Boolean) as any
       : [],
     available: item.is_available && !item.is_sold_out,
+    prepMinutes: item.prep_minutes ?? null,
   }));
 
-  return { meta, categories, items, plan: meta.plan || 'standard' };
+  return { meta, categories, items, plan: meta.plan || 'basic' };
 }
 
 /**
@@ -120,7 +124,7 @@ function sanitizeMenuData(raw: any): RestaurantMenu {
     heroTitle: raw.meta?.heroTitle ? String(raw.meta.heroTitle) : undefined,
     heroSubtitle: raw.meta?.heroSubtitle ? String(raw.meta.heroSubtitle) : undefined,
     heroBadges: Array.isArray(raw.meta?.heroBadges) ? raw.meta.heroBadges.map(String) : undefined,
-    plan: raw.plan === 'vip' || raw.meta?.plan === 'vip' ? 'vip' : 'standard',
+    plan: normalizePlan(raw.plan ?? raw.meta?.plan),
   };
 
   // 1. Categories: Preserve custom categories or fallback to defaults (excluding any redundant 'all' category)
@@ -280,7 +284,11 @@ const SAVED_MENU_PREFIX = 'azai:menu:';
 export function getSavedMenu(slug: string): RestaurantMenu | null {
   try {
     const raw = localStorage.getItem(`${SAVED_MENU_PREFIX}${slug.toLowerCase().trim()}`);
-    return raw ? (JSON.parse(raw) as RestaurantMenu) : null;
+    if (!raw) return null;
+    const menu = JSON.parse(raw) as RestaurantMenu;
+    // Menus saved before the Basic / Plus / Pro rename still say 'standard' or 'vip'
+    const plan = normalizePlan(menu.meta?.plan ?? menu.plan);
+    return { ...menu, plan, meta: { ...menu.meta, plan } };
   } catch {
     return null;
   }
@@ -391,6 +399,8 @@ export async function createAdminItem(item: {
   price: number;
   imageUrl?: string;
   tags?: string[];
+  /** Pro: minutes the dish takes; null uses the restaurant default. */
+  prepMinutes?: number | null;
 }): Promise<BackendMenuItem> {
   const res = await apiClient.post<{ message: string; data: BackendMenuItem }>('/admin/items', {
     category_id: item.categoryId,
@@ -399,6 +409,7 @@ export async function createAdminItem(item: {
     price: item.price,
     image_url: item.imageUrl || '',
     tags: item.tags || [],
+    prep_minutes: item.prepMinutes ?? null,
   });
   return res.data;
 }
@@ -413,6 +424,7 @@ export async function updateAdminItem(
     imageUrl?: string;
     tags?: string[];
     isAvailable?: boolean;
+    prepMinutes?: number | null;
   }
 ): Promise<BackendMenuItem> {
   const res = await apiClient.put<{ message: string; data: BackendMenuItem }>(`/admin/items/${id}`, {
@@ -423,6 +435,7 @@ export async function updateAdminItem(
     image_url: item.imageUrl || '',
     tags: item.tags || [],
     is_available: item.isAvailable !== false,
+    prep_minutes: item.prepMinutes ?? null,
   });
   return res.data;
 }
@@ -467,6 +480,12 @@ export async function updateAdminTenantTheme(themeConfig: Record<string, any>): 
 /**
  * Fetches live restaurant tenant profile from PostgreSQL
  */
+/** Pro manager: change prep and reminder times; only the fields sent change. */
+export async function updateTenantSettings(changes: Partial<TenantSettings>): Promise<TenantSettings> {
+  const res = await apiClient.patch<{ data: TenantSettings }>('/admin/tenant/settings', changes);
+  return res.data;
+}
+
 export async function fetchAdminTenantProfile(): Promise<RestaurantMeta | null> {
   try {
     const res = await apiClient.get<{ data: any }>('/admin/tenant');
@@ -475,7 +494,8 @@ export async function fetchAdminTenantProfile(): Promise<RestaurantMeta | null> 
         name: res.data.name,
         slug: res.data.slug,
         currency: res.data.currency || 'ETB',
-        plan: res.data.plan,
+        plan: normalizePlan(res.data.plan),
+        settings: res.data.settings,
         ...(res.data.theme_config || {}),
       };
     }
@@ -501,7 +521,7 @@ export interface ActiveTenantInfo {
   id: string;
   slug: string;
   name: string;
-  plan: 'standard' | 'vip';
+  plan: PlanTier;
   currency: string;
   theme_config?: Record<string, any>;
   is_active: boolean;
@@ -513,21 +533,11 @@ export interface ActiveTenantInfo {
 export async function fetchActiveRestaurants(): Promise<ActiveTenantInfo[]> {
   try {
     const res = await apiClient.get<{ data: ActiveTenantInfo[] }>('/restaurants');
-    return res?.data || [];
+    return (res?.data || []).map((tenant) => ({ ...tenant, plan: normalizePlan(tenant.plan) }));
   } catch (err) {
     console.warn('[menuService] Failed to fetch active restaurants:', err);
     return [];
   }
 }
 
-/**
- * Returns the active plan tier ('standard' or 'vip').
- *
- * The plan is derived exclusively from the backend API response (PostgreSQL tenants.plan).
- * There is intentionally no URL or localStorage override — plan spoofing via ?plan=vip
- * is not possible in production. The backend enforces the real access control.
- */
-export function getEffectiveTenantPlan(_slug: string, backendPlan?: 'standard' | 'vip'): 'standard' | 'vip' {
-  return backendPlan || 'standard';
-}
 

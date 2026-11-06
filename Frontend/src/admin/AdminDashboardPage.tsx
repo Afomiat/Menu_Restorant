@@ -23,13 +23,51 @@ import {
   toggleAdminItemSoldOut,
   updateOrderStatus,
   updateTableOrdersStatus,
+  isTableActionTarget,
   cancelTableOrders,
   cancelAllActiveOrders,
   clearCompletedOrders,
 } from '../services/orderService';
-import { getAdminToken, clearAdminToken } from '../services/apiClient';
+import { getAdminToken, clearAdminToken, getStoredStaff, type StaffUser } from '../services/apiClient';
+import { canManage, canUseKitchen, normalizeRole } from '../utils/roles';
+import { t } from '../i18n/en';
+import AdminStaffModal from './AdminStaffModal';
+import AdminRoleHome from './AdminRoleHome';
+import ProKitchenBoard from './ProKitchenBoard';
+import WaiterTablesScreen, { type ReadyAlert } from './WaiterTablesScreen';
+import BillsScreen from './BillsScreen';
+import DecisionsScreen from './DecisionsScreen';
+import ReportsScreen from './ReportsScreen';
+import type { AdminView } from './AdminSidebar';
+import { useBell } from '../hooks/useBell';
+import { hasPlan } from '../utils/plan';
+
+/** When cooking started: kept while cooking or later, set now when it starts, cleared when moved back to new. */
+function startedAtFor(row: CartItem, status: OrderStatus): number | undefined {
+  if (status === 'preparing') return row.startedAt ?? Date.now();
+  if (status === 'not_started' || status === 'pending_grace') return undefined;
+  return row.startedAt;
+}
+
+/** A live bill, table or shift alert shown as a banner until dismissed. */
+interface StaffAlert {
+  key: string;
+  event: string;
+  tableNumber: string;
+}
+
+// Alerts that ring the friendly bell; the rest use the alert sound
+const BELL_ALERTS = new Set(['bill:requested', 'bill:collected', 'bill:handed_over']);
+
+interface VeryLateAlert {
+  orderId: string;
+  tableNumber: string;
+  cookingMinutes: number;
+  targetMinutes: number;
+}
 import { useKitchenWebSocket } from '../hooks/useKitchenWebSocket';
-import type { MenuItem, Category, RestaurantMeta, RestaurantMenu, CartItem, OrderStatus } from '../types';
+import type { MenuItem, Category, RestaurantMeta, RestaurantMenu, CartItem, OrderStatus, PlanTier } from '../types';
+import { PLAN_INFO } from '../utils/plan';
 import { matchesSearchQuery } from '../utils/search';
 import SkeletonLoader from '../components/common/SkeletonLoader';
 import NotFoundPage from '../pages/NotFoundPage';
@@ -57,11 +95,11 @@ export default function AdminDashboardPage() {
     useRestaurantMenu(slug);
 
   // The plan tier is derived exclusively from the backend API response (PostgreSQL tenants.plan).
-  // It is NOT overridable from the UI — the backend RequireVIPPlan middleware is the real gate.
-  const planFromBackend: 'standard' | 'vip' = initialMeta?.plan || 'standard';
+  // It is NOT overridable from the UI — the backend RequirePlan middleware is the real gate.
+  const planFromBackend: PlanTier = initialMeta?.plan || 'basic';
 
   // Active top-level view: 'menu' (Dashboard/Dishes) or 'kitchen' (Live KDS Orders)
-  const [activeView, setActiveView] = useState<'menu' | 'kitchen'>('menu');
+  const [activeView, setActiveView] = useState<AdminView>('menu');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Local editable state
@@ -154,12 +192,56 @@ export default function AdminDashboardPage() {
   }, [initialMeta, initialCategories, initialItems]);
 
   const [adminToken, setAdminToken] = useState<string | null>(getAdminToken());
+  const [staffUser, setStaffUser] = useState<StaffUser | null>(getStoredStaff());
+  const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
 
-  // Live WebSocket feed for real-time Kitchen Display System (VIP Plan)
+  // Each role sees its own screen. The backend enforces the same rules on every request.
+  const staffRole = adminToken ? normalizeRole(staffUser?.role) ?? 'manager' : null;
+  const isManager = canManage(staffRole);
+  const viewToShow: AdminView = staffRole === 'chef' ? 'kitchen' : activeView;
+
+  // Pro screens: the kitchen board, the waiter's tables, bells and alerts
+  const isPro = hasPlan(planFromBackend, 'pro');
+  const bell = useBell();
+  const [readyAlerts, setReadyAlerts] = useState<ReadyAlert[]>([]);
+  const [veryLateAlerts, setVeryLateAlerts] = useState<VeryLateAlert[]>([]);
+  const [staffAlerts, setStaffAlerts] = useState<StaffAlert[]>([]);
+  const [ordersChanged, setOrdersChanged] = useState(0);
+  const markOrdersChanged = () => setOrdersChanged((n) => n + 1);
+
+  // Live WebSocket feed for real-time Kitchen Display System (Plus and Pro)
   useKitchenWebSocket({
     token: adminToken,
+    // Pro screens ring their own bell (the kitchen for new orders, waiters for their tables)
+    chimeOnNewOrder: !isPro,
+    onOrderReady: (data) => {
+      if (!data?.order_id) return;
+      setReadyAlerts((prev) =>
+        prev.some((a) => a.orderId === data.order_id) ? prev : [...prev, { orderId: data.order_id, tableNumber: data.table_number }]
+      );
+      bell.ring('bell');
+      markOrdersChanged();
+    },
+    onStaffAlert: (event, data) => {
+      const key = `${event}:${data.bill_id || data.table_number || Date.now()}`;
+      setStaffAlerts((prev) =>
+        prev.some((a) => a.key === key) ? prev : [...prev, { key, event, tableNumber: data.table_number || '' }]
+      );
+      bell.ring(BELL_ALERTS.has(event) ? 'bell' : 'alert');
+      markOrdersChanged();
+    },
+    onOrderVeryLate: (data) => {
+      if (!data?.order_id) return;
+      setVeryLateAlerts((prev) =>
+        prev.some((a) => a.orderId === data.order_id)
+          ? prev
+          : [...prev, { orderId: data.order_id, tableNumber: data.table_number, cookingMinutes: data.cooking_minutes, targetMinutes: data.target_minutes }]
+      );
+      bell.ring('alert');
+    },
     onOrderCreated: (orderData: any) => {
       if (!orderData) return;
+      markOrdersChanged();
       const newItems = mapBackendOrderToCartItems(orderData, items);
       setKitchenOrders((prev) => {
         const filtered = prev.filter((o) => o.orderId !== orderData.id);
@@ -182,9 +264,10 @@ export default function AdminDashboardPage() {
     },
     onOrderStatusUpdated: (orderId: string, status: string) => {
       if (!orderId || !status) return;
+      markOrdersChanged();
       const mapped = mapBackendStatusToFrontend(status);
       setKitchenOrders((prev) => {
-        const updated = prev.map((o) => (o.orderId === orderId ? { ...o, status: mapped } : o));
+        const updated = prev.map((o) => (o.orderId === orderId ? { ...o, status: mapped, startedAt: startedAtFor(o, mapped) } : o));
         saveRestaurantOrders(slug, updated);
         return updated;
       });
@@ -193,8 +276,12 @@ export default function AdminDashboardPage() {
 
   // Listen for unauthorized 401 events to prompt login
   useEffect(() => {
-    const handleUnauthorized = () => {
+    const handleUnauthorized = (event: Event) => {
       setAdminToken(null);
+      setStaffUser(null);
+      if ((event as CustomEvent<{ code?: string }>).detail?.code === 'STAFF_INACTIVE') {
+        setLoginNotice(t.inactiveNotice);
+      }
     };
     window.addEventListener('azai:auth:unauthorized', handleUnauthorized);
     return () => window.removeEventListener('azai:auth:unauthorized', handleUnauthorized);
@@ -226,8 +313,9 @@ export default function AdminDashboardPage() {
   }, [adminToken, liveTenantSlug]);
 
   // Authoritatively fetch active kitchen orders from PostgreSQL backend
+  const canSeeKitchen = canUseKitchen(staffRole);
   useEffect(() => {
-    if (!adminToken) {
+    if (!adminToken || !canSeeKitchen) {
       return;
     }
 
@@ -241,11 +329,13 @@ export default function AdminDashboardPage() {
         saveRestaurantOrders(slug, []);
       }
     });
-  }, [slug, items, adminToken]);
+  }, [slug, items, adminToken, canSeeKitchen]);
 
   const handleLogout = () => {
     clearAdminToken();
     setAdminToken(null);
+    setStaffUser(null);
+    setActiveView('menu');
     showToast('Signed out of staff console');
   };
 
@@ -254,7 +344,7 @@ export default function AdminDashboardPage() {
     // 1. Optimistically update local React state immediately (0ms perceived latency)
     setKitchenOrders((prev) => {
       const updated = prev.map((o) =>
-        o.orderId === orderId ? { ...o, status, statusUpdatedAt: Date.now() } : o
+        o.orderId === orderId ? { ...o, status, statusUpdatedAt: Date.now(), startedAt: startedAtFor(o, status) } : o
       );
       saveRestaurantOrders(slug, updated);
       return updated;
@@ -268,18 +358,14 @@ export default function AdminDashboardPage() {
   };
 
   const handleKitchenTableStatusChange = (tableNumber: string, status: OrderStatus) => {
-    // 1. Optimistically update all orders at this table immediately
-    setKitchenOrders((prev) => {
-      const updated = prev.map((o) =>
-        o.tableNumber === tableNumber && o.status !== 'complete' && o.status !== 'cancelled'
-          ? { ...o, status, statusUpdatedAt: Date.now() }
-          : o
-      );
-      saveRestaurantOrders(slug, updated);
-      return updated;
-    });
+    // 1. Optimistically update the orders at this table that the action moves forward
+    setKitchenOrders((prev) =>
+      prev.map((o) =>
+        isTableActionTarget(o, tableNumber, status) ? { ...o, status, statusUpdatedAt: Date.now(), startedAt: startedAtFor(o, status) } : o
+      )
+    );
 
-    // 2. Persist to server in background
+    // 2. Save and persist to server in background; the service picks the same orders from saved state
     updateTableOrdersStatus(slug, tableNumber, status).catch((err) => {
       console.error('Failed to update table orders on server:', err);
       showToast('⚠️ Failed to sync table status with server');
@@ -521,6 +607,7 @@ export default function AdminDashboardPage() {
     imageUrl: item.imageUrl,
     tags: item.tags,
     isAvailable: item.available !== false,
+    prepMinutes: item.prepMinutes ?? null,
   });
 
   const setSoldOutOnBackend = async (itemId: string, isSoldOut: boolean) => {
@@ -676,15 +763,17 @@ export default function AdminDashboardPage() {
       <AdminSidebar
         meta={meta!}
         slug={slug}
-        activeView={activeView}
+        activeView={viewToShow}
         onSelectView={(view) => setActiveView(view)}
         activeOrdersCount={activeOrdersCount}
         onOpenTables={() => setIsTablesModalOpen(true)}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
+        onOpenStaff={() => setIsStaffModalOpen(true)}
         onLogout={handleLogout}
         onChangeDesign={handleChangeDesign}
         isMobileOpen={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
+        role={staffRole}
       />
 
       {/* Mobile Top Header (Visible on screens <= 1024px) */}
@@ -696,31 +785,94 @@ export default function AdminDashboardPage() {
           </span>
         </div>
 
-        <div className="admin-mobile-header-actions">
-          <button
-            type="button"
-            className="admin-mobile-header-add-btn"
-            onClick={() => {
-              setEditingItem(null);
-              setIsDishModalOpen(true);
-            }}
-            aria-label="Add new dish"
-          >
-            <Plus size={20} strokeWidth={2.5} />
-          </button>
-        </div>
+        {isManager && (
+          <div className="admin-mobile-header-actions">
+            <button
+              type="button"
+              className="admin-mobile-header-add-btn"
+              onClick={() => {
+                setEditingItem(null);
+                setIsDishModalOpen(true);
+              }}
+              aria-label="Add new dish"
+            >
+              <Plus size={20} strokeWidth={2.5} />
+            </button>
+          </div>
+        )}
       </header>
 
       {/* Main Full-Width Edge-to-Edge Dashboard */}
       <main className="admin-main-viewport">
-        {activeView === 'kitchen' ? (
+        {isManager &&
+          veryLateAlerts.map((alert) => (
+            <div
+              key={alert.orderId}
+              role="alert"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: '#dc2626', color: '#fff', borderRadius: '12px', padding: '12px 16px', margin: '0 0 10px', fontWeight: 700 }}
+            >
+              <span>{t.kitchen.veryLate(alert.tableNumber, alert.cookingMinutes, alert.targetMinutes)}</span>
+              <button
+                type="button"
+                className="admin-sec-pill-btn"
+                onClick={() => setVeryLateAlerts((prev) => prev.filter((a) => a.orderId !== alert.orderId))}
+              >
+                {t.kitchen.dismiss}
+              </button>
+            </div>
+          ))}
+        {staffAlerts.map((alert) => (
+          <div
+            key={alert.key}
+            role="alert"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: BELL_ALERTS.has(alert.event) ? '#2563eb' : '#b45309', color: '#fff', borderRadius: '12px', padding: '12px 16px', margin: '0 0 10px', fontWeight: 700 }}
+          >
+            <span>{(t.alerts[alert.event] || ((table: string) => `${alert.event} ${table}`))(alert.tableNumber)}</span>
+            <button
+              type="button"
+              className="admin-sec-pill-btn"
+              onClick={() => setStaffAlerts((prev) => prev.filter((a) => a.key !== alert.key))}
+            >
+              {t.kitchen.dismiss}
+            </button>
+          </div>
+        ))}
+        {staffRole === 'cashier' && isPro ? (
+          <BillsScreen role={staffRole} currency={meta.currency || 'ETB'} refreshSignal={ordersChanged} showShift />
+        ) : isManager && isPro && viewToShow === 'alerts' ? (
+          <DecisionsScreen currency={meta.currency || 'ETB'} refreshSignal={ordersChanged} />
+        ) : isManager && isPro && viewToShow === 'reports' ? (
+          <ReportsScreen currency={meta.currency || 'ETB'} />
+        ) : isManager && isPro && viewToShow === 'bills' ? (
+          <BillsScreen role={staffRole} currency={meta.currency || 'ETB'} refreshSignal={ordersChanged} />
+        ) : staffRole === 'waiter' && isPro ? (
+          <WaiterTablesScreen
+            currency={meta.currency || 'ETB'}
+            fullName={staffUser?.full_name}
+            onLogout={handleLogout}
+            bell={bell}
+            readyAlerts={readyAlerts}
+            onDismissAlert={(orderId) => setReadyAlerts((prev) => prev.filter((a) => a.orderId !== orderId))}
+            refreshSignal={ordersChanged}
+          />
+        ) : staffRole === 'waiter' || staffRole === 'cashier' ? (
+          <AdminRoleHome role={staffRole} fullName={staffUser?.full_name} onLogout={handleLogout} />
+        ) : viewToShow === 'kitchen' && isPro ? (
+          <ProKitchenBoard
+            orders={kitchenOrders}
+            role={staffRole}
+            bell={bell}
+            onOrderStatusChange={handleKitchenOrderStatusChange}
+            onCancelOrder={(orderId) => handleKitchenOrderStatusChange(orderId, 'cancelled')}
+          />
+        ) : viewToShow === 'kitchen' ? (
           /* ── Full Dashboard Kitchen Orders View ────────────────────────────── */
           <AdminKitchenView
             slug={slug}
             meta={meta!}
             orders={kitchenOrders}
             items={items}
-            onBackToMenu={() => setActiveView('menu')}
+            onBackToMenu={isManager ? () => setActiveView('menu') : undefined}
             onOrderStatusChange={handleKitchenOrderStatusChange}
             onTableStatusChange={handleKitchenTableStatusChange}
             onTableCancel={handleKitchenTableCancel}
@@ -753,18 +905,12 @@ export default function AdminDashboardPage() {
                     gap: '5px',
                     letterSpacing: '0.5px',
                     textTransform: 'uppercase',
-                    background:
-                      planFromBackend === 'vip'
-                        ? 'linear-gradient(135deg, #f59e0b, #ea580c)'
-                        : 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                    background: PLAN_INFO[planFromBackend].gradient,
                     color: '#ffffff',
-                    boxShadow:
-                      planFromBackend === 'vip'
-                        ? '0 2px 8px rgba(245, 158, 11, 0.35)'
-                        : '0 2px 8px rgba(59, 130, 246, 0.35)',
+                    boxShadow: `0 2px 8px ${PLAN_INFO[planFromBackend].color}59`,
                   }}
                 >
-                  <span>{planFromBackend === 'vip' ? '👑 VIP Tier' : '⚡ Standard Tier'}</span>
+                  <span>{PLAN_INFO[planFromBackend].icon} {PLAN_INFO[planFromBackend].label} Plan</span>
                 </span>
               </div>
 
@@ -1023,6 +1169,7 @@ export default function AdminDashboardPage() {
           setEditingItem(null);
         }}
         onSave={handleSaveItem}
+        showPrepTime={isPro}
       />
 
       {/* Categories Add Modal */}
@@ -1089,6 +1236,8 @@ export default function AdminDashboardPage() {
         onClose={() => setIsSettingsModalOpen(false)}
         onSave={handleSaveSettings}
         onResetToDefault={handleResetToDefault}
+        showProTimings={isPro && isManager}
+        onToast={showToast}
       />
 
       {/* Dining Tables & QR Code Generator Modal */}
@@ -1096,6 +1245,16 @@ export default function AdminDashboardPage() {
         isOpen={isTablesModalOpen}
         onClose={() => setIsTablesModalOpen(false)}
         restaurantSlug={slug}
+        plan={planFromBackend}
+      />
+
+      {/* Staff accounts (managers, Pro plan) */}
+      <AdminStaffModal
+        isOpen={isStaffModalOpen && isManager}
+        onClose={() => setIsStaffModalOpen(false)}
+        plan={planFromBackend}
+        currentUserId={staffUser?.id}
+        onToast={showToast}
       />
 
       {/* Floating Toast Notification */}
@@ -1107,18 +1266,21 @@ export default function AdminDashboardPage() {
 
       {/* Mobile Bottom Navigation Bar (Visible on screens <= 1024px) */}
       <nav className="admin-mobile-bottom-nav" aria-label="Mobile Navigation">
-        <button
-          type="button"
-          className={`admin-mobile-tab-btn ${activeView === 'menu' ? 'active' : ''}`}
-          onClick={() => setActiveView('menu')}
-        >
-          <UtensilsCrossed size={19} />
-          <span>Staff</span>
-        </button>
+        {isManager && (
+          <button
+            type="button"
+            className={`admin-mobile-tab-btn ${viewToShow === 'menu' ? 'active' : ''}`}
+            onClick={() => setActiveView('menu')}
+          >
+            <UtensilsCrossed size={19} />
+            <span>Staff</span>
+          </button>
+        )}
 
+        {canSeeKitchen && (
         <button
           type="button"
-          className={`admin-mobile-tab-btn ${activeView === 'kitchen' ? 'active' : ''}`}
+          className={`admin-mobile-tab-btn ${viewToShow === 'kitchen' ? 'active' : ''}`}
           onClick={() => setActiveView('kitchen')}
         >
           <div style={{ position: 'relative', display: 'inline-flex' }}>
@@ -1129,6 +1291,7 @@ export default function AdminDashboardPage() {
           </div>
           <span>Kitchen</span>
         </button>
+        )}
 
         <a
           href={`/${slug}`}
@@ -1145,11 +1308,14 @@ export default function AdminDashboardPage() {
       {/* Staff Production Login Modal */}
       <AdminLoginModal
         isOpen={!adminToken}
+        restaurantSlug={slug}
         notice={loginNotice}
-        onSuccess={(token) => {
+        onSuccess={(token, user) => {
           setLoginNotice(null);
+          setStaffUser(user ?? getStoredStaff());
+          setActiveView('menu');
           setAdminToken(token);
-          showToast('Signed in successfully');
+          showToast(user?.full_name ? `Signed in as ${user.full_name}` : 'Signed in successfully');
         }}
       />
     </div>

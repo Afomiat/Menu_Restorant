@@ -11,41 +11,119 @@ import (
 )
 
 type Querier interface {
+	AddBillPayment(ctx context.Context, arg AddBillPaymentParams) error
+	// Whether this customer phone already ordered on the bill (same party) or not (new customers)
+	BillSessionHasOrdered(ctx context.Context, arg BillSessionHasOrderedParams) (bool, error)
+	BulkCancelAllActiveOrders(ctx context.Context, tenantID pgtype.UUID) error
+	BulkCancelTableOrders(ctx context.Context, arg BulkCancelTableOrdersParams) error
 	CancelOrderInGrace(ctx context.Context, arg CancelOrderInGraceParams) (CancelOrderInGraceRow, error)
+	CopyItemToRemake(ctx context.Context, arg CopyItemToRemakeParams) error
+	CountActiveManagers(ctx context.Context, tenantID pgtype.UUID) (int64, error)
+	// Bills a waiter still holds that are not collected yet
+	CountWaiterUnpaidBills(ctx context.Context, arg CountWaiterUnpaidBillsParams) (int64, error)
 	CreateCategory(ctx context.Context, arg CreateCategoryParams) (Category, error)
 	CreateMenuItem(ctx context.Context, arg CreateMenuItemParams) (MenuItem, error)
 	CreateOrder(ctx context.Context, arg CreateOrderParams) (CreateOrderRow, error)
-	CreateOrderItem(ctx context.Context, arg CreateOrderItemParams) (OrderItem, error)
+	CreateOrderItem(ctx context.Context, arg CreateOrderItemParams) (CreateOrderItemRow, error)
 	CreateOrderItemModifier(ctx context.Context, arg CreateOrderItemModifierParams) (OrderItemModifier, error)
+	CreateProblem(ctx context.Context, arg CreateProblemParams) (pgtype.UUID, error)
+	// A free copy of the order (same table, bill and target) for the kitchen to cook again
+	CreateRemakeOrder(ctx context.Context, arg CreateRemakeOrderParams) (pgtype.UUID, error)
 	CreateTable(ctx context.Context, arg CreateTableParams) (RestaurantTable, error)
 	CreateTenant(ctx context.Context, arg CreateTenantParams) (Tenant, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	DecideProblem(ctx context.Context, arg DecideProblemParams) error
+	DecideWalkout(ctx context.Context, arg DecideWalkoutParams) error
+	DeleteBill(ctx context.Context, arg DeleteBillParams) error
 	DeleteCategory(ctx context.Context, arg DeleteCategoryParams) error
 	DeleteMenuItem(ctx context.Context, arg DeleteMenuItemParams) error
+	DeletePushSubscription(ctx context.Context, endpoint string) error
+	EndShift(ctx context.Context, userID pgtype.UUID) (StaffShift, error)
+	GetActiveBillForTable(ctx context.Context, arg GetActiveBillForTableParams) (pgtype.UUID, error)
 	GetCategoryByID(ctx context.Context, arg GetCategoryByIDParams) (Category, error)
 	GetMenuItemByID(ctx context.Context, arg GetMenuItemByIDParams) (MenuItem, error)
 	GetModifierByID(ctx context.Context, arg GetModifierByIDParams) (GetModifierByIDRow, error)
 	GetModifierByIDAndMenuItemID(ctx context.Context, arg GetModifierByIDAndMenuItemIDParams) (GetModifierByIDAndMenuItemIDRow, error)
+	GetOpenShift(ctx context.Context, userID pgtype.UUID) (StaffShift, error)
 	GetOrderByID(ctx context.Context, arg GetOrderByIDParams) (GetOrderByIDRow, error)
+	// The dish a problem is about, with its order's table, bill and kitchen people
+	GetOrderItemForProblem(ctx context.Context, arg GetOrderItemForProblemParams) (GetOrderItemForProblemRow, error)
+	GetRequestedBillForTable(ctx context.Context, arg GetRequestedBillForTableParams) (GetRequestedBillForTableRow, error)
+	GetStaffByID(ctx context.Context, arg GetStaffByIDParams) (User, error)
 	GetTableByNumber(ctx context.Context, arg GetTableByNumberParams) (RestaurantTable, error)
 	GetTenantByID(ctx context.Context, id pgtype.UUID) (Tenant, error)
 	GetTenantBySlug(ctx context.Context, slug string) (Tenant, error)
-	GetUserByEmail(ctx context.Context, email string) (User, error)
+	GetUserByEmail(ctx context.Context, email pgtype.Text) (User, error)
+	GetUserByTenantPhone(ctx context.Context, arg GetUserByTenantPhoneParams) (User, error)
+	// Opens a bill for the table unless one is already taking orders
+	InsertActiveBill(ctx context.Context, arg InsertActiveBillParams) error
+	IsUserActive(ctx context.Context, id pgtype.UUID) (bool, error)
+	// What a dish costs on the bill: its price with modifiers, times the quantity
+	ItemValue(ctx context.Context, id pgtype.UUID) (pgtype.Numeric, error)
+	LastShift(ctx context.Context, userID pgtype.UUID) (StaffShift, error)
 	ListActiveOrdersByTenant(ctx context.Context, tenantID pgtype.UUID) ([]ListActiveOrdersByTenantRow, error)
 	ListActiveTenants(ctx context.Context) ([]Tenant, error)
+	ListActivity(ctx context.Context, arg ListActivityParams) ([]ListActivityRow, error)
+	ListBillPayments(ctx context.Context, billIds []pgtype.UUID) ([]ListBillPaymentsRow, error)
+	// Bills with their totals (orders not cancelled) and what has been paid.
+	// since: bills confirmed or walked out after this time are included; active ones always are.
+	ListBills(ctx context.Context, arg ListBillsParams) ([]ListBillsRow, error)
+	// Pro bills whose reminder or alert is due, with the restaurant's times (defaults 10/20/15/120)
+	ListBillsDue(ctx context.Context, now pgtype.Timestamptz) ([]ListBillsDueRow, error)
 	ListCategoriesByTenant(ctx context.Context, tenantID pgtype.UUID) ([]Category, error)
 	ListMenuItemsByCategory(ctx context.Context, arg ListMenuItemsByCategoryParams) ([]MenuItem, error)
 	ListMenuItemsByTenant(ctx context.Context, tenantID pgtype.UUID) ([]MenuItem, error)
 	ListOrderItemModifiersByItemID(ctx context.Context, orderItemID pgtype.UUID) ([]OrderItemModifier, error)
-	ListOrderItemsByOrderID(ctx context.Context, orderID pgtype.UUID) ([]OrderItem, error)
-	ListTablesByTenant(ctx context.Context, tenantID pgtype.UUID) ([]RestaurantTable, error)
+	ListOrderItemsByOrderID(ctx context.Context, orderID pgtype.UUID) ([]ListOrderItemsByOrderIDRow, error)
+	// Problems with the dish, table and people involved; open_only lists those waiting for a decision
+	ListProblems(ctx context.Context, arg ListProblemsParams) ([]ListProblemsRow, error)
+	// The browsers of the given people, and of everyone active in the restaurant with the given roles
+	ListPushSubscriptions(ctx context.Context, arg ListPushSubscriptionsParams) ([]ListPushSubscriptionsRow, error)
+	ListStaff(ctx context.Context, tenantID pgtype.UUID) ([]User, error)
+	ListTablesByTenant(ctx context.Context, tenantID pgtype.UUID) ([]ListTablesByTenantRow, error)
+	// Pro orders cooking for twice their target that no manager has been alerted about yet
+	ListVeryLateOrders(ctx context.Context, now pgtype.Timestamptz) ([]ListVeryLateOrdersRow, error)
+	ListWalkouts(ctx context.Context, arg ListWalkoutsParams) ([]ListWalkoutsRow, error)
+	MarkBillReminded(ctx context.Context, arg MarkBillRemindedParams) error
+	MarkItemRemoved(ctx context.Context, id pgtype.UUID) (int64, error)
+	MarkOrderVeryLateAlerted(ctx context.Context, id pgtype.UUID) error
+	// Closes an unpaid bill as a walkout, keeping what was still owed
+	MarkWalkout(ctx context.Context, arg MarkWalkoutParams) error
+	// Moves a bill's orders onto another bill and table (merge or move)
+	MoveBillOrders(ctx context.Context, arg MoveBillOrdersParams) error
+	MoveBillPayments(ctx context.Context, arg MoveBillPaymentsParams) error
+	MoveBillToTable(ctx context.Context, arg MoveBillToTableParams) error
+	RecordActivity(ctx context.Context, arg RecordActivityParams) error
+	ReduceOrderTotal(ctx context.Context, arg ReduceOrderTotalParams) error
+	// One cashier's confirmed money between the times
+	ReportCashierShift(ctx context.Context, arg ReportCashierShiftParams) (ReportCashierShiftRow, error)
+	// Per dish: how many orders with it were cooked, average cooking minutes against the target, and how many ran late
+	ReportKitchen(ctx context.Context, arg ReportKitchenParams) ([]ReportKitchenRow, error)
+	// Bills opened between the times that are still not confirmed (end of day check)
+	ReportOpenBills(ctx context.Context, arg ReportOpenBillsParams) ([]ReportOpenBillsRow, error)
+	// Money collected between the times, by payment method (walkouts' part payments included)
+	ReportSalesByMethod(ctx context.Context, arg ReportSalesByMethodParams) ([]ReportSalesByMethodRow, error)
+	// One waiter's money between the times
+	ReportWaiterShift(ctx context.Context, arg ReportWaiterShiftParams) (ReportWaiterShiftRow, error)
+	// Per waiter, for bills opened between the times
+	ReportWaiters(ctx context.Context, arg ReportWaitersParams) ([]ReportWaitersRow, error)
+	// Moves a bill and records who did the step and when
+	SetBillStatus(ctx context.Context, arg SetBillStatusParams) error
+	SetBillWaiter(ctx context.Context, arg SetBillWaiterParams) error
+	SetOrderBill(ctx context.Context, arg SetOrderBillParams) error
+	StartShift(ctx context.Context, arg StartShiftParams) (StaffShift, error)
 	ToggleMenuItemSoldOut(ctx context.Context, arg ToggleMenuItemSoldOutParams) (ToggleMenuItemSoldOutRow, error)
 	UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (Category, error)
 	UpdateMenuItem(ctx context.Context, arg UpdateMenuItemParams) (MenuItem, error)
+	// Records who did each kitchen step and when. Moving an order back (undo) clears the later steps.
 	UpdateOrderStatus(ctx context.Context, arg UpdateOrderStatusParams) (UpdateOrderStatusRow, error)
+	UpdateStaff(ctx context.Context, arg UpdateStaffParams) (User, error)
 	UpdateTableQRSecret(ctx context.Context, arg UpdateTableQRSecretParams) (UpdateTableQRSecretRow, error)
+	UpdateTableWaiter(ctx context.Context, arg UpdateTableWaiterParams) (RestaurantTable, error)
 	UpdateTenantPlan(ctx context.Context, arg UpdateTenantPlanParams) (Tenant, error)
+	UpdateTenantSettings(ctx context.Context, arg UpdateTenantSettingsParams) (Tenant, error)
 	UpdateTenantTheme(ctx context.Context, arg UpdateTenantThemeParams) (Tenant, error)
+	UpsertPushSubscription(ctx context.Context, arg UpsertPushSubscriptionParams) error
 }
 
 var _ Querier = (*Queries)(nil)

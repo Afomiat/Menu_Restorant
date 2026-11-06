@@ -56,7 +56,10 @@ export const clearAdminToken = removeAdminToken;
 export interface StaffUser {
   id: string;
   email: string;
-  role: 'owner' | 'manager' | 'kitchen' | 'waiter' | 'staff' | 'super_admin';
+  phone?: string;
+  full_name?: string;
+  /** Logins from before the Pro roles may still say 'owner' or 'kitchen'; see normalizeRole. */
+  role: string;
   tenant_id: string;
 }
 
@@ -69,11 +72,29 @@ export function getStoredStaff(): StaffUser | null {
   }
 }
 
-export async function loginStaff(email: string, password: string): Promise<{ token: string; user: StaffUser }> {
-  const res = await apiClient.post<{ token: string; user: StaffUser }>('/auth/login', {
-    email,
-    password,
-  });
+const NO_TENANT_ID = '00000000-0000-0000-0000-000000000000';
+
+export const NO_RESTAURANT_LOGIN_MESSAGE =
+  'This account is not linked to a restaurant, so it cannot open a restaurant dashboard. Sign in with a staff account of this restaurant.';
+
+/**
+ * Signs staff in with an email, or with a phone number at the restaurant whose page is open
+ * (phone numbers are only unique within one restaurant).
+ */
+export async function loginStaff(
+  identifier: string,
+  password: string,
+  restaurantSlug?: string
+): Promise<{ token: string; user: StaffUser }> {
+  const trimmed = identifier.trim();
+  const body = trimmed.includes('@')
+    ? { email: trimmed, password }
+    : { phone: trimmed, restaurant: restaurantSlug, password };
+  const res = await apiClient.post<{ token: string; user: StaffUser }>('/auth/login', body);
+  // Azai team accounts have no restaurant; the dashboard would reject every request and ask to sign in again
+  if (res?.user && (!res.user.tenant_id || res.user.tenant_id === NO_TENANT_ID)) {
+    throw new Error(NO_RESTAURANT_LOGIN_MESSAGE);
+  }
   if (res?.token) {
     setAdminToken(res.token);
     if (res.user) {
@@ -142,10 +163,14 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
       if (response.status === 401 && endpoint.includes('/admin')) {
         clearAdminToken();
         if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('azai:auth:unauthorized'));
+          // The code says why, e.g. STAFF_INACTIVE when a manager turned the account off
+          window.dispatchEvent(new CustomEvent('azai:auth:unauthorized', { detail: { code: data?.error } }));
         }
       }
-      const errorMsg = data?.error || data?.message || `HTTP ${response.status}: ${response.statusText}`;
+      // Some errors are a code (UPGRADE_REQUIRED, STAFF_INACTIVE) with the readable text in message
+      const isCode = typeof data?.error === 'string' && /^[A-Z_]+$/.test(data.error);
+      const errorMsg =
+        (isCode && data?.message) || data?.error || data?.message || `HTTP ${response.status}: ${response.statusText}`;
       throw new ApiError(response.status, errorMsg, data);
     }
 

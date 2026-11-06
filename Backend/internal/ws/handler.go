@@ -18,7 +18,7 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-// ServeWS authenticates the kitchen tablet via ?token=<jwt>, verifies VIP license, and connects to its private room
+// ServeWS authenticates the kitchen tablet via ?token=<jwt>, verifies the Plus plan or higher, and connects to its private room
 func ServeWS(hub *Hub, tenantUsecase domain.TenantUsecase, jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.Query("token")
@@ -33,12 +33,12 @@ func ServeWS(hub *Hub, tenantUsecase domain.TenantUsecase, jwtSecret string) gin
 			return
 		}
 
-		// VIP PLAN CHECK: Only restaurants with VIP tier have access to real-time Kitchen Display WebSocket
-		hasVIP, err := tenantUsecase.VerifyVIPAccess(c.Request.Context(), claims.TenantID)
-		if err != nil || !hasVIP {
+		// PLAN CHECK: Only restaurants on Plus or higher have access to real-time Kitchen Display WebSocket
+		hasPlan, err := tenantUsecase.VerifyPlanAccess(c.Request.Context(), claims.TenantID, domain.PlanPlus)
+		if err != nil || !hasPlan {
 			c.JSON(http.StatusForbidden, gin.H{
 				"error":   "UPGRADE_REQUIRED",
-				"message": "Real-time kitchen display WebSocket feed is restricted to VIP tier restaurants.",
+				"message": "Real-time kitchen display WebSocket feed is restricted to Plus and Pro restaurants.",
 			})
 			return
 		}
@@ -53,6 +53,8 @@ func ServeWS(hub *Hub, tenantUsecase domain.TenantUsecase, jwtSecret string) gin
 			conn:     conn,
 			tenantID: claims.TenantID,
 			send:     make(chan []byte, 256),
+			userID:   claims.UserID,
+			role:     domain.NormalizeRole(claims.Role),
 		})
 	}
 }

@@ -13,15 +13,15 @@ import (
 	"menu-backend/usecase"
 )
 
-func TestOrder_VIPPlanRequired(t *testing.T) {
+func TestOrder_PlusPlanRequired(t *testing.T) {
 	tenantID := uuid.New()
 	qrSecret := "test-secret-key-32-chars-abcdef"
 
 	tenantRepo := &mockTenantRepo{
 		tenant: &domain.Tenant{
 			ID:   tenantID,
-			Name: "Standard Bistro",
-			Plan: domain.PlanStandard, // Standard plan does NOT have smart ordering
+			Name: "Basic Bistro",
+			Plan: domain.PlanBasic, // Basic plan does NOT have smart ordering
 		},
 	}
 	orderRepo := &mockOrderRepo{}
@@ -41,10 +41,10 @@ func TestOrder_VIPPlanRequired(t *testing.T) {
 
 	_, err := orderUc.PlaceOrder(context.Background(), input)
 	if err == nil {
-		t.Fatal("expected error when placing order on Standard tier restaurant, got nil")
+		t.Fatal("expected error when placing order on Basic tier restaurant, got nil")
 	}
 
-	expectedMsg := "digital ordering is disabled; this restaurant requires a VIP plan upgrade"
+	expectedMsg := "digital ordering is disabled; this restaurant requires a Plus plan upgrade"
 	if err.Error() != expectedMsg {
 		t.Fatalf("expected '%s', got '%s'", expectedMsg, err.Error())
 	}
@@ -55,7 +55,7 @@ func TestOrder_TableSpoofingProtection(t *testing.T) {
 	qrSecret := "test-secret-key-32-chars-abcdef"
 
 	tenantRepo := &mockTenantRepo{
-		tenant: &domain.Tenant{ID: tenantID, Plan: domain.PlanVIP},
+		tenant: &domain.Tenant{ID: tenantID, Plan: domain.PlanPlus},
 	}
 	orderRepo := &mockOrderRepo{}
 	tableRepo := &mockTableRepo{}
@@ -84,7 +84,7 @@ func TestOrder_MissingTableTokenRejected(t *testing.T) {
 	qrSecret := "test-secret-key-32-chars-abcdef"
 
 	tenantRepo := &mockTenantRepo{
-		tenant: &domain.Tenant{ID: tenantID, Plan: domain.PlanVIP},
+		tenant: &domain.Tenant{ID: tenantID, Plan: domain.PlanPlus},
 	}
 	orderRepo := &mockOrderRepo{}
 	tableRepo := &mockTableRepo{}
@@ -116,7 +116,7 @@ func TestOrder_ServerSidePriceLookupAndTamperProofing(t *testing.T) {
 	validToken := security.GenerateTableToken(tenantID.String(), tableNumber, qrSecret)
 
 	tenantRepo := &mockTenantRepo{
-		tenant: &domain.Tenant{ID: tenantID, Plan: domain.PlanVIP},
+		tenant: &domain.Tenant{ID: tenantID, Plan: domain.PlanPlus},
 	}
 	tableRepo := &mockTableRepo{
 		table: &domain.RestaurantTable{
@@ -190,7 +190,7 @@ func TestOrder_SoldOutRejection(t *testing.T) {
 	validToken := security.GenerateTableToken(tenantID.String(), tableNumber, qrSecret)
 
 	tenantRepo := &mockTenantRepo{
-		tenant: &domain.Tenant{ID: tenantID, Plan: domain.PlanVIP},
+		tenant: &domain.Tenant{ID: tenantID, Plan: domain.PlanPlus},
 	}
 	tableRepo := &mockTableRepo{
 		table: &domain.RestaurantTable{
@@ -238,7 +238,7 @@ func TestOrder_NegativeModifierPriceRejection(t *testing.T) {
 	tableNumber := "5"
 	validToken := security.GenerateTableToken(tenantID.String(), tableNumber, qrSecret)
 
-	tenantRepo := &mockTenantRepo{tenant: &domain.Tenant{ID: tenantID, Plan: domain.PlanVIP}}
+	tenantRepo := &mockTenantRepo{tenant: &domain.Tenant{ID: tenantID, Plan: domain.PlanPlus}}
 	tableRepo := &mockTableRepo{
 		table: &domain.RestaurantTable{ID: tableID, TenantID: tenantID, TableNumber: tableNumber, IsActive: true},
 	}

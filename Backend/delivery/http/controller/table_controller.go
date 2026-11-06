@@ -1,9 +1,11 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	"menu-backend/delivery/http/middleware"
 	"menu-backend/domain"
@@ -12,13 +14,63 @@ import (
 type TableController struct {
 	tableUsecase  domain.TableUsecase
 	tenantUsecase domain.TenantUsecase
+	billUsecase   domain.BillUsecase
 }
 
-func NewTableController(tableUsecase domain.TableUsecase, tenantUsecase domain.TenantUsecase) *TableController {
+func NewTableController(tableUsecase domain.TableUsecase, tenantUsecase domain.TenantUsecase, billUsecase domain.BillUsecase) *TableController {
 	return &TableController{
 		tableUsecase:  tableUsecase,
 		tenantUsecase: tenantUsecase,
+		billUsecase:   billUsecase,
 	}
+}
+
+// AssignWaiter handles PATCH /api/v1/admin/tables/:id/waiter
+// Body {"waiter_id": "<uuid>"} gives the table to a waiter; {"waiter_id": null} to nobody
+func (ctrl *TableController) AssignWaiter(c *gin.Context) {
+	tenantID, ok := middleware.GetTenantIDFromContext(c)
+	claims, hasClaims := middleware.GetAuthClaims(c)
+	if !ok || !hasClaims {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+		return
+	}
+
+	tableID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid table id"})
+		return
+	}
+
+	var req struct {
+		WaiterID *string `json:"waiter_id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "waiter_id is required (or null for no waiter)"})
+		return
+	}
+	var waiterID *uuid.UUID
+	if req.WaiterID != nil && *req.WaiterID != "" {
+		id, err := uuid.Parse(*req.WaiterID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid waiter id"})
+			return
+		}
+		waiterID = &id
+	}
+
+	table, err := ctrl.tableUsecase.AssignWaiter(c.Request.Context(), claims.UserID, tenantID, tableID, waiterID)
+	switch {
+	case errors.Is(err, domain.ErrNotAWaiter):
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	case errors.Is(err, domain.ErrTableNotFound):
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	case err != nil:
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to assign waiter"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": table})
 }
 
 // ListTables handles GET /api/v1/admin/tables
@@ -133,6 +185,11 @@ func (ctrl *TableController) ValidateTable(c *gin.Context) {
 			"message": "This table QR code is invalid, expired, or has been tampered with.",
 		})
 		return
+	}
+
+	// Pro: new customers scanning a table whose bill is still unpaid alert the waiter and managers
+	if ctrl.billUsecase != nil && tenant.HasPlan(domain.PlanPro) {
+		ctrl.billUsecase.CheckRescan(c.Request.Context(), tenant.ID, tableNumber, c.GetHeader("X-Session-Token"))
 	}
 
 	c.JSON(http.StatusOK, gin.H{

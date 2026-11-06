@@ -77,6 +77,21 @@ func (r *tenantRepository) UpdateTheme(ctx context.Context, id uuid.UUID, themeC
 	return toDomainTenant(t), nil
 }
 
+func (r *tenantRepository) UpdateSettings(ctx context.Context, id uuid.UUID, settings domain.TenantSettings) (*domain.Tenant, error) {
+	settingsBytes, err := json.Marshal(settings)
+	if err != nil {
+		return nil, err
+	}
+	t, err := r.q.UpdateTenantSettings(ctx, sqlc.UpdateTenantSettingsParams{
+		ID:       converter.UUIDToPg(id),
+		Settings: settingsBytes,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return toDomainTenant(t), nil
+}
+
 func (r *tenantRepository) ListActive(ctx context.Context) ([]domain.Tenant, error) {
 	rows, err := r.q.ListActiveTenants(ctx)
 	if err != nil {
@@ -94,6 +109,10 @@ func toDomainTenant(t sqlc.Tenant) *domain.Tenant {
 	if len(t.ThemeConfig) > 0 {
 		_ = json.Unmarshal(t.ThemeConfig, &themeConfig)
 	}
+	var settings domain.TenantSettings
+	if len(t.Settings) > 0 {
+		_ = json.Unmarshal(t.Settings, &settings)
+	}
 
 	return &domain.Tenant{
 		ID:          converter.PgToUUID(t.ID),
@@ -103,6 +122,7 @@ func toDomainTenant(t sqlc.Tenant) *domain.Tenant {
 		Currency:    t.Currency,
 		ThemeConfig: themeConfig,
 		IsActive:    t.IsActive,
+		Settings:    settings.WithDefaults(),
 		CreatedAt:   converter.PgToTime(t.CreatedAt),
 		UpdatedAt:   converter.PgToTime(t.UpdatedAt),
 	}
