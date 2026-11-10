@@ -1,5 +1,8 @@
-# Local development database only (make db-up). Production uses Supabase.
+# Local environment for the whole backend: `docker compose up --build`
+# Starts Postgres, applies the migrations, loads sample data once, then starts the API.
+# Production uses Supabase; nothing here touches it.
 name: azai-menu
+
 services:
   db:
     image: postgres:17-alpine
@@ -16,6 +19,67 @@ services:
       interval: 2s
       timeout: 3s
       retries: 30
+
+  # Creates/updates the tables. Safe to run again: it only applies what is missing.
+  migrate:
+    image: migrate/migrate:v4.18.1
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./db/migrations:/migrations:ro
+    command:
+      - "-path=/migrations"
+      - "-database=postgres://azai:azai@db:5432/azai?sslmode=disable"
+      - "up"
+
+  # Loads the demo restaurants and staff only when the database is empty,
+  # so local changes are not wiped on the next start.
+  seed:
+    image: postgres:17-alpine
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      PGPASSWORD: azai
+    volumes:
+      - ./db/seed:/seed:ro
+    command:
+      - sh
+      - -c
+      - |
+        if [ "$$(psql -h db -U azai -d azai -tAc 'select count(*) from tenants')" = "0" ]; then
+          psql -h db -U azai -d azai -v ON_ERROR_STOP=1 -q -f /seed/local_seed.sql && echo "sample data loaded"
+        else
+          echo "database already has data, skipping seed"
+        fi
+
+  api:
+    build: .
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      ENVIRONMENT: development
+      DB_URL: postgres://azai:azai@db:5432/azai?sslmode=disable
+      # Local-only secrets. Never reuse these in production.
+      JWT_SECRET: local-dev-jwt-secret-not-for-production-0123456789
+      QR_SECRET_KEY: local-dev-qr-secret-not-for-production-0123456789
+      # Browser origin of the front end. Ports 5173 and 3000 on localhost are always allowed too.
+      FRONTEND_URL: http://localhost:5173
+      # Image upload signing needs real Cloudinary keys; leave empty to run without uploads.
+      CLOUDINARY_CLOUD_NAME: ""
+      CLOUDINARY_API_KEY: ""
+      CLOUDINARY_API_SECRET: ""
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
 
 volumes:
   azai-db:
