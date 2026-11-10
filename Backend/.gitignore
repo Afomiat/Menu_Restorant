@@ -1,0 +1,6 @@
+@"
+.env
+.env.local
+*.dump
+bin/
+"@ | Set-Content -Encoding ascii .gitignore
