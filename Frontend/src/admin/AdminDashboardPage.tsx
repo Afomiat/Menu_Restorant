@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, type CSSProperties } from 'react';
 import { useParams } from 'react-router-dom';
-import { Plus, AlertCircle, Sparkles, ChefHat, ExternalLink, UtensilsCrossed, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, AlertCircle, Sparkles, ChefHat, ExternalLink, UtensilsCrossed, ChevronLeft, ChevronRight, Menu as MenuIcon } from 'lucide-react';
 import useRestaurantMenu from '../hooks/useRestaurantMenu';
 import { PlanProvider } from '../context/PlanContext';
 import {
@@ -779,6 +779,17 @@ export default function AdminDashboardPage() {
       {/* Mobile Top Header (Visible on screens <= 1024px) */}
       <header className="admin-mobile-header">
         <div className="admin-mobile-header-brand">
+          {/* Opens the sidebar drawer: on phones and tablets it is the only way to Bills, Alerts,
+              Reports, Staff, Tables, Settings and Sign Out */}
+          <button
+            type="button"
+            className="admin-mobile-menu-btn"
+            onClick={() => setIsMobileSidebarOpen(true)}
+            aria-label="Open navigation menu"
+            aria-expanded={isMobileSidebarOpen}
+          >
+            <MenuIcon size={22} />
+          </button>
           <span className="admin-fancy-staff-title">
             <span className="staff-part">Staff</span>{' '}
             <span className="dashboard-part">Dashboard</span>
@@ -1273,7 +1284,7 @@ export default function AdminDashboardPage() {
             onClick={() => setActiveView('menu')}
           >
             <UtensilsCrossed size={19} />
-            <span>Staff</span>
+            <span>Dishes</span>
           </button>
         )}
 

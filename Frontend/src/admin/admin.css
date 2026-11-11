@@ -2053,6 +2053,7 @@
   .admin-mobile-header-brand {
     display: flex;
     align-items: center;
+    gap: 6px;
   }
 
   .admin-mobile-header .admin-fancy-staff-title {

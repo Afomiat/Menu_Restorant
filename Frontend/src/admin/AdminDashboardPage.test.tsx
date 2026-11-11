@@ -220,6 +220,26 @@ describe('AdminDashboardPage screens by role', () => {
     expect(fetchStaff).toHaveBeenCalledTimes(1);
   });
 
+  it('opens the sidebar from the phone header, so a manager reaches every screen', () => {
+    signedInAs('manager');
+    renderDashboard();
+    const sidebar = screen.getByRole('complementary', { name: 'Sidebar Navigation' });
+    expect(sidebar.className).not.toContain('mobile-open');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }));
+
+    expect(sidebar.className).toContain('mobile-open');
+  });
+
+  it('labels the phone tab for the dish list "Dishes", not "Staff"', () => {
+    signedInAs('manager');
+    renderDashboard();
+    const tabs = within(screen.getByRole('navigation', { name: 'Mobile Navigation' }));
+
+    expect(tabs.getByText('Dishes')).toBeTruthy();
+    expect(tabs.queryByText('Staff')).toBeNull();
+  });
+
   it('tells a turned-off staff member why they were signed out', async () => {
     currentPlan = 'plus';
     signedInAs('waiter');
