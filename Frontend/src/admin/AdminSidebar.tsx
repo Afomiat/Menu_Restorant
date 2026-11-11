@@ -292,7 +292,8 @@ export default function AdminSidebar({
           </nav>
         </div>
 
-        {/* Bottom Promo/Status Card (GoMeal Style) */}
+        {/* Bottom Promo/Status Card (GoMeal Style): about managing the menu, so managers only */}
+        {isManager && (
         <div className="admin-sidebar-banner">
           <div className="admin-sidebar-banner-decor" />
           <div className="admin-sidebar-banner-title">
@@ -331,6 +332,7 @@ export default function AdminSidebar({
             View Menu
           </a>
         </div>
+        )}
       </aside>
     </>
   );

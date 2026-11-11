@@ -7,6 +7,7 @@ import BillCard from './BillCard';
 import ShiftBar from './ShiftBar';
 import DishProblemButton from './DishProblemButton';
 import PushButton from './PushButton';
+import SoldOutButton from './SoldOutButton';
 import { t } from '../i18n/en';
 import { tableState, type TableState } from '../utils/orderBoards';
 
@@ -25,6 +26,10 @@ interface WaiterTablesScreenProps {
   /** Changes whenever an order changes, so the screen reloads its tables. */
   refreshSignal: number;
   currency?: string;
+  /** Opens the sold-out list, so a waiter told by the kitchen can mark a dish. */
+  onOpenSoldOut?: () => void;
+  /** How many dishes are sold out right now, shown on the button. */
+  soldOutCount?: number;
 }
 
 const STATE_STYLE: Record<TableState, { label: string; color: string; bg: string }> = {
@@ -43,6 +48,8 @@ export default function WaiterTablesScreen({
   onDismissAlert,
   refreshSignal,
   currency,
+  onOpenSoldOut,
+  soldOutCount = 0,
 }: WaiterTablesScreenProps) {
   const [tables, setTables] = useState<TableOrders[] | null>(null);
   const [bills, setBills] = useState<Bill[]>([]);
@@ -91,7 +98,8 @@ export default function WaiterTablesScreen({
           <h1 className="admin-top-title" style={{ margin: 0 }}>{t.waiter.title}</h1>
           {fullName && <p style={{ margin: '2px 0 0', color: '#64748b', fontSize: '13px' }}>{fullName}</p>}
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {onOpenSoldOut && <SoldOutButton count={soldOutCount} onClick={onOpenSoldOut} />}
           {!bell.enabled && (
             <button type="button" className="admin-save-pill-btn" onClick={() => bell.enable()}>
               <Volume2 size={16} /> {t.kitchen.enableSound}

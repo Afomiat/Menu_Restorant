@@ -72,6 +72,8 @@ export const en = {
       `${tableLabel(table)}: cooking for ${minutes} min (target ${target} min)`,
     dismiss: 'Dismiss',
     remake: 'REMAKE',
+    soldOut: (count: number) => (count > 0 ? `Sold out (${count})` : 'Sold out'),
+    soldOutHint: 'Mark dishes the kitchen has run out of',
   },
 
   waiter: {

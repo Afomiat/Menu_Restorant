@@ -61,4 +61,16 @@ describe('remakes', () => {
     expect(tickets.map((tk) => tk.orderId)).toEqual(['remake', 'old', 'new']);
     expect(tickets[0].remakeOf).toBe('first-tibs');
   });
+
+  it('orders a table as remakes, cooking, new, then food already ready', () => {
+    const tickets = groupTickets([
+      row('ready', 'Tea', 'ready', { placedAt: 500 }),
+      row('new', 'Buna', 'not_started', { placedAt: 900 }),
+      row('cooking', 'Shiro', 'preparing', { placedAt: 2000, startedAt: 2100 }),
+      row('remake', 'Tibs', 'not_started', { placedAt: 5000, remakeOf: 'first-tibs' }),
+      row('ready-remake', 'Firfir', 'ready', { placedAt: 100, remakeOf: 'first-firfir' }),
+    ]);
+
+    expect(tickets.map((tk) => tk.orderId)).toEqual(['remake', 'cooking', 'new', 'ready-remake', 'ready']);
+  });
 });

@@ -8,7 +8,7 @@ export interface KitchenTicket {
   startedAt?: number;
   targetMinutes: number;
   items: CartItem[];
-  /** Set when this ticket cooks a dish again after a problem; remakes come first. */
+  /** Set when this ticket cooks a dish again after a problem; remakes come first (unless already ready). */
   remakeOf?: string;
 }
 
@@ -34,7 +34,14 @@ export function groupTickets(orders: CartItem[], defaultPrepMinutes = 15): Kitch
     }
     ticket.items.push(row);
   }
-  return [...byOrder.values()].sort((a, b) => Number(!!b.remakeOf) - Number(!!a.remakeOf) || a.placedAt - b.placedAt);
+  return [...byOrder.values()].sort((a, b) => ticketRank(a) - ticketRank(b) || a.placedAt - b.placedAt);
+}
+
+/** Kitchen order inside a table: remakes, then cooking, then new; food already ready goes last. */
+function ticketRank(ticket: KitchenTicket): number {
+  if (ticket.status === 'ready') return 3;
+  if (ticket.remakeOf) return 0;
+  return ticket.status === 'preparing' ? 1 : 2;
 }
 
 /** What a waiter's table is waiting for. */

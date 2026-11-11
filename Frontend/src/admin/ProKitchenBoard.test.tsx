@@ -154,3 +154,36 @@ describe('ProKitchenBoard remakes', () => {
     expect(within(screen.getByTestId('ticket-a')).queryByText('REMAKE')).toBeNull();
   });
 });
+
+describe('ProKitchenBoard order inside a table', () => {
+  it('shows remakes, cooking and new first, and dims food already ready at the end', () => {
+    renderBoard([
+      row('done', 'Tea', 'ready', { placedAt: NOW - 20 * MIN }),
+      row('new', 'Buna', 'not_started', { placedAt: NOW - 3 * MIN }),
+      row('cook', 'Shiro', 'preparing', { placedAt: NOW - 8 * MIN, startedAt: NOW - MIN }),
+      row('again', 'Tibs', 'not_started', { placedAt: NOW - MIN, remakeOf: 'first' }),
+    ]);
+
+    const ids = Array.from(screen.getByTestId('kitchen-table-5').querySelectorAll('article')).map((el) => el.getAttribute('data-testid'));
+    expect(ids).toEqual(['ticket-again', 'ticket-cook', 'ticket-new', 'ticket-done']);
+    expect(screen.getByTestId('ticket-done').style.opacity).toBe('0.65');
+    expect(screen.getByTestId('ticket-cook').style.opacity).toBe('1');
+  });
+});
+
+describe('ProKitchenBoard sold out', () => {
+  it('lets the chef open the sold-out list', () => {
+    const onOpenSoldOut = vi.fn();
+    render(
+      <ProKitchenBoard orders={[]} role="chef" bell={makeBell()} onOrderStatusChange={vi.fn()} onOpenSoldOut={onOpenSoldOut} soldOutCount={0} now={NOW} />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sold out' }));
+    expect(onOpenSoldOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides the button when the screen cannot change sold out', () => {
+    renderBoard([]);
+    expect(screen.queryByRole('button', { name: /Sold out/ })).toBeNull();
+  });
+});

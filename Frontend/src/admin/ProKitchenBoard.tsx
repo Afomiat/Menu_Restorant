@@ -5,6 +5,7 @@ import { useNow } from '../hooks/useNow';
 import { formatDuration, formatWaited, timerState, type TimerColor } from '../utils/kitchenTimer';
 import { canManage } from '../utils/roles';
 import { groupTickets, type KitchenTicket } from '../utils/orderBoards';
+import SoldOutButton from './SoldOutButton';
 import { t } from '../i18n/en';
 
 interface ProKitchenBoardProps {
@@ -16,6 +17,10 @@ interface ProKitchenBoardProps {
   bell: { enabled: boolean; enable: () => Promise<boolean> | boolean; ring: (kind?: 'bell' | 'alert') => void };
   /** Default prep time, for orders placed before targets were recorded. */
   defaultPrepMinutes?: number;
+  /** Opens the sold-out list; the chef marks dishes the kitchen has run out of. */
+  onOpenSoldOut?: () => void;
+  /** How many dishes are sold out right now, shown on the button. */
+  soldOutCount?: number;
   /** Fixed time for tests; the board ticks every second otherwise. */
   now?: number;
 }
@@ -29,6 +34,8 @@ export default function ProKitchenBoard({
   onCancelOrder,
   bell,
   defaultPrepMinutes = 15,
+  onOpenSoldOut,
+  soldOutCount = 0,
   now: fixedNow,
 }: ProKitchenBoardProps) {
   const tickingNow = useNow(1000);
@@ -70,11 +77,16 @@ export default function ProKitchenBoard({
         <h1 className="admin-top-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
           <ChefHat size={24} /> {t.kitchen.title}
         </h1>
-        {!bell.enabled && (
-          <button type="button" className="admin-save-pill-btn" onClick={() => bell.enable()}>
-            <Volume2 size={16} /> {t.kitchen.enableSound}
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {onOpenSoldOut && (
+            <SoldOutButton count={soldOutCount} onClick={onOpenSoldOut} />
+          )}
+          {!bell.enabled && (
+            <button type="button" className="admin-save-pill-btn" onClick={() => bell.enable()}>
+              <Volume2 size={16} /> {t.kitchen.enableSound}
+            </button>
+          )}
+        </div>
       </div>
 
       {tables.length === 0 ? (
@@ -120,13 +132,16 @@ function Ticket({
   onCancel?: () => void;
 }) {
   const timer = ticket.status === 'preparing' && ticket.startedAt ? timerState(ticket.startedAt, ticket.targetMinutes, now) : null;
-  const borderColor = timer ? TIMER_COLORS[timer.color] : ticket.status === 'ready' ? '#16a34a' : '#e2e8f0';
+  const isReady = ticket.status === 'ready';
+  const borderColor = timer ? TIMER_COLORS[timer.color] : isReady ? '#16a34a' : '#e2e8f0';
 
   return (
     <article
       data-testid={`ticket-${ticket.orderId}`}
       data-timer={timer?.color}
-      style={{ border: `2px solid ${borderColor}`, borderRadius: '12px', padding: '12px', background: '#fff' }}
+      data-ready={isReady || undefined}
+      // Food already cooked waits for the waiter: dimmed and last, so the chef's eye goes to what still needs cooking
+      style={{ border: `2px solid ${borderColor}`, borderRadius: '12px', padding: '12px', background: isReady ? '#f8fafc' : '#fff', opacity: isReady ? 0.65 : 1 }}
     >
       {ticket.remakeOf && (
         <span style={{ display: 'inline-block', marginBottom: '6px', fontSize: '11px', fontWeight: 800, color: '#fff', background: '#b91c1c', padding: '2px 8px', borderRadius: '999px' }}>

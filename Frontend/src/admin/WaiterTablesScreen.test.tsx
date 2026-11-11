@@ -121,6 +121,15 @@ describe('WaiterTablesScreen', () => {
     fireEvent.click(screen.getByText('Tap to enable sound'));
     expect(enable).toHaveBeenCalled();
   });
+
+  it('opens the sold-out list and shows how many dishes are sold out', async () => {
+    fetchMyTables.mockResolvedValue([]);
+    const onOpenSoldOut = vi.fn();
+    renderScreen({ onOpenSoldOut, soldOutCount: 2 });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sold out (2)' }));
+    expect(onOpenSoldOut).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('WaiterTablesScreen bills', () => {

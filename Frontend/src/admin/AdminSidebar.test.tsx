@@ -94,6 +94,18 @@ describe('AdminSidebar by role', () => {
 
     expect(navItems()).toEqual(['Sign Out']);
   });
+
+  it('shows the Menu Status card to managers only', () => {
+    render(<AdminSidebar meta={{ ...baseMeta, plan: 'pro' }} slug="aura" role="manager" />);
+    expect(screen.getByText('Menu Status: Live')).toBeTruthy();
+    cleanup();
+
+    for (const role of ['chef', 'waiter', 'cashier'] as const) {
+      render(<AdminSidebar meta={{ ...baseMeta, plan: 'pro' }} slug="aura" role={role} />);
+      expect(screen.queryByText('Menu Status: Live')).toBeNull();
+      cleanup();
+    }
+  });
 });
 
 describe('AdminSidebar Bills (Pro managers)', () => {

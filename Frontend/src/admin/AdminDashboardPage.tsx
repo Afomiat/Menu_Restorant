@@ -756,6 +756,8 @@ export default function AdminDashboardPage() {
     ? items.filter((it) => it.categoryId === categoryToDelete.id).length
     : 0;
 
+  const soldOutCount = items.filter((it) => it.available === false).length;
+
   const activeOrdersCount = kitchenOrders.filter(
     (o) => o.status !== 'complete' && o.status !== 'cancelled'
   ).length;
@@ -870,6 +872,8 @@ export default function AdminDashboardPage() {
             readyAlerts={readyAlerts}
             onDismissAlert={(orderId) => setReadyAlerts((prev) => prev.filter((a) => a.orderId !== orderId))}
             refreshSignal={ordersChanged}
+            onOpenSoldOut={() => setIsSoldOutModalOpen(true)}
+            soldOutCount={soldOutCount}
           />
         ) : staffRole === 'waiter' || staffRole === 'cashier' ? (
           <AdminRoleHome role={staffRole} fullName={staffUser?.full_name} onLogout={handleLogout} />
@@ -880,6 +884,8 @@ export default function AdminDashboardPage() {
             bell={bell}
             onOrderStatusChange={handleKitchenOrderStatusChange}
             onCancelOrder={(orderId) => handleKitchenOrderStatusChange(orderId, 'cancelled')}
+            onOpenSoldOut={() => setIsSoldOutModalOpen(true)}
+            soldOutCount={soldOutCount}
           />
         ) : viewToShow === 'kitchen' ? (
           /* ── Full Dashboard Kitchen Orders View ────────────────────────────── */
