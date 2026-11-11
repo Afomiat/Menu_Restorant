@@ -292,6 +292,8 @@ export default function AdminDashboardPage() {
   // restaurant in the URL; otherwise every edit would be sent on behalf of another tenant.
   const liveTenantSlug = initialMeta?.slug?.toLowerCase();
   const [loginNotice, setLoginNotice] = useState<string | null>(null);
+  // The restaurant's default prep time (Settings), shown in the dish editor for dishes without their own
+  const [defaultPrepMinutes, setDefaultPrepMinutes] = useState(15);
 
   useEffect(() => {
     if (!adminToken || !liveTenantSlug) return;
@@ -299,6 +301,8 @@ export default function AdminDashboardPage() {
     let cancelled = false;
     fetchAdminTenantProfile().then((profile) => {
       if (cancelled) return;
+      const prep = profile?.settings?.default_prep_minutes;
+      if (prep) setDefaultPrepMinutes(prep);
       const profileSlug = profile?.slug?.toLowerCase();
       if (profileSlug && profileSlug !== liveTenantSlug) {
         clearAdminToken();
@@ -1159,6 +1163,7 @@ export default function AdminDashboardPage() {
                       }}
                       onDelete={() => setItemToDelete(dish)}
                       onUpdatePrice={handleUpdatePrice}
+                      showPrepTime={isPro}
                       onToggleStock={handleToggleStock}
                     />
                   ))}
@@ -1182,6 +1187,7 @@ export default function AdminDashboardPage() {
         }}
         onSave={handleSaveItem}
         showPrepTime={isPro}
+        defaultPrepMinutes={defaultPrepMinutes}
       />
 
       {/* Categories Add Modal */}
@@ -1249,6 +1255,7 @@ export default function AdminDashboardPage() {
         onSave={handleSaveSettings}
         onResetToDefault={handleResetToDefault}
         showProTimings={isPro && isManager}
+        onTimingsSaved={(settings) => setDefaultPrepMinutes(settings.default_prep_minutes)}
       />
 
       {/* Dining Tables & QR Code Generator Modal */}

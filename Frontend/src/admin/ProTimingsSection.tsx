@@ -32,8 +32,13 @@ function validate(values: Record<string, string>): string | null {
   return null;
 }
 
+interface ProTimingsSectionProps {
+  /** Called with the timings the server stored, so other screens can use the new values */
+  onSaved?: (settings: TenantSettings) => void;
+}
+
 /** Pro managers: prep and reminder times, saved together with the rest of the Settings window. */
-const ProTimingsSection = forwardRef<ProTimingsHandle>(function ProTimingsSection(_props, ref) {
+const ProTimingsSection = forwardRef<ProTimingsHandle, ProTimingsSectionProps>(function ProTimingsSection({ onSaved }, ref) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -67,6 +72,7 @@ const ProTimingsSection = forwardRef<ProTimingsHandle>(function ProTimingsSectio
           const stored = Object.fromEntries(FIELDS.map((f) => [f.key, String(result[f.key])]));
           setValues(stored);
           setSaved(stored);
+          onSaved?.(result);
           return true;
         } catch (err: unknown) {
           setError(err instanceof Error ? err.message : 'Failed to save timings');
@@ -74,7 +80,7 @@ const ProTimingsSection = forwardRef<ProTimingsHandle>(function ProTimingsSectio
         }
       },
     }),
-    [values, saved, loading],
+    [values, saved, loading, onSaved],
   );
 
   return (

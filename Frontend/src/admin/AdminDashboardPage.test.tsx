@@ -108,6 +108,7 @@ vi.mock('../services/problemService', () => ({
 }));
 
 import AdminDashboardPage from './AdminDashboardPage';
+import { fetchAdminTenantProfile } from '../services/menuService';
 
 /** Signs in as a staff member with this role, the way a successful login stores it. */
 function signedInAs(role: string, full_name = 'Test Person') {
@@ -238,6 +239,17 @@ describe('AdminDashboardPage screens by role', () => {
 
     expect(tabs.getByText('Dishes')).toBeTruthy();
     expect(tabs.queryByText('Staff')).toBeNull();
+  });
+
+  it('gives the dish editor the restaurant\'s default prep time', async () => {
+    vi.mocked(fetchAdminTenantProfile).mockResolvedValueOnce({ name: 'Bistro', slug: 'bistro', settings: { default_prep_minutes: 20 } } as never);
+    signedInAs('manager');
+    renderDashboard();
+    await waitFor(() => expect(fetchAdminTenantProfile).toHaveBeenCalled());
+
+    fireEvent.click(screen.getAllByText('Add Dish')[0]);
+
+    expect(await screen.findByText('Leave empty to use the restaurant default (20 min).')).toBeTruthy();
   });
 
   it('tells a turned-off staff member why they were signed out', async () => {

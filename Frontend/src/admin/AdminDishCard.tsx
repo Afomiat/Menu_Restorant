@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { MoreHorizontal, Edit2, Trash2, CheckCircle2, XCircle } from 'lucide-react';
+import { MoreHorizontal, Edit2, Trash2, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import type { MenuItem } from '../types';
 import { formatCurrency } from '../utils/currency';
+import { t as text } from '../i18n/en';
 
 interface AdminDishCardProps {
   item: MenuItem;
@@ -11,6 +12,8 @@ interface AdminDishCardProps {
   onDelete: (itemId: string) => void;
   onUpdatePrice: (itemId: string, newPrice: number) => void;
   onToggleStock: (itemId: string) => void;
+  /** Pro: show the dish's own prep time, so the manager sees which dishes have one */
+  showPrepTime?: boolean;
 }
 
 export default function AdminDishCard({
@@ -21,6 +24,7 @@ export default function AdminDishCard({
   onDelete,
   onUpdatePrice,
   onToggleStock,
+  showPrepTime = false,
 }: AdminDishCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isEditingPrice, setIsEditingPrice] = useState(false);
@@ -144,6 +148,15 @@ export default function AdminDishCard({
           <h4 className="admin-dish-title" title={item.name}>
             {item.name}
           </h4>
+          {showPrepTime && item.prepMinutes ? (
+            <span
+              className="admin-dish-prep"
+              title={text.dish.prepBadgeTitle}
+              style={{ fontSize: '11px', fontWeight: 700, color: '#475569', background: '#f1f5f9', borderRadius: '999px', padding: '2px 8px', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+            >
+              <Clock size={11} /> {text.dish.prepBadge(item.prepMinutes)}
+            </span>
+          ) : null}
         </div>
 
         {/* Dietary and promotional tags */}

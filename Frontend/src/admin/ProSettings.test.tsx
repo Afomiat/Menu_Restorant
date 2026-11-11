@@ -26,6 +26,7 @@ vi.mock('../services/menuService', () => ({
 import AdminTablesModal from './AdminTablesModal';
 import AdminSettingsModal from './AdminSettingsModal';
 import AdminItemModal from './AdminItemModal';
+import AdminDishCard from './AdminDishCard';
 
 const waiter = (id: string, full_name: string, extra: Partial<StaffMember> = {}): StaffMember => ({
   id,
@@ -261,6 +262,31 @@ describe('Dish editor: prep time (Pro)', () => {
     fireEvent.submit(prep.closest('form')!);
 
     expect(onSave.mock.calls[0][0].prepMinutes).toBeNull();
+  });
+
+  it('shows the restaurant\'s own default, not a fixed 15', () => {
+    render(<AdminItemModal isOpen item={{ ...tibs, prepMinutes: null }} categories={categories} currency="ETB" onClose={vi.fn()} onSave={vi.fn()} showPrepTime defaultPrepMinutes={20} />);
+
+    const prep = screen.getByLabelText('Prep time (minutes)') as HTMLInputElement;
+    expect(prep.value).toBe('');
+    expect(prep.placeholder).toBe('Default (20)');
+    expect(screen.getByText('Leave empty to use the restaurant default (20 min).')).toBeTruthy();
+  });
+
+  it('shows a dish\'s own prep time on its card (Pro only)', () => {
+    const card = (item: MenuItem, showPrepTime: boolean) =>
+      render(<AdminDishCard item={item} categoryName="Mains" currency="ETB" onEdit={vi.fn()} onDelete={vi.fn()} onUpdatePrice={vi.fn()} onToggleStock={vi.fn()} showPrepTime={showPrepTime} />);
+
+    card(tibs, true);
+    expect(screen.getByTitle('Prep time set for this dish').textContent).toContain('25 min');
+    cleanup();
+
+    card({ ...tibs, prepMinutes: null }, true);
+    expect(screen.queryByTitle('Prep time set for this dish')).toBeNull();
+    cleanup();
+
+    card(tibs, false);
+    expect(screen.queryByTitle('Prep time set for this dish')).toBeNull();
   });
 
   it('has no prep time below Pro', () => {

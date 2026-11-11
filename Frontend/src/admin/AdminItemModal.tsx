@@ -474,7 +474,7 @@ export default function AdminItemModal({
                   min={1}
                   max={240}
                   className="admin-input-control"
-                  placeholder={String(defaultPrepMinutes)}
+                  placeholder={text.dish.prepPlaceholder(defaultPrepMinutes)}
                   value={formData.prepMinutes ?? ''}
                   onChange={(e) =>
                     setFormData({ ...formData, prepMinutes: e.target.value === '' ? null : Number(e.target.value) })

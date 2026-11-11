@@ -113,6 +113,9 @@ export const en = {
   dish: {
     prepMinutes: 'Prep time (minutes)',
     prepHint: (fallback: number) => `Leave empty to use the restaurant default (${fallback} min).`,
+    prepPlaceholder: (fallback: number) => `Default (${fallback})`,
+    prepBadge: (minutes: number) => `${minutes} min`,
+    prepBadgeTitle: 'Prep time set for this dish',
   },
 
   bills: {

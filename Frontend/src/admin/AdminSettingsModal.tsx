@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Settings, RefreshCw, DollarSign, Store, MapPin, Palette, Image as ImageIcon, UploadCloud, Loader2, Trash2, Clock } from 'lucide-react';
-import type { RestaurantMeta } from '../types';
+import type { RestaurantMeta, TenantSettings } from '../types';
 import AdminConfirmModal from './AdminConfirmModal';
 import ProTimingsSection, { type ProTimingsHandle } from './ProTimingsSection';
 import { uploadImageToCloudinary } from '../services/uploadService';
@@ -13,6 +13,7 @@ interface AdminSettingsModalProps {
   onResetToDefault: () => void;
   /** Pro restaurants also set prep and reminder times here. */
   showProTimings?: boolean;
+  onTimingsSaved?: (settings: TenantSettings) => void;
 }
 
 const COMMON_CURRENCIES = [
@@ -31,6 +32,7 @@ export default function AdminSettingsModal({
   onClose,
   onSave,
   showProTimings = false,
+  onTimingsSaved,
   onResetToDefault,
 }: AdminSettingsModalProps) {
   const timingsRef = useRef<ProTimingsHandle>(null);
@@ -527,7 +529,7 @@ export default function AdminSettingsModal({
               </button>
             </div>
             )}
-            {showProTimings && <ProTimingsSection ref={timingsRef} />}
+            {showProTimings && <ProTimingsSection ref={timingsRef} onSaved={onTimingsSaved} />}
           </div>
 
           <div className="admin-modal-footer">
