@@ -105,8 +105,9 @@ export const en = {
     billEscalation: 'Alert manager about an unpaid bill after',
     confirmReminder: 'Remind cashier to confirm after',
     longTable: 'Remind waiter about a long-open table after',
-    save: 'Save timings',
-    saved: 'Timings saved',
+    enterNumber: (label: string) => `${label}: enter a number of minutes.`,
+    outOfRange: (label: string, max: number) => `${label} must be between 1 and ${max} minutes.`,
+    escalationOrder: 'The manager alert for an unpaid bill must come after the waiter reminder.',
   },
 
   dish: {

@@ -1249,7 +1249,6 @@ export default function AdminDashboardPage() {
         onSave={handleSaveSettings}
         onResetToDefault={handleResetToDefault}
         showProTimings={isPro && isManager}
-        onToast={showToast}
       />
 
       {/* Dining Tables & QR Code Generator Modal */}

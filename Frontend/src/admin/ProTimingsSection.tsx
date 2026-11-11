@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import type { TenantSettings } from '../types';
 import { fetchAdminTenantProfile, updateTenantSettings } from '../services/menuService';
@@ -12,11 +12,31 @@ const FIELDS: { key: keyof TenantSettings; label: string; max: number }[] = [
   { key: 'long_table_minutes', label: t.settings.longTable, max: 600 },
 ];
 
-/** Pro managers: prep and reminder times, saved on their own (separately from branding). */
-export default function ProTimingsSection({ onSaved }: { onSaved?: (message: string) => void }) {
+export interface ProTimingsHandle {
+  /**
+   * Saves the timings if any changed. Resolves false, with the reason shown in the section,
+   * when a value is wrong or the server refuses, so the Settings window can stay open.
+   */
+  save: () => Promise<boolean>;
+}
+
+/** Checks the values the way the server does, with the names the manager sees. */
+function validate(values: Record<string, string>): string | null {
+  for (const f of FIELDS) {
+    const raw = (values[f.key] ?? '').trim();
+    if (raw === '' || !Number.isInteger(Number(raw))) return t.settings.enterNumber(f.label);
+    const n = Number(raw);
+    if (n < 1 || n > f.max) return t.settings.outOfRange(f.label, f.max);
+  }
+  if (Number(values.bill_escalation_minutes) <= Number(values.bill_reminder_minutes)) return t.settings.escalationOrder;
+  return null;
+}
+
+/** Pro managers: prep and reminder times, saved together with the rest of the Settings window. */
+const ProTimingsSection = forwardRef<ProTimingsHandle>(function ProTimingsSection(_props, ref) {
   const [values, setValues] = useState<Record<string, string>>({});
+  const [saved, setSaved] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -24,30 +44,38 @@ export default function ProTimingsSection({ onSaved }: { onSaved?: (message: str
       .then((profile) => {
         const settings = profile?.settings;
         if (settings) {
-          setValues(Object.fromEntries(FIELDS.map((f) => [f.key, String(settings[f.key])])));
+          const loaded = Object.fromEntries(FIELDS.map((f) => [f.key, String(settings[f.key])]));
+          setValues(loaded);
+          setSaved(loaded);
         }
       })
       .finally(() => setLoading(false));
   }, []);
 
-  const save = async () => {
-    setSaving(true);
-    setError(null);
-    try {
-      const changes: Partial<TenantSettings> = {};
-      for (const f of FIELDS) {
-        const n = Number(values[f.key]);
-        if (values[f.key] !== undefined && values[f.key] !== '') changes[f.key] = n;
-      }
-      const saved = await updateTenantSettings(changes);
-      setValues(Object.fromEntries(FIELDS.map((f) => [f.key, String(saved[f.key])])));
-      onSaved?.(t.settings.saved);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to save timings');
-    } finally {
-      setSaving(false);
-    }
-  };
+  useImperativeHandle(
+    ref,
+    () => ({
+      save: async () => {
+        const changed = FIELDS.some((f) => (values[f.key] ?? '') !== (saved[f.key] ?? ''));
+        if (loading || !changed) return true;
+        const problem = validate(values);
+        setError(problem);
+        if (problem) return false;
+        try {
+          const changes = Object.fromEntries(FIELDS.map((f) => [f.key, Number(values[f.key])])) as Partial<TenantSettings>;
+          const result = await updateTenantSettings(changes);
+          const stored = Object.fromEntries(FIELDS.map((f) => [f.key, String(result[f.key])]));
+          setValues(stored);
+          setSaved(stored);
+          return true;
+        } catch (err: unknown) {
+          setError(err instanceof Error ? err.message : 'Failed to save timings');
+          return false;
+        }
+      },
+    }),
+    [values, saved, loading],
+  );
 
   return (
     <section aria-label={t.settings.proTitle} style={{ borderTop: '1px solid var(--admin-border)', paddingTop: '16px', display: 'grid', gap: '10px' }}>
@@ -61,8 +89,9 @@ export default function ProTimingsSection({ onSaved }: { onSaved?: (message: str
               <span>{f.label}</span>
               <input
                 type="number"
-                min={1}
-                max={f.max}
+                inputMode="numeric"
+                // No min/max here: the browser's own popup would block the save with a generic message;
+                // validate() names the setting instead
                 className="admin-input-control"
                 style={{ width: '90px' }}
                 value={values[f.key] ?? ''}
@@ -75,11 +104,10 @@ export default function ProTimingsSection({ onSaved }: { onSaved?: (message: str
               {error}
             </p>
           )}
-          <button type="button" className="admin-save-pill-btn" style={{ justifySelf: 'start' }} onClick={save} disabled={saving}>
-            {saving ? <Loader2 size={14} className="admin-spin" /> : null} {t.settings.save}
-          </button>
         </>
       )}
     </section>
   );
-}
+});
+
+export default ProTimingsSection;

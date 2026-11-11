@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { X, Settings, RefreshCw, DollarSign, Store, MapPin, Palette, Image as ImageIcon, UploadCloud, Loader2, Trash2, Clock } from 'lucide-react';
 import type { RestaurantMeta } from '../types';
 import AdminConfirmModal from './AdminConfirmModal';
-import ProTimingsSection from './ProTimingsSection';
+import ProTimingsSection, { type ProTimingsHandle } from './ProTimingsSection';
 import { uploadImageToCloudinary } from '../services/uploadService';
 
 interface AdminSettingsModalProps {
@@ -13,7 +13,6 @@ interface AdminSettingsModalProps {
   onResetToDefault: () => void;
   /** Pro restaurants also set prep and reminder times here. */
   showProTimings?: boolean;
-  onToast?: (message: string) => void;
 }
 
 const COMMON_CURRENCIES = [
@@ -32,9 +31,10 @@ export default function AdminSettingsModal({
   onClose,
   onSave,
   showProTimings = false,
-  onToast,
   onResetToDefault,
 }: AdminSettingsModalProps) {
+  const timingsRef = useRef<ProTimingsHandle>(null);
+  const [isSavingTimings, setIsSavingTimings] = useState(false);
   const [name, setName] = useState('');
   const [tagline, setTagline] = useState('');
   const [currency, setCurrency] = useState('ETB');
@@ -141,8 +141,15 @@ export default function AdminSettingsModal({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Pro timings save with the same button; a wrong value keeps the window open with the reason shown
+    if (timingsRef.current) {
+      setIsSavingTimings(true);
+      const ok = await timingsRef.current.save();
+      setIsSavingTimings(false);
+      if (!ok) return;
+    }
     const finalCurrency = isCustomCurrency
       ? customCurrency.trim().toUpperCase() || 'ETB'
       : currency;
@@ -520,7 +527,7 @@ export default function AdminSettingsModal({
               </button>
             </div>
             )}
-            {showProTimings && <ProTimingsSection onSaved={onToast} />}
+            {showProTimings && <ProTimingsSection ref={timingsRef} />}
           </div>
 
           <div className="admin-modal-footer">
@@ -534,13 +541,13 @@ export default function AdminSettingsModal({
             <button
               type="submit"
               className="admin-modal-btn admin-modal-btn-save"
-              disabled={isUploading}
+              disabled={isUploading || isSavingTimings}
               style={{
-                opacity: isUploading ? 0.7 : 1,
-                cursor: isUploading ? 'not-allowed' : 'pointer',
+                opacity: isUploading || isSavingTimings ? 0.7 : 1,
+                cursor: isUploading || isSavingTimings ? 'not-allowed' : 'pointer',
               }}
             >
-              {isUploading ? 'Uploading...' : 'Save Settings'}
+              {isUploading ? 'Uploading...' : isSavingTimings ? 'Saving...' : 'Save Settings'}
             </button>
           </div>
         </form>
