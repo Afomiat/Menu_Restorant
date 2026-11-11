@@ -102,12 +102,22 @@ describe('BillCard for a waiter', () => {
     expect(onChanged).toHaveBeenCalled();
   });
 
+  it('drops the table name inside a table card and suggests other tables to move to', () => {
+    render(<BillCard bill={bill('b1', 'open')} role="waiter" onChanged={vi.fn()} showTable={false} tableSuggestions={['5', '6', 'Garden']} />);
+
+    expect(screen.queryByText('Table 5')).toBeNull();
+    expect(screen.getByText('Bill')).toBeTruthy();
+    fireEvent.click(screen.getByText('Move or join table'));
+    const options = Array.from(document.querySelectorAll('datalist option')).map((o) => o.getAttribute('value'));
+    expect(options).toEqual(['6', 'Garden']);
+  });
+
   it('collects by Telebirr with the reference, and by cash without one', async () => {
     svc.collectBill.mockResolvedValue(bill('b1', 'collected'));
     render(<BillCard bill={bill('b1', 'bill_requested')} role="waiter" onChanged={vi.fn()} />);
 
     fireEvent.click(screen.getByText('Collect'));
-    const form = screen.getByRole('form', { name: 'Collect for table 5' });
+    const form = screen.getByRole('form', { name: 'Collect for Table 5' });
     expect((within(form).getByLabelText('Amount') as HTMLInputElement).value).toBe('670');
     expect(within(form).queryByLabelText('Transaction reference')).toBeNull();
 
@@ -124,7 +134,7 @@ describe('BillCard for a waiter', () => {
 
     fireEvent.click(screen.getByText('Collect'));
     fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '900' } });
-    fireEvent.submit(screen.getByRole('form', { name: 'Collect for table 5' }));
+    fireEvent.submit(screen.getByRole('form', { name: 'Collect for Table 5' }));
 
     expect((await screen.findByRole('alert')).textContent).toBe('the amount is more than the bill still owes');
   });
@@ -234,7 +244,7 @@ describe('Walkouts on the bill card', () => {
 
     fireEvent.click(screen.getByText('Left without paying'));
     const group = screen.getByRole('group', { name: 'Left without paying' });
-    expect(group.textContent).toContain('Mark table 5 as a walkout of');
+    expect(group.textContent).toContain('Mark Table 5 as a walkout of');
     expect(problemSvc.markWalkout).not.toHaveBeenCalled();
 
     fireEvent.click(within(group).getByText('Left without paying'));

@@ -84,6 +84,8 @@ export const en = {
     cooking: 'Cooking',
     ordered: 'Ordered',
     served: 'Served',
+    servedDone: 'Served ✓',
+    partPaid: 'Part paid',
     readyBanner: (table: string) => `${tableLabel(table)}: food is ready`,
     order: (n: number) => `Order ${n}`,
   },
@@ -123,6 +125,7 @@ export const en = {
   bills: {
     title: 'Bills',
     navLabel: 'Bills',
+    heading: 'Bill',
     status: {
       open: 'Eating',
       bill_requested: 'Bill asked',
@@ -136,7 +139,7 @@ export const en = {
     owed: 'Owed',
     askBill: 'Ask for bill',
     collect: 'Collect',
-    collectTitle: (table: string) => `Collect for table ${table}`,
+    collectTitle: (table: string) => `Collect for ${tableLabel(table)}`,
     amount: 'Amount',
     method: 'Paid by',
     reference: 'Transaction reference',
@@ -172,7 +175,7 @@ export const en = {
     'bill:unconfirmed': (table: string) => `${tableLabel(table)}: collected money not confirmed yet`,
     'bill:handed_over': (table: string) => `${tableLabel(table)}'s bill was handed to you`,
     'table:long_open': (table: string) => `${tableLabel(table)} has been open a long time`,
-    'table:open_bill_rescanned': (table: string) => `New customers at table ${table}, but its bill is unpaid`,
+    'table:open_bill_rescanned': (table: string) => `New customers at ${tableLabel(table)}, but its bill is unpaid`,
     'shift:open_bills': () => 'A waiter tried to end their shift with unpaid bills',
     'problem:reported': (table: string) => `${tableLabel(table)} reported a problem with a dish`,
     'walkout:marked': (table: string) => `${tableLabel(table)} left without paying`,
@@ -201,7 +204,7 @@ export const en = {
 
   walkouts: {
     mark: 'Left without paying',
-    confirmMark: (table: string, amount: string) => `Mark table ${table} as a walkout of ${amount}?`,
+    confirmMark: (table: string, amount: string) => `Mark ${tableLabel(table)} as a walkout of ${amount}?`,
     summary: (table: string, amount: string, waiter: string) =>
       `${tableLabel(table)} left without paying ${amount}${waiter ? `, waiter ${waiter}` : ''}`,
     decisions: { waiter_pays: 'Waiter pays', restaurant_loss: 'Restaurant takes the loss' } as Record<string, string>,

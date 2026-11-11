@@ -9,7 +9,7 @@ import DishProblemButton from './DishProblemButton';
 import PushButton from './PushButton';
 import SoldOutButton from './SoldOutButton';
 import { t } from '../i18n/en';
-import { tableState, type TableState } from '../utils/orderBoards';
+import { billsSignature, isServed, tableState, type TableState } from '../utils/orderBoards';
 
 export interface ReadyAlert {
   orderId: string;
@@ -111,7 +111,7 @@ export default function WaiterTablesScreen({
         </div>
       </div>
 
-      <ShiftBar role="waiter" currency={currency} />
+      <ShiftBar role="waiter" currency={currency} refreshSignal={billsSignature(bills)} />
       <PushButton />
 
       {readyAlerts.map((alert) => (
@@ -140,25 +140,47 @@ export default function WaiterTablesScreen({
           const bill = bills.find(
             (b) => b.table_number === table.table_number && (b.status === 'open' || b.status === 'bill_requested' || b.status === 'collected')
           );
+          // The bill's state next to the kitchen state, so "Bill asked" is seen without scrolling
+          const billChip = !bill
+            ? null
+            : bill.status === 'bill_requested' || bill.status === 'collected'
+              ? t.bills.status[bill.status]
+              : bill.amount_paid > 0 && bill.amount_owed > 0
+                ? t.waiter.partPaid
+                : null;
           return (
             <div key={table.id} className="admin-kitchen-table-card" data-testid={`waiter-table-${table.table_number}`}>
               <div className="admin-kitchen-card-header">
                 <strong style={{ fontSize: '17px' }}>{t.kitchen.table(table.table_number)}</strong>
-                <span style={{ fontSize: '12px', fontWeight: 800, color: state.color, background: state.bg, padding: '3px 10px', borderRadius: '999px' }}>
-                  {state.label}
+                <span style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 800, color: state.color, background: state.bg, padding: '3px 10px', borderRadius: '999px' }}>
+                    {state.label}
+                  </span>
+                  {billChip && (
+                    <span data-testid="table-bill-chip" style={{ fontSize: '12px', fontWeight: 800, color: '#b45309', background: '#ffedd5', padding: '3px 10px', borderRadius: '999px' }}>
+                      {billChip}
+                    </span>
+                  )}
                 </span>
               </div>
               <div style={{ display: 'grid', gap: '10px', padding: '12px 16px' }}>
-                {orders.map((order, i) => (
-                  <div key={order.id} style={{ borderTop: i > 0 ? '1px solid #e2e8f0' : 'none', paddingTop: i > 0 ? '10px' : 0 }}>
-                    <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>{t.waiter.order(i + 1)}</div>
+                {orders.map((order, i) => {
+                  const served = isServed(order.status);
+                  // A problem is reported once the food has reached the table (or is ready to go)
+                  const canReport = served || order.status === 'ready';
+                  return (
+                  <div key={order.id} data-served={served || undefined} style={{ borderTop: i > 0 ? '1px solid #e2e8f0' : 'none', paddingTop: i > 0 ? '10px' : 0, opacity: served ? 0.75 : 1 }}>
+                    <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>{t.waiter.order(i + 1)}</span>
+                      {served && <span style={{ color: '#15803d', fontWeight: 700 }}>{t.waiter.servedDone}</span>}
+                    </div>
                     <ul style={{ listStyle: 'none', margin: 0, padding: 0, fontSize: '14px' }}>
                       {(order.items || []).map((it) => (
                         <li key={it.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
                           <span>
                             <strong>{it.quantity}×</strong> {it.item_name}
                           </span>
-                          <DishProblemButton orderId={order.id} itemId={it.id} dishName={it.item_name} />
+                          {canReport && <DishProblemButton orderId={order.id} itemId={it.id} dishName={it.item_name} />}
                         </li>
                       ))}
                     </ul>
@@ -174,8 +196,18 @@ export default function WaiterTablesScreen({
                       </button>
                     )}
                   </div>
-                ))}
-                {bill && <BillCard bill={bill} role="waiter" currency={currency} onChanged={load} />}
+                  );
+                })}
+                {bill && (
+                  <BillCard
+                    bill={bill}
+                    role="waiter"
+                    currency={currency}
+                    onChanged={load}
+                    showTable={false}
+                    tableSuggestions={(tables || []).map((tb) => tb.table.table_number)}
+                  />
+                )}
               </div>
             </div>
           );

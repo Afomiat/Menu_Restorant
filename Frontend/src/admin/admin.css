@@ -2460,3 +2460,8 @@
 
 
 
+
+/* Bill actions keep each label on one line; the row wraps instead (phones) */
+.admin-bill-actions > button {
+  white-space: nowrap;
+}

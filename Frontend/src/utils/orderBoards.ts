@@ -1,4 +1,4 @@
-import type { BackendOrder, CartItem, OrderStatus } from '../types';
+import type { BackendOrder, Bill, CartItem, OrderStatus } from '../types';
 
 export interface KitchenTicket {
   orderId: string;
@@ -47,9 +47,18 @@ function ticketRank(ticket: KitchenTicket): number {
 /** What a waiter's table is waiting for. */
 export type TableState = 'ready' | 'cooking' | 'ordered' | 'none';
 
+/** Served orders stay on the waiter's table (to report a problem) but no longer wait for anything. */
+export const isServed = (status: string) => status === 'delivered' || status === 'complete';
+
 export function tableState(orders: BackendOrder[]): TableState {
+  orders = orders.filter((o) => !isServed(o.status));
   if (orders.some((o) => o.status === 'ready')) return 'ready';
   if (orders.some((o) => o.status === 'preparing')) return 'cooking';
   if (orders.length > 0) return 'ordered';
   return 'none';
+}
+
+/** Changes when any bill's state or payments change; used to refresh the shift totals. */
+export function billsSignature(bills: Bill[]): string {
+  return bills.map((b) => `${b.id}:${b.status}:${b.amount_paid}:${b.waiter_id ?? ''}`).sort().join('|');
 }

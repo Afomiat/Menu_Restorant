@@ -11,6 +11,10 @@ interface BillCardProps {
   currency?: string;
   /** Called after any change so the screen reloads its bills. */
   onChanged: (bill?: Bill) => void;
+  /** False inside a table's card, where the table name is already the heading. */
+  showTable?: boolean;
+  /** Tables offered when moving or joining the bill; any other name can still be typed. */
+  tableSuggestions?: string[];
 }
 
 type Panel = 'none' | 'collect' | 'move' | 'handover' | 'walkout';
@@ -18,7 +22,7 @@ type Panel = 'none' | 'collect' | 'move' | 'handover' | 'walkout';
 const METHODS: PaymentMethod[] = ['cash', 'telebirr', 'cbe_birr_bank'];
 
 /** One bill with what was paid and what is owed, and the actions the signed-in role may take. */
-export default function BillCard({ bill, role, currency = 'ETB', onChanged }: BillCardProps) {
+export default function BillCard({ bill, role, currency = 'ETB', onChanged, showTable = true, tableSuggestions = [] }: BillCardProps) {
   const [panel, setPanel] = useState<Panel>('none');
   const [amount, setAmount] = useState(String(bill.amount_owed));
   const [method, setMethod] = useState<PaymentMethod>('cash');
@@ -33,6 +37,7 @@ export default function BillCard({ bill, role, currency = 'ETB', onChanged }: Bi
   const confirms = role === 'cashier' || role === 'manager' || role === 'super_admin';
   const takesOrders = bill.status === 'open' || bill.status === 'bill_requested';
   const money = (v: number) => formatPrice(v, currency);
+  const moveOptions = tableSuggestions.filter((name) => name !== bill.table_number);
 
   const run = async (action: () => Promise<Bill>) => {
     setBusy(true);
@@ -62,13 +67,13 @@ export default function BillCard({ bill, role, currency = 'ETB', onChanged }: Bi
   return (
     <div data-testid={`bill-${bill.id}`} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px', background: '#fff', display: 'grid', gap: '8px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
-        <strong>{t.kitchen.table(bill.table_number)}</strong>
+        {showTable ? <strong>{t.kitchen.table(bill.table_number)}</strong> : <strong>{t.bills.heading}</strong>}
         <span style={{ fontSize: '12px', fontWeight: 800, color: bill.status === 'bill_requested' ? '#b45309' : '#475569' }}>
           {t.bills.status[bill.status]}
         </span>
       </div>
       <div style={{ fontSize: '13px', color: '#64748b' }}>{t.bills.waiter(bill.waiter_name)}</div>
-      <div style={{ display: 'flex', gap: '16px', fontSize: '14px' }}>
+      <div style={{ display: 'flex', gap: '4px 16px', fontSize: '14px', flexWrap: 'wrap', whiteSpace: 'nowrap' }}>
         <span>
           {t.bills.total}: <strong>{money(bill.total_amount)}</strong>
         </span>
@@ -92,7 +97,7 @@ export default function BillCard({ bill, role, currency = 'ETB', onChanged }: Bi
         </ul>
       )}
 
-      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+      <div className="admin-bill-actions" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
         {serves && bill.status === 'open' && (
           <button type="button" className="admin-sec-pill-btn" disabled={busy} onClick={() => run(() => requestBill(bill.id))}>
             {t.bills.askBill}
@@ -197,7 +202,21 @@ export default function BillCard({ bill, role, currency = 'ETB', onChanged }: Bi
             run(() => moveBill(bill.id, table.trim()));
           }}
         >
-          <input className="admin-input-control" aria-label={t.bills.moveTo} placeholder={t.bills.moveTo} value={table} onChange={(e) => setTable(e.target.value)} />
+          <input
+            className="admin-input-control"
+            aria-label={t.bills.moveTo}
+            placeholder={t.bills.moveTo}
+            value={table}
+            onChange={(e) => setTable(e.target.value)}
+            list={moveOptions.length > 0 ? `move-tables-${bill.id}` : undefined}
+          />
+          {moveOptions.length > 0 && (
+            <datalist id={`move-tables-${bill.id}`}>
+              {moveOptions.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
+          )}
           <button type="submit" className="admin-save-pill-btn" disabled={busy || !table.trim()}>
             {t.bills.save}
           </button>

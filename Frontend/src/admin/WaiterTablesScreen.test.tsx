@@ -173,4 +173,50 @@ describe('WaiterTablesScreen problems', () => {
     const card = await screen.findByTestId('waiter-table-5');
     expect(within(card).getAllByText('Report problem')).toHaveLength(2);
   });
+
+  it('keeps served orders on the table, marked served, without making it wait', async () => {
+    fetchMyTables.mockResolvedValue([table('5', [order('a', 'delivered' as OrderStatus)])]);
+    renderScreen();
+
+    const card = await screen.findByTestId('waiter-table-5');
+    expect(within(card).getByText('Served ✓')).toBeTruthy();
+    expect(within(card).getByText('No open orders')).toBeTruthy();
+    expect(within(card).queryByRole('button', { name: /^Served$/ })).toBeNull();
+  });
+
+  it('does not offer Report problem before the food is ready', async () => {
+    fetchMyTables.mockResolvedValue([table('5', [order('a', 'not_started'), order('b', 'preparing', 'Shiro')])]);
+    renderScreen();
+
+    const card = await screen.findByTestId('waiter-table-5');
+    expect(within(card).queryByText('Report problem')).toBeNull();
+  });
+});
+
+describe('WaiterTablesScreen table header', () => {
+  const bill = (status: string, extra: Record<string, unknown> = {}) => ({
+    id: `bill-${status}`, tenant_id: 't', table_id: null, table_number: '5', waiter_id: 'w1', waiter_name: 'Abebe', status,
+    total_amount: 670, amount_paid: 0, amount_owed: 670, requested_at: null, collected_at: null, confirmed_at: null,
+    created_at: '', closed_at: null, payments: [], ...extra,
+  });
+
+  it('shows the bill state next to the kitchen state', async () => {
+    fetchMyTables.mockResolvedValue([table('5', [order('a', 'ready')]), table('6', [])]);
+    fetchBills.mockResolvedValue([bill('bill_requested')]);
+    renderScreen();
+
+    const card = await screen.findByTestId('waiter-table-5');
+    await waitFor(() => expect(within(card).getByTestId('table-bill-chip').textContent).toBe('Bill asked'));
+    expect(within(card).getByText('Food ready')).toBeTruthy();
+    expect(within(screen.getByTestId('waiter-table-6')).queryByTestId('table-bill-chip')).toBeNull();
+  });
+
+  it('marks a bill that is part paid', async () => {
+    fetchMyTables.mockResolvedValue([table('5', [order('a', 'preparing')])]);
+    fetchBills.mockResolvedValue([bill('open', { amount_paid: 50, amount_owed: 620 })]);
+    renderScreen();
+
+    const card = await screen.findByTestId('waiter-table-5');
+    await waitFor(() => expect(within(card).getByTestId('table-bill-chip').textContent).toBe('Part paid'));
+  });
 });

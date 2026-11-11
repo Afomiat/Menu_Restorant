@@ -9,7 +9,16 @@ import { t } from '../i18n/en';
  * Start and end a shift; ending is refused while a waiter still holds unpaid bills.
  * Waiters and cashiers also see their own totals for the shift.
  */
-export default function ShiftBar({ role, currency = 'ETB' }: { role?: StaffRole | null; currency?: string }) {
+export default function ShiftBar({
+  role,
+  currency = 'ETB',
+  refreshSignal = '',
+}: {
+  role?: StaffRole | null;
+  currency?: string;
+  /** Changes whenever the screen's bills change, so the totals and any old error are refreshed. */
+  refreshSignal?: string;
+}) {
   const [shift, setShift] = useState<Shift | null>(null);
   const [totals, setTotals] = useState<ShiftReport | null>(null);
   const [busy, setBusy] = useState(false);
@@ -26,7 +35,12 @@ export default function ShiftBar({ role, currency = 'ETB' }: { role?: StaffRole 
     fetchMyShiftReport()
       .then(setTotals)
       .catch(() => setTotals(null));
-  }, [shift, role]);
+  }, [shift, role, refreshSignal]);
+
+  // An old refusal ("you still have unpaid bills") no longer applies once the bills change
+  useEffect(() => {
+    setError(null);
+  }, [refreshSignal]);
 
   const run = async (action: () => Promise<Shift>, after: (s: Shift) => Shift | null) => {
     setBusy(true);
