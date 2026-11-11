@@ -139,9 +139,54 @@ describe('AdminStaffModal', () => {
     fireEvent.change(within(row).getByLabelText('New password for Abebe Kebede (at least 6 characters)'), {
       target: { value: 'newpass1' },
     });
-    fireEvent.click(within(row).getByText('Saved'));
+    fireEvent.click(within(row).getByText('Save'));
 
     await waitFor(() => expect(updateStaff).toHaveBeenCalledWith('02', { password: 'newpass1' }));
     expect(onToast).toHaveBeenCalledWith('Password changed for Abebe Kebede');
+  });
+
+  it('lets the manager edit their own name and phone', async () => {
+    const renamed = { ...hana, full_name: 'Hana A. Alemu', phone: '+251911000099' };
+    updateStaff.mockResolvedValueOnce(renamed);
+    const onToast = renderModal();
+    const own = await screen.findByTestId('staff-row-01');
+
+    fireEvent.click(within(own).getByText('Edit'));
+    fireEvent.change(within(own).getByLabelText('Full name of Hana Alemu'), { target: { value: '  Hana A. Alemu ' } });
+    fireEvent.change(within(own).getByLabelText('Phone number of Hana Alemu'), { target: { value: '0911 000 099' } });
+    fireEvent.click(within(own).getByText('Save'));
+
+    await waitFor(() =>
+      expect(updateStaff).toHaveBeenCalledWith('01', { full_name: 'Hana A. Alemu', phone: '0911 000 099' }),
+    );
+    expect(onToast).toHaveBeenCalledWith('Saved Hana A. Alemu');
+    expect(await within(own).findByText('Hana A. Alemu')).toBeTruthy();
+  });
+
+  it('says so when the server keeps the old phone number', async () => {
+    // A backend without phone changes saves the name and returns the old number
+    updateStaff.mockResolvedValueOnce({ ...abebe, full_name: 'Abebe K.' });
+    const onToast = renderModal();
+    const row = await screen.findByTestId('staff-row-02');
+
+    fireEvent.click(within(row).getByText('Edit'));
+    fireEvent.change(within(row).getByLabelText('Full name of Abebe Kebede'), { target: { value: 'Abebe K.' } });
+    fireEvent.change(within(row).getByLabelText('Phone number of Abebe Kebede'), { target: { value: '0911 000 055' } });
+    fireEvent.click(within(row).getByText('Save'));
+
+    expect(await screen.findByText(/the phone number could not be changed yet/)).toBeTruthy();
+    expect(onToast).not.toHaveBeenCalled();
+  });
+
+  it('does not save an empty name', async () => {
+    renderModal();
+    const row = await screen.findByTestId('staff-row-02');
+
+    fireEvent.click(within(row).getByText('Edit'));
+    fireEvent.change(within(row).getByLabelText('Full name of Abebe Kebede'), { target: { value: '   ' } });
+    fireEvent.click(within(row).getByText('Save'));
+
+    expect(await screen.findByText('Enter a full name.')).toBeTruthy();
+    expect(updateStaff).not.toHaveBeenCalled();
   });
 });

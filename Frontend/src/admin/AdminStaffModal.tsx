@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, Users, Loader2, UserPlus, KeyRound } from 'lucide-react';
+import { X, Users, Loader2, UserPlus, KeyRound, Pencil } from 'lucide-react';
 import type { PlanTier, StaffMember, StaffRole } from '../types';
 import { createStaff, fetchStaff, updateStaff, type StaffChanges } from '../services/staffService';
 import { hasPlan } from '../utils/plan';
@@ -27,6 +27,10 @@ export default function AdminStaffModal({ isOpen, onClose, plan, currentUserId, 
   const [busyId, setBusyId] = useState<string | null>(null);
   const [passwordFor, setPasswordFor] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState('');
+  // Name and phone editing, one row at a time
+  const [editFor, setEditFor] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
 
   const isPro = hasPlan(plan, 'pro');
 
@@ -46,6 +50,7 @@ export default function AdminStaffModal({ isOpen, onClose, plan, currentUserId, 
       setFormError(null);
       setPasswordFor(null);
       setNewPassword('');
+      setEditFor(null);
     }
   }, [isOpen]);
 
@@ -88,6 +93,48 @@ export default function AdminStaffModal({ isOpen, onClose, plan, currentUserId, 
     if (await handleChange(member, { password: newPassword }, t.staff.passwordReset(member.full_name))) {
       setPasswordFor(null);
       setNewPassword('');
+    }
+  };
+
+  const openEdit = (member: StaffMember) => {
+    const opening = editFor !== member.id;
+    setEditFor(opening ? member.id : null);
+    setEditName(member.full_name);
+    setEditPhone(member.phone || '');
+    setPasswordFor(null);
+  };
+
+  const handleEditSave = async (member: StaffMember) => {
+    const name = editName.trim();
+    if (!name) {
+      setListError(t.staff.nameRequired);
+      return;
+    }
+    const phone = editPhone.trim();
+    const changes: StaffChanges = {};
+    if (name !== member.full_name) changes.full_name = name;
+    const phoneRequested = phone !== '' && phone !== (member.phone || '');
+    if (phoneRequested) changes.phone = phone;
+    if (Object.keys(changes).length === 0) {
+      setEditFor(null);
+      return;
+    }
+    setBusyId(member.id);
+    setListError(null);
+    try {
+      const updated = await updateStaff(member.id, changes);
+      replace(updated);
+      setEditFor(null);
+      // A server that does not support phone changes ignores the field and returns the old number
+      if (phoneRequested && (updated.phone || '') === (member.phone || '')) {
+        setListError(t.staff.phoneNotSaved);
+      } else {
+        onToast?.(t.staff.detailsSaved(updated.full_name || name));
+      }
+    } catch (err: unknown) {
+      setListError(err instanceof Error ? err.message : 'Failed to save');
+    } finally {
+      setBusyId(null);
     }
   };
 
@@ -191,9 +238,20 @@ export default function AdminStaffModal({ isOpen, onClose, plan, currentUserId, 
                           type="button"
                           className="admin-sec-pill-btn"
                           disabled={busy}
+                          onClick={() => openEdit(member)}
+                          aria-expanded={editFor === member.id}
+                        >
+                          <Pencil size={14} /> {t.staff.edit}
+                        </button>
+
+                        <button
+                          type="button"
+                          className="admin-sec-pill-btn"
+                          disabled={busy}
                           onClick={() => {
                             setPasswordFor(passwordFor === member.id ? null : member.id);
                             setNewPassword('');
+                            setEditFor(null);
                           }}
                         >
                           <KeyRound size={14} /> {t.staff.resetPassword}
@@ -215,7 +273,42 @@ export default function AdminStaffModal({ isOpen, onClose, plan, currentUserId, 
                               disabled={busy || newPassword.length === 0}
                               onClick={() => handlePasswordSave(member)}
                             >
-                              {t.staff.saved}
+                              {t.staff.save}
+                            </button>
+                          </div>
+                        )}
+
+                        {editFor === member.id && (
+                          <div style={{ flexBasis: '100%', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                            <input
+                              type="text"
+                              className="admin-input-control"
+                              style={{ flex: '1 1 160px' }}
+                              aria-label={t.staff.editName(member.full_name || member.email)}
+                              placeholder={t.staff.fullName}
+                              value={editName}
+                              maxLength={100}
+                              onChange={(e) => setEditName(e.target.value)}
+                            />
+                            <input
+                              type="tel"
+                              className="admin-input-control"
+                              style={{ flex: '1 1 140px' }}
+                              aria-label={t.staff.editPhone(member.full_name || member.email)}
+                              placeholder={t.staff.phonePlaceholder}
+                              value={editPhone}
+                              onChange={(e) => setEditPhone(e.target.value)}
+                            />
+                            <button
+                              type="button"
+                              className="admin-save-pill-btn"
+                              disabled={busy}
+                              onClick={() => handleEditSave(member)}
+                            >
+                              {t.staff.save}
+                            </button>
+                            <button type="button" className="admin-sec-pill-btn" disabled={busy} onClick={() => setEditFor(null)}>
+                              {t.staff.cancel}
                             </button>
                           </div>
                         )}

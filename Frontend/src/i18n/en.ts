@@ -42,7 +42,16 @@ export const en = {
     resetPassword: 'New password',
     resetPasswordPrompt: (name: string) => `New password for ${name} (at least 6 characters)`,
     passwordReset: (name: string) => `Password changed for ${name}`,
+    save: 'Save',
     saved: 'Saved',
+    edit: 'Edit',
+    cancel: 'Cancel',
+    editName: (name: string) => `Full name of ${name}`,
+    editPhone: (name: string) => `Phone number of ${name}`,
+    detailsSaved: (name: string) => `Saved ${name}`,
+    nameRequired: 'Enter a full name.',
+    phoneNotSaved:
+      'The name was saved, but the phone number could not be changed yet: the server does not support it. Ask the Azai team.',
   },
 
   kitchen: {

@@ -12,6 +12,7 @@ export interface NewStaffInput {
 /** Only the fields that are set are changed. */
 export interface StaffChanges {
   full_name?: string;
+  phone?: string;
   role?: StaffRole;
   is_active?: boolean;
   password?: string;
