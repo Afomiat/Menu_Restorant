@@ -6,6 +6,7 @@ import { sizedImageUrl } from '../../utils/imageUrl';
 import OrderEstimate from '../../components/common/OrderEstimate';
 import AskBillButton from '../../components/common/AskBillButton';
 import { tableLabel } from '../../utils/table';
+import { tableOrderStatus } from '../../utils/kitchenTimer';
 
 interface ModernCartDrawerProps {
   cart: CartItem[];
@@ -347,7 +348,7 @@ export default function ModernCartDrawer({
 
                     <div className="modern-top-bill-right">
                       <div className="modern-top-bill-status">
-                        <span className="modern-pulse-dot" /> Kitchen Preparing
+                        <span className="modern-pulse-dot" /> {tableOrderStatus(placedOrders.map((o) => o.status))}
                       </div>
                       <div className="modern-top-bill-count">
                         <span>{totalPlacedCount} {totalPlacedCount === 1 ? 'item' : 'items'} ordered</span>

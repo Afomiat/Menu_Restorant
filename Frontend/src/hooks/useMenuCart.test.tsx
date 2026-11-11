@@ -124,6 +124,29 @@ describe('useMenuCart asking for the bill', () => {
     expect(result.current.billError).toBeNull();
   });
 
+  it('still says the waiter is coming after a reload', async () => {
+    window.history.pushState({}, '', '/m/demo-pro?table=5&token=tok123');
+    customerRequestBill.mockReset().mockResolvedValue(undefined);
+    placeLiveOrder.mockResolvedValue(serverOrder('o1', [{ name: 'Tibs', qty: 1 }], 15));
+    const first = renderHook(() => useMenuCart({ restaurantSlug: 'demo-pro', items: MENU, loading: false, tableNumber: '5', oneOrderPerCart: true }));
+    act(() => first.result.current.handleAddToOrder(tibs, 1, ''));
+    await act(async () => {
+      await first.result.current.handlePlaceOrder('5');
+    });
+    await act(async () => {
+      await first.result.current.handleRequestBill();
+    });
+    first.unmount();
+
+    // The page is opened again in the same browser: same orders, so the request is remembered
+    const again = renderHook(() => useMenuCart({ restaurantSlug: 'demo-pro', items: MENU, loading: false, tableNumber: '5', oneOrderPerCart: true }));
+    expect(again.result.current.billAsked).toBe(true);
+
+    // A later visit with no orders from that meal starts fresh
+    act(() => again.result.current.handleClearOrders());
+    expect(again.result.current.billAsked).toBe(false);
+  });
+
   it('keeps the reason when asking fails', async () => {
     window.history.pushState({}, '', '/m/demo-pro?table=5&token=tok123');
     customerRequestBill.mockReset().mockRejectedValue(new Error('this table has no open bill'));

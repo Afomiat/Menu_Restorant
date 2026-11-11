@@ -5,6 +5,7 @@ import { useCartDrawerLogic } from '../../hooks/useCartDrawerLogic';
 import OrderEstimate from '../../components/common/OrderEstimate';
 import AskBillButton from '../../components/common/AskBillButton';
 import { tableLabel } from '../../utils/table';
+import { tableOrderStatus } from '../../utils/kitchenTimer';
 
 interface ClassicCartDrawerProps {
   cart: CartItem[];
@@ -713,7 +714,7 @@ export default function ClassicCartDrawer({
                       }}
                     >
                       <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--accent-gold)' }} />
-                      Kitchen Preparing
+                      {tableOrderStatus(placedOrders.map((o) => o.status))}
                     </span>
                   </div>
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { customerEstimate, formatDuration, formatWaited, parsePrepMinutes, timerState, todayInEthiopia } from './kitchenTimer';
+import { customerEstimate, formatDuration, formatWaited, parsePrepMinutes, tableOrderStatus, timerState, todayInEthiopia } from './kitchenTimer';
 
 const MIN = 60_000;
 const start = 1_000_000;
@@ -45,6 +45,11 @@ describe('customerEstimate', () => {
     expect(customerEstimate('preparing', 15, start, start + 40 * MIN)).toBe('Almost ready');
   });
 
+  it('never shows more than the prep time when the phone clock is behind', () => {
+    // Started "in the future" from the phone's point of view
+    expect(customerEstimate('preparing', 15, start + 20_000, start)).toBe('Ready in about 15 min');
+  });
+
   it('shows nothing once ready, or without a target (Basic and Plus)', () => {
     expect(customerEstimate('ready', 15, start, start)).toBeNull();
     expect(customerEstimate('complete', 15, start, start)).toBeNull();
@@ -67,5 +72,22 @@ describe('todayInEthiopia', () => {
   it('uses Ethiopian time (UTC+3) for the day', () => {
     expect(todayInEthiopia(new Date('2026-11-05T20:59:00Z'))).toBe('2026-11-05');
     expect(todayInEthiopia(new Date('2026-11-05T21:00:00Z'))).toBe('2026-11-06');
+  });
+});
+
+describe('tableOrderStatus', () => {
+  it('follows the dishes still to serve', () => {
+    expect(tableOrderStatus(['pending_grace'])).toBe('Sent to kitchen');
+    expect(tableOrderStatus(['not_started', 'preparing'])).toBe('Cooking');
+    expect(tableOrderStatus(['ready', 'preparing'])).toBe('Partly ready');
+    expect(tableOrderStatus(['ready', 'ready'])).toBe('Ready');
+    expect(tableOrderStatus(['delivered', 'ready'])).toBe('Ready');
+    expect(tableOrderStatus(['delivered', 'complete'])).toBe('Served');
+  });
+
+  it('ignores cancelled dishes', () => {
+    expect(tableOrderStatus(['cancelled', 'ready'])).toBe('Ready');
+    expect(tableOrderStatus(['cancelled'])).toBeNull();
+    expect(tableOrderStatus([])).toBeNull();
   });
 });

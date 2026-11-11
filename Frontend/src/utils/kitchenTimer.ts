@@ -56,7 +56,8 @@ export function customerEstimate(
   }
   if (status === 'preparing') {
     if (!startedAt) return `About ${targetMinutes} min`;
-    const leftMinutes = Math.ceil((startedAt + targetMinutes * 60_000 - now) / 60_000);
+    // Capped at the prep time: the phone's clock can run a little behind the server's
+    const leftMinutes = Math.min(targetMinutes, Math.ceil((startedAt + targetMinutes * 60_000 - now) / 60_000));
     return leftMinutes > 0 ? `Ready in about ${leftMinutes} min` : 'Almost ready';
   }
   return null;
@@ -71,4 +72,20 @@ export function todayInEthiopia(now = new Date()): string {
 export function parsePrepMinutes(value: unknown): number | null {
   const n = typeof value === 'number' ? value : parseInt(String(value ?? ''), 10);
   return Number.isFinite(n) && n >= 1 && n <= 240 ? Math.round(n) : null;
+}
+
+/**
+ * One line for the customer's whole table, from the state of the dishes they ordered:
+ * "Ready" only when every dish still to serve is ready, "Served" once everything has been brought.
+ */
+export function tableOrderStatus(statuses: (OrderStatus | undefined)[]): string | null {
+  const live = statuses.filter((s) => s !== 'cancelled');
+  if (live.length === 0) return null;
+  const toServe = live.filter((s) => s !== 'delivered' && s !== 'complete');
+  if (toServe.length === 0) return 'Served';
+  const ready = toServe.filter((s) => s === 'ready').length;
+  if (ready === toServe.length) return 'Ready';
+  if (ready > 0) return 'Partly ready';
+  if (toServe.some((s) => s === 'preparing')) return 'Cooking';
+  return 'Sent to kitchen';
 }

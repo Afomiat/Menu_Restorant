@@ -433,13 +433,31 @@ export default function useMenuCart({
 
   // Undo an order within 60-second grace period
   // Pro: "Ask for the bill" tells the table's waiter, proven by the table's QR token
-  const [billAsked, setBillAsked] = useState(false);
+  // Remembered with the orders it covers, so a reload still says the waiter is coming;
+  // a new visit (no shared orders) starts fresh
+  const billAskedKey = `azai:bill_asked:${slug}:${resolvedTable || ''}`;
+  const [billAskedFor, setBillAskedFor] = useState<string[]>(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(billAskedKey) || '[]');
+      return Array.isArray(stored) ? stored : [];
+    } catch {
+      return [];
+    }
+  });
+  const [askedThisVisit, setAskedThisVisit] = useState(false);
+  const billAsked = askedThisVisit || billAskedFor.some((id) => myOrderIds.includes(id));
   const [billError, setBillError] = useState<string | null>(null);
   const handleRequestBill = async () => {
     setBillError(null);
     try {
       await customerRequestBill(slug, resolvedTable || '', resolvedToken);
-      setBillAsked(true);
+      setAskedThisVisit(true);
+      setBillAskedFor(myOrderIds);
+      try {
+        localStorage.setItem(billAskedKey, JSON.stringify(myOrderIds));
+      } catch {
+        // Storage unavailable: the message still shows until the page is reloaded
+      }
     } catch (err: any) {
       setBillError(err?.message || 'Could not ask for the bill. Please call your waiter.');
     }
@@ -502,6 +520,13 @@ export default function useMenuCart({
 
 const handleClearOrders = () => {
   setMyOrderIds([]);
+  setBillAskedFor([]);
+  setAskedThisVisit(false);
+  try {
+    localStorage.removeItem(billAskedKey);
+  } catch {
+    // Nothing stored
+  }
   setPlacedOrders([]);
   clearCustomerOrders(slug);
   try {
