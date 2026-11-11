@@ -86,6 +86,7 @@ import AdminLoginModal from './AdminLoginModal';
 import SearchBar from '../components/common/SearchBar';
 import OfflineBanner from '../components/common/OfflineBanner';
 import './admin.css';
+import { tableLabel } from '../utils/table';
 
 export default function AdminDashboardPage() {
   const { restaurantName } = useParams<{ restaurantName: string }>();
@@ -249,7 +250,7 @@ export default function AdminDashboardPage() {
         saveRestaurantOrders(slug, updated);
         return updated;
       });
-      showToast(`🔔 New Order #${orderData.id?.slice(-4)} received (Table ${orderData.table_number || 'Direct'})`);
+      showToast(`🔔 New Order #${orderData.id?.slice(-4)} received (${orderData.table_number ? tableLabel(orderData.table_number) : 'Direct'})`);
     },
     onOrderCancelled: (cancelledOrderId: string) => {
       if (!cancelledOrderId) return;
@@ -1257,6 +1258,7 @@ export default function AdminDashboardPage() {
         onClose={() => setIsTablesModalOpen(false)}
         restaurantSlug={slug}
         plan={planFromBackend}
+        restaurantName={meta?.name}
       />
 
       {/* Staff accounts (managers, Pro plan) */}

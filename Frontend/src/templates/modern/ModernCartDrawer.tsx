@@ -5,6 +5,7 @@ import { useCartDrawerLogic } from '../../hooks/useCartDrawerLogic';
 import { sizedImageUrl } from '../../utils/imageUrl';
 import OrderEstimate from '../../components/common/OrderEstimate';
 import AskBillButton from '../../components/common/AskBillButton';
+import { tableLabel } from '../../utils/table';
 
 interface ModernCartDrawerProps {
   cart: CartItem[];
@@ -92,7 +93,7 @@ export default function ModernCartDrawer({
               {activeTab === 'tray' ? 'Your Order Tray' : 'Kitchen Status'}
             </h2>
             <div style={{ fontSize: '12px', color: 'var(--modern-text-muted)', marginTop: '2px' }}>
-              {customerTable ? `Dine-In • Table ${customerTable}` : 'Dine-In Menu'}
+              {customerTable ? `Dine-In • ${tableLabel(customerTable)}` : 'Dine-In Menu'}
             </div>
           </div>
           <button
@@ -230,7 +231,7 @@ export default function ModernCartDrawer({
                       <span style={{ fontSize: '20px' }}>📍</span>
                       <div>
                         <div style={{ fontSize: '14px', fontWeight: 800, color: '#065f46', letterSpacing: '-0.2px' }}>
-                          Table {customerTable}
+                          {tableLabel(customerTable)}
                         </div>
                         <div style={{ fontSize: '11px', color: '#047857', fontWeight: 600 }}>
                           Verified Dine-In QR Session
@@ -408,7 +409,7 @@ export default function ModernCartDrawer({
 
                             {order.tableNumber && (
                               <span style={{ fontSize: '11px', color: '#8c919a', fontWeight: 600 }}>
-                                Table {order.tableNumber}
+                                {tableLabel(order.tableNumber)}
                               </span>
                             )}
                           </div>

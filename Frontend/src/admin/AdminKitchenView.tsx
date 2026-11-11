@@ -26,6 +26,7 @@ import { formatPrice } from '../utils/currency';
 import { hasPlan } from '../utils/plan';
 import AdminConfirmModal from './AdminConfirmModal';
 import SearchBar from '../components/common/SearchBar';
+import { groupLabel, tableLabel } from '../utils/table';
 
 interface AdminKitchenViewProps {
   slug: string;
@@ -640,7 +641,7 @@ const confirmClearHistory = () => {
                 <div className="admin-kitchen-card-header">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <div className="admin-kitchen-table-badge">
-                      <span>{tableLabel}</span>
+                      <span>{groupLabel(tableLabel)}</span>
                     </div>
                     <div className="admin-kitchen-card-meta">
                       <span className="admin-kitchen-card-time">
@@ -693,7 +694,7 @@ const confirmClearHistory = () => {
                     <button
                       type="button"
                       onClick={() => setTableToDelete(tableLabel)}
-                      title={`Remove / Clear all orders for ${tableLabel}`}
+                      title={`Remove / Clear all orders for ${groupLabel(tableLabel)}`}
                       style={{
                         background: 'none',
                         border: '1px solid #e2e8f0',
@@ -909,7 +910,7 @@ const confirmClearHistory = () => {
       <AdminConfirmModal
         isOpen={Boolean(tableToDelete)}
         title="Remove Table Orders"
-        message={`Are you sure you want to remove all orders for ${tableToDelete}? This will dismiss this table ticket.`}
+        message={`Are you sure you want to remove all orders for ${groupLabel(tableToDelete || '')}? This will dismiss this table ticket.`}
         itemName={tableToDelete || undefined}
         confirmLabel="Remove Table"
         isDestructive={true}
@@ -921,7 +922,7 @@ const confirmClearHistory = () => {
       <AdminConfirmModal
         isOpen={Boolean(orderToCancel)}
         title="Cancel Dish Order"
-        message={`Are you sure you want to cancel "${orderToCancel?.dishName}"? Only this single dish will be removed from Table ${orderToCancel?.tableNumber || 'Direct'}.`}
+        message={`Are you sure you want to cancel "${orderToCancel?.dishName}"? Only this single dish will be removed from ${orderToCancel?.tableNumber ? tableLabel(orderToCancel.tableNumber) : 'Direct'}.`}
         itemName={orderToCancel?.dishName}
         confirmLabel="Cancel Dish"
         isDestructive={true}

@@ -4,6 +4,7 @@ import { formatPrice } from '../../utils/currency';
 import { useCartDrawerLogic } from '../../hooks/useCartDrawerLogic';
 import OrderEstimate from '../../components/common/OrderEstimate';
 import AskBillButton from '../../components/common/AskBillButton';
+import { tableLabel } from '../../utils/table';
 
 interface ClassicCartDrawerProps {
   cart: CartItem[];
@@ -164,7 +165,7 @@ export default function ClassicCartDrawer({
                 fontWeight: 500,
               }}
             >
-              Dine-In • Table {customerTable ? customerTable : 'Not set'}
+              Dine-In • {customerTable ? tableLabel(customerTable) : 'Table not set'}
             </p>
           </div>
 
@@ -525,7 +526,7 @@ export default function ClassicCartDrawer({
                         <span style={{ fontSize: '18px' }}>📍</span>
                         <div>
                           <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--accent-gold)' }}>
-                            Table {customerTable}
+                            {tableLabel(customerTable)}
                           </div>
                           <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                             Verified Dine-In QR Session
@@ -803,7 +804,7 @@ export default function ClassicCartDrawer({
                               )}
 
                               <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                                Table {order.tableNumber || customerTable || '?'}
+                                {tableLabel(order.tableNumber || customerTable || '?')}
                               </span>
                             </div>
 

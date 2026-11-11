@@ -17,6 +17,7 @@ import {
   clearCompletedOrders,
 } from '../services/orderService';
 import { formatPrice } from '../utils/currency';
+import { groupLabel } from '../utils/table';
 
 interface AdminKitchenDrawerProps {
   slug: string;
@@ -347,7 +348,7 @@ export default function AdminKitchenDrawer({
                           borderRadius: '999px',
                         }}
                       >
-                        🪑 {tableLabel}
+                        🪑 {groupLabel(tableLabel)}
                       </span>
                       <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>
                         {tableOrders.length} {tableOrders.length === 1 ? 'item' : 'items'}

@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { X, QrCode, Plus, Check, Copy, ExternalLink, Printer, Loader2 } from 'lucide-react';
+import { X, QrCode, Plus, Check, Copy, ExternalLink, Printer, Loader2, Download } from 'lucide-react';
+import QRCode from 'qrcode';
 import { fetchAdminTables, createAdminTable, generateAdminTableQR, assignTableWaiter, type AdminTable } from '../services/orderService';
 import { fetchStaff } from '../services/staffService';
 import type { PlanTier, StaffMember } from '../types';
 import { hasPlan } from '../utils/plan';
 import { t as text } from '../i18n/en';
+import { tableLabel } from '../utils/table';
 
 interface AdminTablesModalProps {
   isOpen: boolean;
@@ -12,13 +14,19 @@ interface AdminTablesModalProps {
   restaurantSlug: string;
   /** Pro restaurants give each table a waiter. */
   plan?: PlanTier;
+  /** Printed on the table sticker above the QR code. */
+  restaurantName?: string;
 }
+
+const escapeHtml = (value: string) =>
+  value.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
 
 export default function AdminTablesModal({
   isOpen,
   onClose,
-  restaurantSlug: _restaurantSlug,
+  restaurantSlug,
   plan = 'basic',
+  restaurantName,
 }: AdminTablesModalProps) {
   const isPro = hasPlan(plan, 'pro');
   const [waiters, setWaiters] = useState<StaffMember[]>([]);
@@ -34,6 +42,29 @@ export default function AdminTablesModal({
   const [qrUrl, setQrUrl] = useState<string | null>(null);
   const [isGeneratingQR, setIsGeneratingQR] = useState(false);
   const [copied, setCopied] = useState(false);
+  // The QR code is drawn here in the browser, so it works offline and can be downloaded or printed
+  const [qrImage, setQrImage] = useState<string | null>(null);
+  const [qrError, setQrError] = useState(false);
+  const [waiterSaved, setWaiterSaved] = useState(false);
+
+  useEffect(() => {
+    if (!qrUrl) {
+      setQrImage(null);
+      return;
+    }
+    let cancelled = false;
+    setQrError(false);
+    QRCode.toDataURL(qrUrl, { width: 600, margin: 2, errorCorrectionLevel: 'M' })
+      .then((url) => {
+        if (!cancelled) setQrImage(url);
+      })
+      .catch(() => {
+        if (!cancelled) setQrError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [qrUrl]);
 
   useEffect(() => {
     if (isOpen) {
@@ -55,6 +86,7 @@ export default function AdminTablesModal({
     } else {
       setSelectedTable(null);
       setQrUrl(null);
+      setWaiterSaved(false);
       setNewTableNumber('');
       setCreateError(null);
     }
@@ -67,6 +99,8 @@ export default function AdminTablesModal({
     setSelectedTable(table);
     setIsGeneratingQR(true);
     setCopied(false);
+    setWaiterSaved(false);
+    setQrUrl(null);
     try {
       const res = await generateAdminTableQR(table.table_number);
       // The backend returns the table number unescaped (e.g. "table=Table 1"). Rebuild the query so
@@ -105,13 +139,41 @@ export default function AdminTablesModal({
   const handleAssignWaiter = async (waiterId: string) => {
     if (!selectedTable) return;
     setWaiterError(null);
+    setWaiterSaved(false);
     try {
       const updated = await assignTableWaiter(selectedTable.id, waiterId || null);
-      setTables((prev) => prev.map((tb) => (tb.id === updated.id ? { ...tb, ...updated } : tb)));
-      setSelectedTable((prev) => (prev && prev.id === updated.id ? { ...prev, ...updated } : prev));
+      // Keep the name on the table button in step, also when the response leaves it out
+      const named = { ...updated, assigned_waiter_name: updated.assigned_waiter_id ? updated.assigned_waiter_name || waiters.find((w) => w.id === updated.assigned_waiter_id)?.full_name : '' };
+      setTables((prev) => prev.map((tb) => (tb.id === named.id ? { ...tb, ...named } : tb)));
+      setSelectedTable((prev) => (prev && prev.id === named.id ? { ...prev, ...named } : prev));
+      setWaiterSaved(true);
     } catch (err: unknown) {
       setWaiterError(err instanceof Error ? err.message : 'Failed to assign waiter');
     }
+  };
+
+  const qrFileName = (table: AdminTable) =>
+    `${restaurantSlug || 'menu'}-${tableLabel(table.table_number).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-qr.png`;
+
+  // Prints only the sticker (restaurant, table, QR), not the whole admin page
+  const handlePrintSticker = () => {
+    if (!qrImage || !selectedTable) return;
+    const win = window.open('', '_blank', 'width=480,height=640');
+    if (!win) return;
+    const label = escapeHtml(tableLabel(selectedTable.table_number));
+    const name = restaurantName ? `<div class="name">${escapeHtml(restaurantName)}</div>` : '';
+    win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${label} QR</title><style>
+      @page { margin: 12mm; }
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; display: flex; justify-content: center; margin: 0; }
+      .sticker { width: 80mm; border: 1px dashed #94a3b8; border-radius: 6mm; padding: 6mm; text-align: center; }
+      .name { font-size: 16pt; font-weight: 800; margin-bottom: 1mm; }
+      .table { font-size: 13pt; font-weight: 700; color: #334155; }
+      img { width: 64mm; height: 64mm; display: block; margin: 4mm auto; }
+      .hint { font-size: 10pt; color: #475569; }
+    </style></head><body><div class="sticker">${name}<div class="table">${label}</div>
+      <img src="${qrImage}" alt="QR code"><div class="hint">${escapeHtml(text.tables.stickerHint)}</div></div>
+      <script>window.onload = function () { window.focus(); window.print(); };</script></body></html>`);
+    win.document.close();
   };
 
   const handleCopyLink = () => {
@@ -220,7 +282,13 @@ export default function AdminTablesModal({
                         transition: 'all 0.15s ease',
                       }}
                     >
-                      Table {t.table_number}
+                      {tableLabel(t.table_number)}
+                      {isPro && (
+                        <span style={{ fontWeight: 500, opacity: 0.75 }}>
+                          {' · '}
+                          {t.assigned_waiter_id ? t.assigned_waiter_name || '?' : text.tables.noWaiterShort}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -252,12 +320,22 @@ export default function AdminTablesModal({
                     onChange={(e) => handleAssignWaiter(e.target.value)}
                   >
                     <option value="">{text.tables.noWaiter}</option>
+                    {selectedTable.assigned_waiter_id && !waiters.some((w) => w.id === selectedTable.assigned_waiter_id) && (
+                      <option value={selectedTable.assigned_waiter_id} disabled>
+                        {text.tables.turnedOff(selectedTable.assigned_waiter_name || '?')}
+                      </option>
+                    )}
                     {waiters.map((w) => (
                       <option key={w.id} value={w.id}>
                         {w.full_name}
                       </option>
                     ))}
                   </select>
+                  {waiterSaved && !waiterError && (
+                    <span role="status" style={{ color: 'var(--admin-success, #10b981)', fontSize: '12px', fontWeight: 700 }}>
+                      <Check size={12} /> {text.tables.saved}
+                    </span>
+                  )}
                   {waiterError && (
                     <span role="alert" style={{ color: 'var(--admin-danger)', fontSize: '12px' }}>
                       {waiterError}
@@ -267,7 +345,7 @@ export default function AdminTablesModal({
               )}
 
               <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--admin-text-main)' }}>
-                QR Code for Table {selectedTable.table_number}
+                QR Code for {tableLabel(selectedTable.table_number)}
               </div>
 
               {isGeneratingQR ? (
@@ -286,11 +364,19 @@ export default function AdminTablesModal({
                       display: 'inline-block',
                     }}
                   >
-                    <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrUrl)}`}
-                      alt={`Table ${selectedTable.table_number} QR`}
-                      style={{ width: '180px', height: '180px', display: 'block' }}
-                    />
+                    {qrImage ? (
+                      <img
+                        src={qrImage}
+                        alt={`${tableLabel(selectedTable.table_number)} QR`}
+                        style={{ width: '180px', height: '180px', display: 'block' }}
+                      />
+                    ) : qrError ? (
+                      <div role="alert" style={{ width: '180px', fontSize: '12px', color: 'var(--admin-danger)' }}>{text.tables.qrFailed}</div>
+                    ) : (
+                      <div style={{ width: '180px', height: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Loader2 size={20} className="admin-spin" />
+                      </div>
+                    )}
                   </div>
 
                   <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', wordBreak: 'break-all', maxWidth: '100%', padding: '0 8px' }}>
@@ -318,14 +404,27 @@ export default function AdminTablesModal({
                       Test Link
                     </button>
 
+                    {qrImage && (
+                      <a
+                        className="admin-sec-pill-btn"
+                        href={qrImage}
+                        download={qrFileName(selectedTable)}
+                        style={{ height: '36px', fontSize: '12px', padding: '0 14px', display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}
+                      >
+                        <Download size={14} />
+                        {text.tables.downloadQr}
+                      </a>
+                    )}
+
                     <button
                       type="button"
                       className="admin-sec-pill-btn"
-                      onClick={() => window.print()}
+                      onClick={handlePrintSticker}
+                      disabled={!qrImage}
                       style={{ height: '36px', fontSize: '12px', padding: '0 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
                     >
                       <Printer size={14} />
-                      Print Sticker
+                      {text.tables.printSticker}
                     </button>
                   </div>
                 </>

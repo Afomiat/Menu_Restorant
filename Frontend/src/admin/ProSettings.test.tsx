@@ -13,6 +13,9 @@ vi.mock('../services/orderService', () => ({
 }));
 const fetchStaff = vi.fn();
 vi.mock('../services/staffService', () => ({ fetchStaff: () => fetchStaff() }));
+// The QR code is drawn in the browser; the test only needs to know what it was asked to encode
+const toDataURL = vi.fn(async (text: string) => `data:image/png;base64,QR:${text}`);
+vi.mock('qrcode', () => ({ default: { toDataURL: (text: string) => toDataURL(text) } }));
 const fetchAdminTenantProfile = vi.fn();
 const updateTenantSettings = vi.fn();
 vi.mock('../services/menuService', () => ({
@@ -76,6 +79,66 @@ describe('Tables: assigning a waiter (Pro)', () => {
     fireEvent.change(select, { target: { value: 'w1' } });
 
     expect((await screen.findByRole('alert')).textContent).toBe('choose an active waiter of this restaurant');
+  });
+
+  it('shows each table with its waiter and confirms a change', async () => {
+    fetchAdminTables.mockResolvedValue([
+      { id: 'tb5', tenant_id: 't', table_number: '5', is_active: true, assigned_waiter_id: 'w1', assigned_waiter_name: 'Abebe' },
+      { id: 'tb6', tenant_id: 't', table_number: 'Table 6', is_active: true, assigned_waiter_id: null },
+    ]);
+    assignTableWaiter.mockResolvedValueOnce({ id: 'tb5', tenant_id: 't', table_number: '5', is_active: true, assigned_waiter_id: null });
+    render(<AdminTablesModal isOpen onClose={vi.fn()} restaurantSlug="demo-pro" plan="pro" />);
+
+    expect((await screen.findByText('Table 5')).closest('button')?.textContent).toBe('Table 5 · Abebe');
+    // A table already named "Table 6" is not shown as "Table Table 6"
+    expect(screen.getByText('Table 6').closest('button')?.textContent).toBe('Table 6 · no waiter');
+
+    const select = (await screen.findByLabelText(/^Waiter/)) as HTMLSelectElement;
+    await waitFor(() => expect(select.value).toBe('w1'));
+    fireEvent.change(select, { target: { value: '' } });
+
+    expect((await screen.findByRole('status')).textContent).toContain('Saved');
+    expect(screen.getByText('Table 5').closest('button')?.textContent).toBe('Table 5 · no waiter');
+  });
+
+  it('keeps a turned-off waiter visible on their table', async () => {
+    fetchAdminTables.mockResolvedValue([
+      { id: 'tb5', tenant_id: 't', table_number: '5', is_active: true, assigned_waiter_id: 'w2', assigned_waiter_name: 'Gone' },
+    ]);
+    render(<AdminTablesModal isOpen onClose={vi.fn()} restaurantSlug="demo-pro" plan="pro" />);
+
+    const select = (await screen.findByLabelText(/^Waiter/)) as HTMLSelectElement;
+    await waitFor(() => expect(select.value).toBe('w2'));
+    expect(select.selectedOptions[0].textContent).toBe('Gone (turned off)');
+  });
+
+  it('draws the QR code in the app and offers it as a download', async () => {
+    render(<AdminTablesModal isOpen onClose={vi.fn()} restaurantSlug="demo-pro" plan="pro" />);
+
+    const img = (await screen.findByAltText('Table 5 QR')) as HTMLImageElement;
+    expect(img.src.startsWith('data:image/png')).toBe(true);
+    expect(img.src).not.toContain('qrserver');
+    expect(toDataURL).toHaveBeenCalledWith(expect.stringContaining('/m/demo-pro?table=5&token=x'));
+
+    const link = screen.getByText('Download QR').closest('a') as HTMLAnchorElement;
+    expect(link.getAttribute('download')).toBe('demo-pro-table-5-qr.png');
+    expect(link.getAttribute('href')).toBe(img.getAttribute('src'));
+  });
+
+  it('prints only the sticker, with the restaurant and table', async () => {
+    const doc = { write: vi.fn(), close: vi.fn() };
+    const open = vi.spyOn(window, 'open').mockReturnValue({ document: doc } as unknown as Window);
+    render(<AdminTablesModal isOpen onClose={vi.fn()} restaurantSlug="demo-pro" plan="pro" restaurantName="Demo <Pro>" />);
+    await screen.findByAltText('Table 5 QR');
+
+    fireEvent.click(screen.getByText('Print sticker'));
+
+    const html = doc.write.mock.calls[0][0] as string;
+    expect(html).toContain('Demo &lt;Pro&gt;');
+    expect(html).toContain('Table 5');
+    expect(html).toContain('Scan to see the menu and order');
+    expect(html).toContain('window.print()');
+    open.mockRestore();
   });
 
   it('has no waiter choice below Pro', async () => {

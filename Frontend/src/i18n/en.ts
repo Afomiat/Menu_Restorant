@@ -1,3 +1,5 @@
+import { tableLabel } from '../utils/table';
+
 /**
  * Text shown on the staff screens. New staff-facing text lives here so another language
  * (Amharic) can be added later as a file with the same keys.
@@ -58,7 +60,7 @@ export const en = {
     title: 'Kitchen',
     enableSound: 'Tap to enable sound',
     empty: 'No open orders. New orders appear here with a bell.',
-    table: (n: string) => `Table ${n}`,
+    table: (n: string) => tableLabel(n),
     waiting: (waited: string, target: number) => `New · ${waited} · ${target} min`,
     cooking: 'Cooking',
     readyWaiting: 'Ready · waiting for the waiter',
@@ -67,7 +69,7 @@ export const en = {
     served: 'Served',
     cancel: 'Cancel order',
     veryLate: (table: string, minutes: number, target: number) =>
-      `Table ${table}: cooking for ${minutes} min (target ${target} min)`,
+      `${tableLabel(table)}: cooking for ${minutes} min (target ${target} min)`,
     dismiss: 'Dismiss',
     remake: 'REMAKE',
   },
@@ -80,13 +82,20 @@ export const en = {
     cooking: 'Cooking',
     ordered: 'Ordered',
     served: 'Served',
-    readyBanner: (table: string) => `Table ${table}: food is ready`,
+    readyBanner: (table: string) => `${tableLabel(table)}: food is ready`,
     order: (n: number) => `Order ${n}`,
   },
 
   tables: {
     waiter: 'Waiter',
     noWaiter: 'No waiter (alerts go to managers)',
+    noWaiterShort: 'no waiter',
+    turnedOff: (name: string) => `${name} (turned off)`,
+    saved: 'Saved',
+    downloadQr: 'Download QR',
+    printSticker: 'Print sticker',
+    stickerHint: 'Scan to see the menu and order',
+    qrFailed: 'Could not draw the QR code. Copy the link instead.',
   },
 
   settings: {
@@ -150,17 +159,17 @@ export const en = {
 
   /** Banners for live alerts, by event. */
   alerts: {
-    'bill:requested': (table: string) => `Table ${table} asks for the bill`,
-    'bill:reminder': (table: string) => `Table ${table}: the bill is still unpaid`,
-    'bill:escalated': (table: string) => `Table ${table}: the bill is unpaid for a long time`,
-    'bill:collected': (table: string) => `Table ${table}: money collected, please confirm`,
-    'bill:unconfirmed': (table: string) => `Table ${table}: collected money not confirmed yet`,
-    'bill:handed_over': (table: string) => `Table ${table}'s bill was handed to you`,
-    'table:long_open': (table: string) => `Table ${table} has been open a long time`,
+    'bill:requested': (table: string) => `${tableLabel(table)} asks for the bill`,
+    'bill:reminder': (table: string) => `${tableLabel(table)}: the bill is still unpaid`,
+    'bill:escalated': (table: string) => `${tableLabel(table)}: the bill is unpaid for a long time`,
+    'bill:collected': (table: string) => `${tableLabel(table)}: money collected, please confirm`,
+    'bill:unconfirmed': (table: string) => `${tableLabel(table)}: collected money not confirmed yet`,
+    'bill:handed_over': (table: string) => `${tableLabel(table)}'s bill was handed to you`,
+    'table:long_open': (table: string) => `${tableLabel(table)} has been open a long time`,
     'table:open_bill_rescanned': (table: string) => `New customers at table ${table}, but its bill is unpaid`,
     'shift:open_bills': () => 'A waiter tried to end their shift with unpaid bills',
-    'problem:reported': (table: string) => `Table ${table} reported a problem with a dish`,
-    'walkout:marked': (table: string) => `Table ${table} left without paying`,
+    'problem:reported': (table: string) => `${tableLabel(table)} reported a problem with a dish`,
+    'walkout:marked': (table: string) => `${tableLabel(table)} left without paying`,
   } as Record<string, (table: string) => string>,
 
   problems: {
@@ -188,7 +197,7 @@ export const en = {
     mark: 'Left without paying',
     confirmMark: (table: string, amount: string) => `Mark table ${table} as a walkout of ${amount}?`,
     summary: (table: string, amount: string, waiter: string) =>
-      `Table ${table} left without paying ${amount}${waiter ? `, waiter ${waiter}` : ''}`,
+      `${tableLabel(table)} left without paying ${amount}${waiter ? `, waiter ${waiter}` : ''}`,
     decisions: { waiter_pays: 'Waiter pays', restaurant_loss: 'Restaurant takes the loss' } as Record<string, string>,
     note: 'Note (optional)',
   },
