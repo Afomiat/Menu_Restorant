@@ -329,6 +329,8 @@ export interface DailyReport {
   }[];
   walkouts: Walkout[];
   removed_dishes: Problem[];
+  /** Dishes the manager sent back to the kitchen; sent by newer servers only. */
+  remade_dishes?: Problem[];
   kitchen: { item_name: string; orders: number; avg_minutes: number; target_minutes: number; late: number }[];
   open_bills: { bill_id: string; table_number: string; status: BillStatus; waiter_name: string; total_amount: number; amount_paid: number }[];
 }

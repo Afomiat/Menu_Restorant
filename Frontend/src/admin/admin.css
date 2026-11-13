@@ -2465,3 +2465,35 @@
 .admin-bill-actions > button {
   white-space: nowrap;
 }
+
+/* Reports on phones: each table row becomes a small card with the column name beside each value */
+@media (max-width: 640px) {
+  .admin-report-table thead {
+    display: none;
+  }
+  .admin-report-table tr {
+    display: block;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 6px 0;
+  }
+  .admin-report-table td {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: none !important;
+    padding: 3px 10px !important;
+    text-align: right !important;
+  }
+  .admin-report-table td::before {
+    content: attr(data-label);
+    color: #64748b;
+    font-weight: 600;
+    text-align: left;
+  }
+  .admin-report-table td:not([data-label]) {
+    text-align: left !important;
+  }
+  .admin-report-table td[data-empty] {
+    display: none;
+  }
+}

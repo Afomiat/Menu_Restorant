@@ -231,8 +231,34 @@ describe('ReportsScreen', () => {
     expect(losses.textContent).toContain('Table 7 left without paying');
     expect(losses.textContent).toContain('Table 5: 1× Tibs');
     expect(losses.textContent).toContain('Kitchen');
-    expect(screen.getByRole('region', { name: 'Kitchen times' }).textContent).toContain('18.5 min');
+    expect(screen.getByRole('region', { name: 'Kitchen times' }).textContent).toContain('18:30');
+    expect(screen.getByRole('region', { name: 'Kitchen times' }).textContent).toContain('15:00');
+    // Headings on every table, and the day's total loss: walkout 600 + removed dish 450
+    expect(sales.querySelector('thead')?.textContent).toBe('Paid byPaymentsAmount');
+    expect(losses.querySelectorAll('thead')).toHaveLength(2);
+    expect(screen.getByTestId('losses-total').textContent).toContain('1,050');
+    // Remakes only appear when the server sends them
+    expect(screen.queryByText('Dishes cooked again')).toBeNull();
     expect(screen.getByRole('region', { name: 'Bills still open' }).textContent).toContain('Bill asked');
+  });
+
+  it('lists dishes cooked again when the server sends them', async () => {
+    svc.fetchDailyReport.mockResolvedValue({ ...report, remade_dishes: [problem('p2', { item_name: 'Shiro', reason: 'cold', decision: 'remake', fault: 'waiter' })] });
+    render(<ReportsScreen currency="ETB" />);
+
+    const losses = await screen.findByRole('region', { name: 'Losses' });
+    expect(losses.textContent).toContain('Dishes cooked again');
+    expect(losses.textContent).toContain('Table 5: 1× Shiro');
+    expect(losses.textContent).toContain('ColdWaiter');
+  });
+
+  it('labels each value for the phone card layout', async () => {
+    svc.fetchDailyReport.mockResolvedValue(report);
+    render(<ReportsScreen currency="ETB" />);
+
+    const waiters = await screen.findByRole('region', { name: 'Waiters' });
+    const labels = Array.from(waiters.querySelectorAll('tbody td')).map((td) => td.getAttribute('data-label'));
+    expect(labels).toEqual(['Waiter', 'Bills', 'Sales', 'Collected', 'Confirmed', 'Not confirmed', 'Walkouts']);
   });
 
   it('loads another day when the date changes', async () => {

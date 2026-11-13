@@ -11,6 +11,10 @@ export default function ReportsScreen({ currency = 'ETB' }: { currency?: string 
   const [report, setReport] = useState<DailyReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const money = (v: number) => formatPrice(v, currency);
+  // Money lost on the day: walkouts plus dishes taken off bills
+  const lossesTotal = report
+    ? report.walkouts.reduce((sum, w) => sum + w.amount, 0) + report.removed_dishes.reduce((sum, p) => sum + (p.removed_amount || 0), 0)
+    : 0;
 
   useEffect(() => {
     fetchDailyReport(date)
@@ -36,6 +40,7 @@ export default function ReportsScreen({ currency = 'ETB' }: { currency?: string 
         <div style={{ display: 'grid', gap: '20px' }}>
           <Section title={t.reports.sales}>
             <Table
+              head={t.reports.salesColumns}
               rows={report.sales_by_method.map((m) => [t.bills.methods[m.method], String(m.payments), money(m.amount)])}
               footer={[t.reports.salesTotal, '', money(report.sales_total)]}
             />
@@ -59,6 +64,7 @@ export default function ReportsScreen({ currency = 'ETB' }: { currency?: string 
           <Section title={t.reports.losses}>
             <h3 style={{ fontSize: '13px', margin: '0 0 4px' }}>{t.reports.walkouts}</h3>
             <Table
+              head={t.reports.walkoutColumns}
               rows={report.walkouts.map((w) => [
                 t.walkouts.summary(w.table_number, money(w.amount), w.waiter_name),
                 w.decision ? t.walkouts.decisions[w.decision] : '—',
@@ -67,12 +73,31 @@ export default function ReportsScreen({ currency = 'ETB' }: { currency?: string 
             />
             <h3 style={{ fontSize: '13px', margin: '10px 0 4px' }}>{t.reports.removed}</h3>
             <Table
+              head={t.reports.removedColumns}
               rows={report.removed_dishes.map((p) => [
                 `${t.kitchen.table(p.table_number)}: ${p.quantity}× ${p.item_name}`,
                 money(p.removed_amount || 0),
                 p.fault ? t.problems.faults[p.fault] : '—',
               ])}
             />
+            {report.remade_dishes && (
+              <>
+                <h3 style={{ fontSize: '13px', margin: '10px 0 4px' }}>{t.reports.remade}</h3>
+                <Table
+                  head={t.reports.remadeColumns}
+                  rows={report.remade_dishes.map((p) => [
+                    `${t.kitchen.table(p.table_number)}: ${p.quantity}× ${p.item_name}`,
+                    t.problems.reasons[p.reason] || p.reason,
+                    p.fault ? t.problems.faults[p.fault] : '—',
+                  ])}
+                />
+              </>
+            )}
+            {lossesTotal > 0 && (
+              <p data-testid="losses-total" style={{ margin: '10px 0 0', fontWeight: 800, fontSize: '14px' }}>
+                {t.reports.lossesTotal}: {money(lossesTotal)}
+              </p>
+            )}
           </Section>
 
           <Section title={t.reports.kitchen}>
@@ -90,6 +115,7 @@ export default function ReportsScreen({ currency = 'ETB' }: { currency?: string 
 
           <Section title={t.reports.openBills}>
             <Table
+              head={t.reports.openBillColumns}
               rows={report.open_bills.map((b) => [
                 t.kitchen.table(b.table_number),
                 t.bills.status[b.status],
@@ -118,7 +144,7 @@ function Table({ head, rows, footer }: { head?: string[]; rows: string[][]; foot
   const cell = { padding: '6px 10px', borderBottom: '1px solid #e2e8f0', textAlign: 'left' as const, fontSize: '13px' };
   return (
     <div style={{ overflowX: 'auto' }}>
-      <table style={{ borderCollapse: 'collapse', width: '100%', background: '#fff' }}>
+      <table className="admin-report-table" style={{ borderCollapse: 'collapse', width: '100%', background: '#fff' }}>
         {head && (
           <thead>
             <tr>
@@ -134,7 +160,7 @@ function Table({ head, rows, footer }: { head?: string[]; rows: string[][]; foot
           {rows.map((row, i) => (
             <tr key={i}>
               {row.map((c, j) => (
-                <td key={j} style={cell}>
+                <td key={j} style={cell} data-label={head?.[j] || undefined}>
                   {c}
                 </td>
               ))}
@@ -145,7 +171,7 @@ function Table({ head, rows, footer }: { head?: string[]; rows: string[][]; foot
           <tfoot>
             <tr>
               {footer.map((c, j) => (
-                <td key={j} style={{ ...cell, fontWeight: 800 }}>
+                <td key={j} style={{ ...cell, fontWeight: 800 }} data-empty={c === '' || undefined}>
                   {c}
                 </td>
               ))}

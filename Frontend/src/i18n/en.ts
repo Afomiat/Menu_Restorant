@@ -246,8 +246,19 @@ export const en = {
     removed: 'Dishes removed from bills',
     kitchen: 'Kitchen times',
     kitchenColumns: ['Dish', 'Orders', 'Average', 'Target', 'Late'],
+    salesColumns: ['Paid by', 'Payments', 'Amount'],
+    walkoutColumns: ['Walkout', 'Decision', 'Note'],
+    removedColumns: ['Dish', 'Amount', 'At fault'],
+    remadeColumns: ['Dish', 'Reason', 'At fault'],
+    openBillColumns: ['Table', 'Status', 'Waiter', 'Owed'],
+    remade: 'Dishes cooked again',
+    lossesTotal: 'Total lost',
     openBills: 'Bills still open',
-    minutes: (m: number) => `${m.toFixed(1)} min`,
+    /** Minutes as a clock: 0.58 → "0:35", 15 → "15:00". */
+    minutes: (m: number) => {
+      const seconds = Math.round(Math.max(0, m) * 60);
+      return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+    },
     nothing: 'Nothing for this day.',
     noWaiter: 'No waiter',
   },
