@@ -213,6 +213,19 @@ describe('BillsScreen', () => {
     await waitFor(() => expect(svc.fetchBills).toHaveBeenCalledTimes(2));
     expect(screen.queryByTestId('shift-status')).toBeNull();
   });
+
+  it("shows the cashier's name and Sign out, and hands every loaded list on", async () => {
+    const list = [bill('coll1', 'collected', { amount_owed: 0 })];
+    svc.fetchBills.mockResolvedValue(list);
+    const onLogout = vi.fn();
+    const onBillsLoaded = vi.fn();
+    render(<BillsScreen role="cashier" refreshSignal={0} showShift fullName="Hana" onLogout={onLogout} onBillsLoaded={onBillsLoaded} />);
+
+    expect(screen.getByText('Hana')).toBeTruthy();
+    fireEvent.click(screen.getByText('Sign out'));
+    expect(onLogout).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onBillsLoaded).toHaveBeenCalledWith(list));
+  });
 });
 
 describe('ShiftBar', () => {

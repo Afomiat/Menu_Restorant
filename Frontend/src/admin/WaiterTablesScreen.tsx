@@ -30,6 +30,8 @@ interface WaiterTablesScreenProps {
   onOpenSoldOut?: () => void;
   /** How many dishes are sold out right now, shown on the button. */
   soldOutCount?: number;
+  /** Gets every freshly loaded bill list, so old bill banners can clear themselves. */
+  onBillsLoaded?: (bills: Bill[]) => void;
 }
 
 const STATE_STYLE: Record<TableState, { label: string; color: string; bg: string }> = {
@@ -50,6 +52,7 @@ export default function WaiterTablesScreen({
   currency,
   onOpenSoldOut,
   soldOutCount = 0,
+  onBillsLoaded,
 }: WaiterTablesScreenProps) {
   const [tables, setTables] = useState<TableOrders[] | null>(null);
   const [bills, setBills] = useState<Bill[]>([]);
@@ -64,9 +67,12 @@ export default function WaiterTablesScreen({
       })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Failed to load tables'));
     fetchBills()
-      .then(setBills)
+      .then((data) => {
+        setBills(data);
+        onBillsLoaded?.(data);
+      })
       .catch(() => setBills([]));
-  }, []);
+  }, [onBillsLoaded]);
 
   useEffect(() => {
     load();

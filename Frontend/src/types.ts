@@ -286,6 +286,10 @@ export interface Problem {
   reported_by_name: string;
   ready_by_name: string;
   served_by_name: string;
+  /** When the kitchen started, readied and the waiter served the dish (empty when that step has not happened). */
+  started_at?: string | null;
+  ready_at?: string | null;
+  served_at?: string | null;
   decision: ProblemDecision | null;
   fault: Fault | null;
   decided_by_name: string;

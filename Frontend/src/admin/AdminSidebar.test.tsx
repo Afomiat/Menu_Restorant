@@ -95,6 +95,14 @@ describe('AdminSidebar by role', () => {
     expect(navItems()).toEqual(['Sign Out']);
   });
 
+  it('shows how many decisions wait on Alerts', () => {
+    render(<AdminSidebar meta={{ ...baseMeta, plan: 'pro' }} slug="aura" role="manager" onSelectView={vi.fn()} alertsCount={3} />);
+    expect(screen.getByTestId('alerts-count').textContent).toBe('3');
+    cleanup();
+    render(<AdminSidebar meta={{ ...baseMeta, plan: 'pro' }} slug="aura" role="manager" onSelectView={vi.fn()} alertsCount={0} />);
+    expect(screen.queryByTestId('alerts-count')).toBeNull();
+  });
+
   it('shows the Menu Status card to managers only', () => {
     render(<AdminSidebar meta={{ ...baseMeta, plan: 'pro' }} slug="aura" role="manager" />);
     expect(screen.getByText('Menu Status: Live')).toBeTruthy();

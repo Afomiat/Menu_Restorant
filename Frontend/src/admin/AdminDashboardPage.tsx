@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, type CSSProperties } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, type CSSProperties } from 'react';
 import { useParams } from 'react-router-dom';
 import { Plus, AlertCircle, Sparkles, ChefHat, ExternalLink, UtensilsCrossed, ChevronLeft, ChevronRight, Menu as MenuIcon } from 'lucide-react';
 import useRestaurantMenu from '../hooks/useRestaurantMenu';
@@ -35,8 +35,10 @@ import AdminStaffModal from './AdminStaffModal';
 import AdminRoleHome from './AdminRoleHome';
 import ProKitchenBoard from './ProKitchenBoard';
 import WaiterTablesScreen, { type ReadyAlert } from './WaiterTablesScreen';
+import { isBillAlertResolved } from '../utils/orderBoards';
 import BillsScreen from './BillsScreen';
 import DecisionsScreen from './DecisionsScreen';
+import { fetchDecisions } from '../services/problemService';
 import ReportsScreen from './ReportsScreen';
 import type { AdminView } from './AdminSidebar';
 import { useBell } from '../hooks/useBell';
@@ -54,6 +56,7 @@ interface StaffAlert {
   key: string;
   event: string;
   tableNumber: string;
+  billId?: string;
 }
 
 // Alerts that ring the friendly bell; the rest use the alert sound
@@ -66,7 +69,7 @@ interface VeryLateAlert {
   targetMinutes: number;
 }
 import { useKitchenWebSocket } from '../hooks/useKitchenWebSocket';
-import type { MenuItem, Category, RestaurantMeta, RestaurantMenu, CartItem, OrderStatus, PlanTier } from '../types';
+import type { MenuItem, Category, RestaurantMeta, RestaurantMenu, CartItem, OrderStatus, PlanTier, Bill, Decisions } from '../types';
 import { PLAN_INFO } from '../utils/plan';
 import { matchesSearchQuery } from '../utils/search';
 import SkeletonLoader from '../components/common/SkeletonLoader';
@@ -207,8 +210,34 @@ export default function AdminDashboardPage() {
   const [readyAlerts, setReadyAlerts] = useState<ReadyAlert[]>([]);
   const [veryLateAlerts, setVeryLateAlerts] = useState<VeryLateAlert[]>([]);
   const [staffAlerts, setStaffAlerts] = useState<StaffAlert[]>([]);
+
+  // Bill banners clear themselves once the bill has moved on (collected, confirmed, walkout)
+  const dropResolvedBillAlerts = useCallback((bills: Bill[]) => {
+    setStaffAlerts((prev) => {
+      const next = prev.filter((a) => !isBillAlertResolved(a.event, a.billId, bills));
+      return next.length === prev.length ? prev : next;
+    });
+  }, []);
   const [ordersChanged, setOrdersChanged] = useState(0);
   const markOrdersChanged = () => setOrdersChanged((n) => n + 1);
+
+  // How many problems and walkouts wait for the manager, shown on the sidebar's Alerts
+  const [decisionsCount, setDecisionsCount] = useState(0);
+  const updateDecisionsCount = useCallback((d: Decisions) => setDecisionsCount(d.problems.length + d.walkouts.length), []);
+  useEffect(() => {
+    if (!adminToken || !isManager || !isPro) return;
+    let cancelled = false;
+    Promise.resolve()
+      .then(fetchDecisions)
+      .then((d) => {
+        if (!cancelled && d) updateDecisionsCount(d);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [adminToken, isManager, isPro, ordersChanged, updateDecisionsCount]);
+
 
   // Live WebSocket feed for real-time Kitchen Display System (Plus and Pro)
   useKitchenWebSocket({
@@ -226,7 +255,7 @@ export default function AdminDashboardPage() {
     onStaffAlert: (event, data) => {
       const key = `${event}:${data.bill_id || data.table_number || Date.now()}`;
       setStaffAlerts((prev) =>
-        prev.some((a) => a.key === key) ? prev : [...prev, { key, event, tableNumber: data.table_number || '' }]
+        prev.some((a) => a.key === key) ? prev : [...prev, { key, event, tableNumber: data.table_number || '', billId: data.bill_id }]
       );
       bell.ring(BELL_ALERTS.has(event) ? 'bell' : 'alert');
       markOrdersChanged();
@@ -294,6 +323,8 @@ export default function AdminDashboardPage() {
   const [loginNotice, setLoginNotice] = useState<string | null>(null);
   // The restaurant's default prep time (Settings), shown in the dish editor for dishes without their own
   const [defaultPrepMinutes, setDefaultPrepMinutes] = useState(15);
+  // The bill timings (Settings) that decide when a bill shows under Alerts
+  const [billTimings, setBillTimings] = useState({ escalation: 20, confirm: 15 });
 
   useEffect(() => {
     if (!adminToken || !liveTenantSlug) return;
@@ -303,6 +334,10 @@ export default function AdminDashboardPage() {
       if (cancelled) return;
       const prep = profile?.settings?.default_prep_minutes;
       if (prep) setDefaultPrepMinutes(prep);
+      const s = profile?.settings;
+      if (s?.bill_escalation_minutes && s?.confirm_reminder_minutes) {
+        setBillTimings({ escalation: s.bill_escalation_minutes, confirm: s.confirm_reminder_minutes });
+      }
       const profileSlug = profile?.slug?.toLowerCase();
       if (profileSlug && profileSlug !== liveTenantSlug) {
         clearAdminToken();
@@ -781,6 +816,7 @@ export default function AdminDashboardPage() {
         isMobileOpen={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
         role={staffRole}
+        alertsCount={decisionsCount}
       />
 
       {/* Mobile Top Header (Visible on screens <= 1024px) */}
@@ -856,13 +892,29 @@ export default function AdminDashboardPage() {
           </div>
         ))}
         {staffRole === 'cashier' && isPro ? (
-          <BillsScreen role={staffRole} currency={meta.currency || 'ETB'} refreshSignal={ordersChanged} showShift />
+          <BillsScreen
+            role={staffRole}
+            currency={meta.currency || 'ETB'}
+            refreshSignal={ordersChanged}
+            showShift
+            fullName={staffUser?.full_name}
+            onLogout={handleLogout}
+            onBillsLoaded={dropResolvedBillAlerts}
+          />
         ) : isManager && isPro && viewToShow === 'alerts' ? (
-          <DecisionsScreen currency={meta.currency || 'ETB'} refreshSignal={ordersChanged} />
+          <DecisionsScreen
+            currency={meta.currency || 'ETB'}
+            refreshSignal={ordersChanged}
+            kitchenOrders={kitchenOrders}
+            defaultPrepMinutes={defaultPrepMinutes}
+            billEscalationMinutes={billTimings.escalation}
+            confirmReminderMinutes={billTimings.confirm}
+            onLoaded={updateDecisionsCount}
+          />
         ) : isManager && isPro && viewToShow === 'reports' ? (
           <ReportsScreen currency={meta.currency || 'ETB'} />
         ) : isManager && isPro && viewToShow === 'bills' ? (
-          <BillsScreen role={staffRole} currency={meta.currency || 'ETB'} refreshSignal={ordersChanged} />
+          <BillsScreen role={staffRole} currency={meta.currency || 'ETB'} refreshSignal={ordersChanged} onBillsLoaded={dropResolvedBillAlerts} />
         ) : staffRole === 'waiter' && isPro ? (
           <WaiterTablesScreen
             currency={meta.currency || 'ETB'}
@@ -874,6 +926,7 @@ export default function AdminDashboardPage() {
             refreshSignal={ordersChanged}
             onOpenSoldOut={() => setIsSoldOutModalOpen(true)}
             soldOutCount={soldOutCount}
+            onBillsLoaded={dropResolvedBillAlerts}
           />
         ) : staffRole === 'waiter' || staffRole === 'cashier' ? (
           <AdminRoleHome role={staffRole} fullName={staffUser?.full_name} onLogout={handleLogout} />
@@ -1261,7 +1314,10 @@ export default function AdminDashboardPage() {
         onSave={handleSaveSettings}
         onResetToDefault={handleResetToDefault}
         showProTimings={isPro && isManager}
-        onTimingsSaved={(settings) => setDefaultPrepMinutes(settings.default_prep_minutes)}
+        onTimingsSaved={(settings) => {
+          setDefaultPrepMinutes(settings.default_prep_minutes);
+          setBillTimings({ escalation: settings.bill_escalation_minutes, confirm: settings.confirm_reminder_minutes });
+        }}
       />
 
       {/* Dining Tables & QR Code Generator Modal */}

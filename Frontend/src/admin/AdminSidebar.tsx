@@ -20,6 +20,8 @@ interface AdminSidebarProps {
   activeView?: AdminView;
   onSelectView?: (view: AdminView) => void;
   activeOrdersCount?: number;
+  /** Problems and walkouts waiting for the manager's decision (Pro). */
+  alertsCount?: number;
   onOpenKitchen?: () => void;
   onOpenTables?: () => void;
   onOpenSettings?: () => void;
@@ -38,6 +40,7 @@ export default function AdminSidebar({
   activeView = 'menu',
   onSelectView,
   activeOrdersCount = 0,
+  alertsCount = 0,
   onOpenKitchen,
   onOpenTables,
   onOpenSettings,
@@ -201,7 +204,26 @@ export default function AdminSidebar({
                   }}
                 >
                   <AlertTriangle size={18} />
-                  <span>{t.decisionsScreen.navLabel}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {t.decisionsScreen.navLabel}
+                    {alertsCount > 0 && (
+                      <span
+                        data-testid="alerts-count"
+                        aria-label={`${alertsCount} waiting`}
+                        style={{
+                          backgroundColor: activeView === 'alerts' ? '#ffffff' : 'var(--admin-primary, #ff5a36)',
+                          color: activeView === 'alerts' ? 'var(--admin-primary, #ff5a36)' : '#ffffff',
+                          fontSize: '11px',
+                          fontWeight: 800,
+                          padding: '2px 8px',
+                          borderRadius: '999px',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        }}
+                      >
+                        {alertsCount}
+                      </span>
+                    )}
+                  </span>
                 </button>
                 <button
                   type="button"

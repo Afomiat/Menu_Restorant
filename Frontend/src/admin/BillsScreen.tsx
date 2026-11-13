@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { LogOut } from 'lucide-react';
 import type { Bill, StaffRole } from '../types';
 import { fetchBills } from '../services/billService';
 import BillCard from './BillCard';
@@ -14,10 +15,15 @@ interface BillsScreenProps {
   refreshSignal: number;
   /** Cashiers work in shifts; managers do not need the shift bar. */
   showShift?: boolean;
+  /** The cashier's name and Sign out, shown in the header like the waiter's screen. */
+  fullName?: string;
+  onLogout?: () => void;
+  /** Gets every freshly loaded list, so old bill banners can clear themselves. */
+  onBillsLoaded?: (bills: Bill[]) => void;
 }
 
 /** Cashiers and managers (Pro): collected bills to confirm first, then open bills, then today's confirmed ones. */
-export default function BillsScreen({ role, currency, refreshSignal, showShift = false }: BillsScreenProps) {
+export default function BillsScreen({ role, currency, refreshSignal, showShift = false, fullName, onLogout, onBillsLoaded }: BillsScreenProps) {
   const [bills, setBills] = useState<Bill[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,9 +32,10 @@ export default function BillsScreen({ role, currency, refreshSignal, showShift =
       .then((data) => {
         setBills(data);
         setError(null);
+        onBillsLoaded?.(data);
       })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Failed to load bills'));
-  }, []);
+  }, [onBillsLoaded]);
 
   useEffect(() => {
     load();
@@ -47,7 +54,17 @@ export default function BillsScreen({ role, currency, refreshSignal, showShift =
 
   return (
     <section className="admin-kitchen-page-view" aria-label={t.bills.title}>
-      <h1 className="admin-top-title" style={{ margin: '0 0 12px' }}>{t.bills.title}</h1>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
+        <div>
+          <h1 className="admin-top-title" style={{ margin: 0 }}>{t.bills.title}</h1>
+          {fullName && <p style={{ margin: '2px 0 0', color: '#64748b', fontSize: '13px' }}>{fullName}</p>}
+        </div>
+        {onLogout && (
+          <button type="button" className="admin-sec-pill-btn" onClick={onLogout}>
+            <LogOut size={14} /> {t.roleHome.signOut}
+          </button>
+        )}
+      </div>
       {showShift && <ShiftBar role={role} currency={currency} refreshSignal={billsSignature(bills || [])} />}
       <PushButton />
       {error && <p role="status" style={{ color: '#dc2626', fontSize: '13px' }}>{error}</p>}

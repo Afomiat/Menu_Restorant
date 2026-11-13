@@ -209,6 +209,7 @@ export const en = {
       `${tableLabel(table)} left without paying ${amount}${waiter ? `, waiter ${waiter}` : ''}`,
     decisions: { waiter_pays: 'Waiter pays', restaurant_loss: 'Restaurant takes the loss' } as Record<string, string>,
     note: 'Note (optional)',
+    markedAt: (time: string, by: string) => (by ? `Marked at ${time} by ${by}` : `Marked at ${time}`),
   },
 
   decisionsScreen: {
@@ -218,6 +219,18 @@ export const en = {
     walkouts: 'Walkouts',
     none: 'Nothing waiting for you.',
     decide: 'Decide',
+    chooseBoth: 'Choose Remake or Remove from bill, and who was at fault.',
+    chooseFault: 'Choose…',
+    times: (reported: string, started: string, ready: string, served: string) =>
+      `Started ${started} · ready ${ready} · served ${served} · reported ${reported}`,
+    billClosed: 'This bill is already paid or closed, so the dish cannot be taken off it. Choose Remake instead.',
+    late: 'Late dishes',
+    lateLine: (table: string, minutes: number, target: number) =>
+      `${tableLabel(table)}: cooking for ${minutes} min (target ${target} min)`,
+    unpaid: 'Unpaid bills',
+    askedAgo: (table: string, minutes: number) => `${tableLabel(table)} asked for the bill ${minutes} min ago`,
+    collectedAgo: (table: string, minutes: number) => `${tableLabel(table)}: collected ${minutes} min ago, not confirmed by the cashier`,
+    waiterOwes: (waiter: string, owed: string) => (waiter ? `Waiter ${waiter} · ${owed}` : owed),
   },
 
   reports: {

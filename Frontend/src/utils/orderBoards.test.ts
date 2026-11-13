@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { BackendOrder, CartItem, MenuItem, OrderStatus } from '../types';
-import { groupTickets, tableState } from './orderBoards';
+import type { BackendOrder, Bill, CartItem, MenuItem, OrderStatus } from '../types';
+import { groupTickets, isBillAlertResolved, tableState } from './orderBoards';
 
 const dish = (name: string): MenuItem => ({ id: name, name, price: 100, imageUrl: '', description: '', tags: [], available: true, categoryId: 'all' });
 const row = (orderId: string, name: string, status: OrderStatus, extra: Partial<CartItem> = {}): CartItem => ({
@@ -72,5 +72,24 @@ describe('remakes', () => {
     ]);
 
     expect(tickets.map((tk) => tk.orderId)).toEqual(['remake', 'cooking', 'new', 'ready-remake', 'ready']);
+  });
+});
+
+describe('isBillAlertResolved', () => {
+  const bills = [
+    { id: 'b1', status: 'confirmed' },
+    { id: 'b2', status: 'collected' },
+  ] as Bill[];
+
+  it('clears "money collected" once the cashier confirms, and "asks for the bill" once collected', () => {
+    expect(isBillAlertResolved('bill:collected', 'b1', bills)).toBe(true);
+    expect(isBillAlertResolved('bill:collected', 'b2', bills)).toBe(false);
+    expect(isBillAlertResolved('bill:requested', 'b2', bills)).toBe(true);
+  });
+
+  it('keeps alerts that are not about a known bill', () => {
+    expect(isBillAlertResolved('bill:collected', 'missing', bills)).toBe(false);
+    expect(isBillAlertResolved('bill:collected', undefined, bills)).toBe(false);
+    expect(isBillAlertResolved('problem:reported', 'b1', bills)).toBe(false);
   });
 });

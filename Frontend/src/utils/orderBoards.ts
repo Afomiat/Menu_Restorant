@@ -62,3 +62,19 @@ export function tableState(orders: BackendOrder[]): TableState {
 export function billsSignature(bills: Bill[]): string {
   return bills.map((b) => `${b.id}:${b.status}:${b.amount_paid}:${b.waiter_id ?? ''}`).sort().join('|');
 }
+
+// Bill states after which a live bill banner no longer needs anyone to act
+const RESOLVED_BY: Record<string, string[]> = {
+  'bill:requested': ['collected', 'confirmed', 'walkout'],
+  'bill:reminder': ['collected', 'confirmed', 'walkout'],
+  'bill:escalated': ['collected', 'confirmed', 'walkout'],
+  'bill:collected': ['confirmed', 'walkout'],
+  'bill:unconfirmed': ['confirmed', 'walkout'],
+};
+
+/** True when a bill banner is out of date because the bill has moved on (for example, confirmed). */
+export function isBillAlertResolved(event: string, billId: string | undefined, bills: Bill[]): boolean {
+  if (!billId || !RESOLVED_BY[event]) return false;
+  const bill = bills.find((b) => b.id === billId);
+  return !!bill && RESOLVED_BY[event].includes(bill.status);
+}
