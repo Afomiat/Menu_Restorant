@@ -50,9 +50,12 @@ func (u *reportUsecase) Daily(ctx context.Context, tenantID uuid.UUID, date stri
 		return nil, err
 	}
 	report.Removed = []domain.Problem{}
+	report.Remade = []domain.Problem{}
 	for _, p := range problems {
 		if p.Decision != nil && *p.Decision == domain.DecisionRemove {
 			report.Removed = append(report.Removed, p)
+		} else if p.Decision != nil && *p.Decision == domain.DecisionRemake {
+			report.Remade = append(report.Remade, p)
 		}
 	}
 	if report.Kitchen, err = u.reportRepo.Kitchen(ctx, tenantID, from, to); err != nil {

@@ -39,6 +39,7 @@ type orderUsecase struct {
 	tenantRepo       domain.TenantRepository
 	tableRepo        domain.TableRepository
 	menuRepo         domain.MenuRepository
+	billRepo         domain.BillRepository
 	tableTokenSecret string
 
 	tenantCache   map[uuid.UUID]cachedTenant
@@ -54,12 +55,18 @@ func NewOrderUsecase(
 	tableRepo domain.TableRepository,
 	menuRepo domain.MenuRepository,
 	tableTokenSecret string,
+	billRepo ...domain.BillRepository,
 ) domain.OrderUsecase {
+	var bRepo domain.BillRepository
+	if len(billRepo) > 0 {
+		bRepo = billRepo[0]
+	}
 	return &orderUsecase{
 		orderRepo:        orderRepo,
 		tenantRepo:       tenantRepo,
 		tableRepo:        tableRepo,
 		menuRepo:         menuRepo,
+		billRepo:         bRepo,
 		tableTokenSecret: tableTokenSecret,
 		tenantCache:      make(map[uuid.UUID]cachedTenant),
 		tableCache:       make(map[string]cachedTable),
@@ -282,14 +289,28 @@ func (u *orderUsecase) UpdateKitchenStatus(ctx context.Context, actor domain.Act
 	if !domain.CanSetOrderStatus(actor.Role, status) {
 		return nil, domain.ErrStatusNotAllowed
 	}
+
+	// B13: Prevent cancelling orders on paid/closed bills
+	if status == domain.StatusCancelled && u.billRepo != nil {
+		existing, err := u.orderRepo.GetByID(ctx, tenantID, orderID)
+		if err == nil && existing != nil && existing.BillID != nil {
+			bill, err := u.billRepo.Get(ctx, tenantID, *existing.BillID)
+			if err == nil && bill != nil && (bill.Status == domain.BillConfirmed || bill.Status == domain.BillWalkout) {
+				return nil, domain.ErrBillState
+			}
+		}
+	}
+
 	order, err := u.orderRepo.UpdateStatus(ctx, tenantID, orderID, status, actor.ID)
 	if err != nil {
 		return nil, err
 	}
 
 	// The table's waiter hears about the order (food ready); without one, the managers do
-	if table, err := u.tableRepo.GetByNumber(ctx, tenantID, order.TableNumber); err == nil && table != nil {
-		order.WaiterID = table.AssignedWaiterID
+	if u.tableRepo != nil {
+		if table, err := u.tableRepo.GetByNumber(ctx, tenantID, order.TableNumber); err == nil && table != nil {
+			order.WaiterID = table.AssignedWaiterID
+		}
 	}
 	return order, nil
 }
@@ -299,7 +320,7 @@ func (u *orderUsecase) TablesWithOrders(ctx context.Context, tenantID, waiterID 
 	if err != nil {
 		return nil, err
 	}
-	orders, err := u.orderRepo.ListActiveByTenant(ctx, tenantID)
+	orders, err := u.orderRepo.ListTableOrdersForOpenBills(ctx, tenantID)
 	if err != nil {
 		return nil, err
 	}

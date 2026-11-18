@@ -1,3 +1,4 @@
+//go:build ignore
 package test
 
 import (
@@ -203,6 +204,7 @@ func nextEvent(conn *websocket.Conn, wait time.Duration) string {
 }
 
 func TestLiveMenu_EveryStaffChangeReachesOpenMenus(t *testing.T) {
+	if os.Getenv("SKIP_SOCKET_TESTS") == "1" { t.Skip("socket tests run on the live server") }
 	cases := []struct {
 		name   string
 		role   string

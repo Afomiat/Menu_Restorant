@@ -19,6 +19,8 @@ type Querier interface {
 	CancelOrderInGrace(ctx context.Context, arg CancelOrderInGraceParams) (CancelOrderInGraceRow, error)
 	CopyItemToRemake(ctx context.Context, arg CopyItemToRemakeParams) error
 	CountActiveManagers(ctx context.Context, tenantID pgtype.UUID) (int64, error)
+	// How many cashiers currently have an open shift (to decide who gets bill:collected)
+	CountOnShiftCashiers(ctx context.Context, tenantID pgtype.UUID) (int32, error)
 	// Bills a waiter still holds that are not collected yet
 	CountWaiterUnpaidBills(ctx context.Context, arg CountWaiterUnpaidBillsParams) (int64, error)
 	CreateCategory(ctx context.Context, arg CreateCategoryParams) (Category, error)
@@ -80,6 +82,8 @@ type Querier interface {
 	// The browsers of the given people, and of everyone active in the restaurant with the given roles
 	ListPushSubscriptions(ctx context.Context, arg ListPushSubscriptionsParams) ([]ListPushSubscriptionsRow, error)
 	ListStaff(ctx context.Context, tenantID pgtype.UUID) ([]User, error)
+	// For My-tables: active orders plus delivered orders on bills still open (not confirmed/walkout)
+	ListTableOrdersForOpenBills(ctx context.Context, tenantID pgtype.UUID) ([]ListTableOrdersForOpenBillsRow, error)
 	ListTablesByTenant(ctx context.Context, tenantID pgtype.UUID) ([]ListTablesByTenantRow, error)
 	// Pro orders cooking for twice their target that no manager has been alerted about yet
 	ListVeryLateOrders(ctx context.Context, now pgtype.Timestamptz) ([]ListVeryLateOrdersRow, error)
@@ -99,7 +103,7 @@ type Querier interface {
 	ReportCashierShift(ctx context.Context, arg ReportCashierShiftParams) (ReportCashierShiftRow, error)
 	// Per dish: how many orders with it were cooked, average cooking minutes against the target, and how many ran late
 	ReportKitchen(ctx context.Context, arg ReportKitchenParams) ([]ReportKitchenRow, error)
-	// Bills opened between the times that are still not confirmed (end of day check)
+	// Bills created before the day ends that are still not confirmed (end of day check)
 	ReportOpenBills(ctx context.Context, arg ReportOpenBillsParams) ([]ReportOpenBillsRow, error)
 	// Money collected between the times, by payment method (walkouts' part payments included)
 	ReportSalesByMethod(ctx context.Context, arg ReportSalesByMethodParams) ([]ReportSalesByMethodRow, error)

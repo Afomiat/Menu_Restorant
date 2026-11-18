@@ -102,12 +102,12 @@ type CollectInput struct {
 
 var (
 	ErrBillNotFound   = errors.New("bill not found")
-	ErrNoOpenBill     = errors.New("this table has no open bill")
-	ErrBillState      = errors.New("the bill cannot do that in its current state")
-	ErrNotYourBill    = errors.New("this bill belongs to another waiter")
-	ErrNoShift        = errors.New("you have no open shift")
-	ErrShiftOpen      = errors.New("your shift is already open")
-	ErrHandoverTarget = errors.New("hand the bill to an active waiter or manager of this restaurant")
+	ErrNoOpenBill     = errors.New("This table has no open bill")
+	ErrBillState      = errors.New("The bill cannot do that in its current state")
+	ErrNotYourBill    = errors.New("This bill belongs to another waiter")
+	ErrNoShift        = errors.New("You have no open shift")
+	ErrShiftOpen      = errors.New("Your shift is already open")
+	ErrHandoverTarget = errors.New("Hand the bill to an active waiter or manager of this restaurant")
 )
 
 // OpenBillsError refuses to end a waiter's shift while they still hold unpaid bills
@@ -116,7 +116,7 @@ type OpenBillsError struct {
 }
 
 func (e *OpenBillsError) Error() string {
-	return fmt.Sprintf("you still have %d unpaid bill(s): collect them, hand them to another waiter, or hand them to a manager", e.Count)
+	return fmt.Sprintf("You still have %d unpaid bill(s). Collect them, hand them to another waiter, or hand them to a manager", e.Count)
 }
 
 type BillRepository interface {
@@ -133,6 +133,8 @@ type BillRepository interface {
 	// Merge moves a bill's orders and payments onto another bill and removes it
 	Merge(ctx context.Context, tenantID, fromBillID, toBillID uuid.UUID, table *RestaurantTable) error
 	CountWaiterUnpaid(ctx context.Context, tenantID, waiterID uuid.UUID) (int, error)
+	// CountOnShiftCashiers returns how many cashiers currently have an open shift
+	CountOnShiftCashiers(ctx context.Context, tenantID uuid.UUID) (int, error)
 	// RequestedBillForTable returns the table's bill waiting for payment, if any
 	RequestedBillForTable(ctx context.Context, tenantID uuid.UUID, tableNumber string) (*Bill, error)
 	SessionOrderedOnBill(ctx context.Context, billID uuid.UUID, sessionToken string) (bool, error)

@@ -70,12 +70,24 @@ func (u *tenantUsecase) UpdateSettings(ctx context.Context, actorID, tenantID uu
 
 	settings := tenant.Settings.WithDefaults()
 	changed := map[string]interface{}{}
+	// readable names for each JSON key, matching the Settings screen labels
+	var settingLabels = map[string]string{
+		"default_prep_minutes":    "Default prep time",
+		"bill_reminder_minutes":   "Bill reminder time",
+		"bill_escalation_minutes": "Manager alert time",
+		"confirm_reminder_minutes": "Confirm reminder time",
+		"long_table_minutes":      "Long table time",
+	}
 	apply := func(name string, value *int, max int, target *int) error {
 		if value == nil || *value == *target {
 			return nil
 		}
+		label := settingLabels[name]
+		if label == "" {
+			label = name
+		}
 		if *value < 1 || *value > max {
-			return &domain.ValidationError{Message: fmt.Sprintf("%s must be between 1 and %d minutes", name, max)}
+			return &domain.ValidationError{Message: fmt.Sprintf("%s must be between 1 and %d minutes", label, max)}
 		}
 		changed[name] = map[string]int{"from": *target, "to": *value}
 		*target = *value
@@ -98,7 +110,7 @@ func (u *tenantUsecase) UpdateSettings(ctx context.Context, actorID, tenantID uu
 		}
 	}
 	if settings.BillEscalationMinutes < settings.BillReminderMinutes {
-		return nil, &domain.ValidationError{Message: "the manager alert for an unpaid bill must come after the waiter reminder"}
+		return nil, &domain.ValidationError{Message: "The manager alert for an unpaid bill must come after the waiter reminder"}
 	}
 	if len(changed) == 0 {
 		return &settings, nil

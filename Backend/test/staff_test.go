@@ -261,6 +261,38 @@ func TestStaffUpdate_ChangesAndRecords(t *testing.T) {
 	}
 }
 
+func TestStaffUpdate_Phone(t *testing.T) {
+	env := newStaffEnv()
+	ctx := context.Background()
+	waiter := env.repo.add(env.tenant.ID, "Abebe", "+251911000002", "", "secret123", domain.RoleWaiter)
+
+	newPhone := "0911 000 099"
+	updated, err := env.uc.Update(ctx, env.manager.ID, env.tenant.ID, waiter.ID, domain.UpdateStaffInput{Phone: &newPhone})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Phone != "+251911000099" {
+		t.Fatalf("expected normalized phone +251911000099, got %s", updated.Phone)
+	}
+
+	logged, err := env.uc.Login(ctx, domain.LoginInput{Phone: "0911000099", RestaurantSlug: "demo-pro", Password: "secret123"})
+	if err != nil || logged.ID != waiter.ID {
+		t.Fatalf("expected waiter to login with updated phone, got %v %v", logged, err)
+	}
+
+	managerPhone := "0911 000 001"
+	_, err = env.uc.Update(ctx, env.manager.ID, env.tenant.ID, waiter.ID, domain.UpdateStaffInput{Phone: &managerPhone})
+	if !errors.Is(err, domain.ErrPhoneTaken) {
+		t.Fatalf("expected ErrPhoneTaken, got %v", err)
+	}
+
+	badPhone := "12345"
+	var validation *domain.ValidationError
+	if _, err := env.uc.Update(ctx, env.manager.ID, env.tenant.ID, waiter.ID, domain.UpdateStaffInput{Phone: &badPhone}); !errors.As(err, &validation) {
+		t.Fatalf("expected validation error, got %v", err)
+	}
+}
+
 func TestStaffUpdate_SafetyRules(t *testing.T) {
 	env := newStaffEnv()
 	ctx := context.Background()

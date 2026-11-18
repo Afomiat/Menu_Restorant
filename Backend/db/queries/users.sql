@@ -32,6 +32,7 @@ UPDATE users
 SET full_name = COALESCE(sqlc.narg('full_name'), full_name),
     role = COALESCE(sqlc.narg('role'), role),
     is_active = COALESCE(sqlc.narg('is_active'), is_active),
+    phone = COALESCE(sqlc.narg('phone'), phone),
     password_hash = COALESCE(sqlc.narg('password_hash'), password_hash)
 WHERE tenant_id = sqlc.arg('tenant_id') AND id = sqlc.arg('id')
 RETURNING id, tenant_id, email, password_hash, role, created_at, full_name, phone, is_active;

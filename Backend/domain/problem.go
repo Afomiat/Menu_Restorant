@@ -30,8 +30,9 @@ func (r ProblemReason) IsValid() bool {
 type ProblemDecision string
 
 const (
-	DecisionRemake ProblemDecision = "remake"
-	DecisionRemove ProblemDecision = "remove_from_bill"
+	DecisionRemake   ProblemDecision = "remake"
+	DecisionRemove   ProblemDecision = "remove_from_bill"
+	DecisionNoChange ProblemDecision = "no_change"
 )
 
 type Fault string
@@ -123,9 +124,9 @@ type PushSubscription struct {
 }
 
 var (
-	ErrProblemNotFound = errors.New("problem not found")
-	ErrAlreadyDecided  = errors.New("this has already been decided")
-	ErrItemNotFound    = errors.New("dish not found on this order")
+	ErrProblemNotFound = errors.New("Problem not found")
+	ErrAlreadyDecided  = errors.New("This has already been decided")
+	ErrItemNotFound    = errors.New("Dish not found on this order")
 )
 
 type ProblemRepository interface {

@@ -44,6 +44,6 @@ type TableUsecase interface {
 }
 
 var (
-	ErrTableNotFound = errors.New("table not found")
-	ErrNotAWaiter    = errors.New("choose an active waiter of this restaurant")
+	ErrTableNotFound = errors.New("There is no table with that name")
+	ErrNotAWaiter    = errors.New("Choose an active waiter of this restaurant")
 )

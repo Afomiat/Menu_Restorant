@@ -50,6 +50,7 @@ type DailyReport struct {
 	Waiters   []WaiterTotals `json:"waiters"`
 	Walkouts  []Walkout      `json:"walkouts"`
 	Removed   []Problem      `json:"removed_dishes"`
+	Remade    []Problem      `json:"remade_dishes"`
 	Kitchen   []DishTiming   `json:"kitchen"`
 	OpenBills []OpenBill     `json:"open_bills"`
 }

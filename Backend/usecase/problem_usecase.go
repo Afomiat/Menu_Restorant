@@ -73,8 +73,8 @@ func (u *problemUsecase) Report(ctx context.Context, actor domain.Actor, tenantI
 }
 
 func (u *problemUsecase) Decide(ctx context.Context, actor domain.Actor, tenantID, problemID uuid.UUID, decision domain.ProblemDecision, fault domain.Fault) (*domain.Problem, error) {
-	if decision != domain.DecisionRemake && decision != domain.DecisionRemove {
-		return nil, &domain.ValidationError{Message: "choose remake or remove from bill"}
+	if decision != domain.DecisionRemake && decision != domain.DecisionRemove && decision != domain.DecisionNoChange {
+		return nil, &domain.ValidationError{Message: "choose remake, remove from bill or no change"}
 	}
 	if !fault.IsValid() {
 		return nil, &domain.ValidationError{Message: "choose who was at fault: kitchen, waiter or no one"}
@@ -109,7 +109,7 @@ func (u *problemUsecase) Decide(ctx context.Context, actor domain.Actor, tenantI
 			return nil, err
 		}
 		removed = &value
-	} else {
+	} else if decision == domain.DecisionRemake {
 		id, err := u.problemRepo.CreateRemake(ctx, tenantID, problem.OrderID, problem.OrderItemID)
 		if err != nil {
 			return nil, err

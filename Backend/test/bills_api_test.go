@@ -16,6 +16,7 @@ import (
 
 	"menu-backend/domain"
 	"menu-backend/internal/security"
+	"menu-backend/usecase"
 )
 
 // stubBills records calls and returns what the test sets
@@ -251,5 +252,52 @@ func TestAPI_OrdersGoOnTheBillAndScansAreChecked(t *testing.T) {
 	plus.ServeHTTP(w, req)
 	if w.Code != 200 || len(plusBills.rescans) != 0 {
 		t.Fatalf("Plus restaurants have no bills to check, got %d %v", w.Code, plusBills.rescans)
+	}
+}
+
+func TestBill_CollectAudience(t *testing.T) {
+	tenantID := uuid.New()
+	billID := uuid.New()
+	actor := domain.Actor{ID: uuid.New(), Role: domain.RoleWaiter}
+
+	testBill := &domain.Bill{
+		ID:          billID,
+		TenantID:    tenantID,
+		Status:      domain.BillRequested,
+		TotalAmount: 100,
+		AmountOwed:  100,
+		WaiterID:    &actor.ID,
+	}
+
+	billRepo := &mockBillRepo{bill: testBill, cashiersCount: 1}
+	notifier := &recordingNotifier{}
+	staffRepo := newMemStaffRepo()
+	activityRepo := &mockActivityRepo{}
+	tableRepo := &mockTableRepo{}
+
+	uc := usecase.NewBillUsecase(billRepo, tableRepo, staffRepo, activityRepo, notifier)
+
+	// 1. With cashier on shift: bill:collected goes to cashiers only
+	_, err := uc.Collect(context.Background(), actor, tenantID, billID, domain.CollectInput{Amount: 100, Method: domain.PayCash})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(notifier.sent) != 1 || len(notifier.sent[0].Roles) != 1 || notifier.sent[0].Roles[0] != domain.RoleCashier {
+		t.Fatalf("expected cashiersOnly audience when cashiers on shift, got %+v", notifier.sent)
+	}
+
+	// 2. Without cashier on shift: fallback to cashiers and managers
+	notifier.sent = nil
+	notifier.event = nil
+	billRepo.cashiersCount = 0
+	testBill.Status = domain.BillRequested
+	testBill.AmountOwed = 100
+
+	_, err = uc.Collect(context.Background(), actor, tenantID, billID, domain.CollectInput{Amount: 100, Method: domain.PayCash})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(notifier.sent) != 1 || len(notifier.sent[0].Roles) != 2 {
+		t.Fatalf("expected cashiersAndManagers audience when no cashier on shift, got %+v", notifier.sent)
 	}
 }

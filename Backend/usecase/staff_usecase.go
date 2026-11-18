@@ -152,6 +152,16 @@ func (u *staffUsecase) Update(ctx context.Context, actorID, tenantID, staffID uu
 		changes.IsActive = input.IsActive
 		details["is_active"] = map[string]bool{"from": current.IsActive, "to": *input.IsActive}
 	}
+	if input.Phone != nil {
+		normalized, err := phone.Normalize(*input.Phone)
+		if err != nil {
+			return nil, &domain.ValidationError{Message: err.Error()}
+		}
+		if normalized != current.Phone {
+			changes.Phone = &normalized
+			details["phone"] = map[string]string{"from": current.Phone, "to": normalized}
+		}
+	}
 	if input.Password != nil {
 		if err := validatePassword(*input.Password); err != nil {
 			return nil, err
@@ -246,7 +256,7 @@ func validateFullName(name string) error {
 
 func validatePassword(password string) error {
 	if len(password) < domain.MinStaffPasswordLength {
-		return &domain.ValidationError{Message: "password must be at least 6 characters"}
+		return &domain.ValidationError{Message: "The password must be at least 6 characters"}
 	}
 	return nil
 }

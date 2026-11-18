@@ -14,8 +14,9 @@ import (
 const bulkCancelAllActiveOrders = `-- name: BulkCancelAllActiveOrders :exec
 UPDATE orders
 SET status = 'cancelled', updated_at = NOW()
-WHERE tenant_id = $1
-  AND status NOT IN ('delivered', 'cancelled')
+WHERE orders.tenant_id = $1
+  AND orders.status NOT IN ('delivered', 'cancelled')
+  AND (orders.bill_id IS NULL OR orders.bill_id NOT IN (SELECT b.id FROM bills b WHERE b.status IN ('confirmed', 'walkout')))
 `
 
 func (q *Queries) BulkCancelAllActiveOrders(ctx context.Context, tenantID pgtype.UUID) error {
@@ -26,9 +27,10 @@ func (q *Queries) BulkCancelAllActiveOrders(ctx context.Context, tenantID pgtype
 const bulkCancelTableOrders = `-- name: BulkCancelTableOrders :exec
 UPDATE orders
 SET status = 'cancelled', updated_at = NOW()
-WHERE tenant_id = $1
-  AND table_number = $2
-  AND status NOT IN ('delivered', 'cancelled')
+WHERE orders.tenant_id = $1
+  AND orders.table_number = $2
+  AND orders.status NOT IN ('delivered', 'cancelled')
+  AND (orders.bill_id IS NULL OR orders.bill_id NOT IN (SELECT b.id FROM bills b WHERE b.status IN ('confirmed', 'walkout')))
 `
 
 type BulkCancelTableOrdersParams struct {
@@ -226,7 +228,7 @@ func (q *Queries) CreateOrderItemModifier(ctx context.Context, arg CreateOrderIt
 }
 
 const getOrderByID = `-- name: GetOrderByID :one
-SELECT id, tenant_id, table_id, table_number, customer_session_token, status, payment_status, total_amount, grace_period_ends_at, created_at, target_minutes, started_at, started_by, ready_at, ready_by, served_at, served_by, remake_of
+SELECT id, tenant_id, table_id, table_number, customer_session_token, status, payment_status, total_amount, grace_period_ends_at, created_at, target_minutes, started_at, started_by, ready_at, ready_by, served_at, served_by, remake_of, bill_id
 FROM orders
 WHERE id = $1 AND tenant_id = $2
 LIMIT 1
@@ -256,6 +258,7 @@ type GetOrderByIDRow struct {
 	ServedAt             pgtype.Timestamptz `json:"served_at"`
 	ServedBy             pgtype.UUID        `json:"served_by"`
 	RemakeOf             pgtype.UUID        `json:"remake_of"`
+	BillID               pgtype.UUID        `json:"bill_id"`
 }
 
 func (q *Queries) GetOrderByID(ctx context.Context, arg GetOrderByIDParams) (GetOrderByIDRow, error) {
@@ -280,6 +283,7 @@ func (q *Queries) GetOrderByID(ctx context.Context, arg GetOrderByIDParams) (Get
 		&i.ServedAt,
 		&i.ServedBy,
 		&i.RemakeOf,
+		&i.BillID,
 	)
 	return i, err
 }
@@ -415,6 +419,77 @@ func (q *Queries) ListOrderItemsByOrderID(ctx context.Context, orderID pgtype.UU
 			&i.UnitPrice,
 			&i.Quantity,
 			&i.Notes,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTableOrdersForOpenBills = `-- name: ListTableOrdersForOpenBills :many
+SELECT o.id, o.tenant_id, o.table_id, o.table_number, o.status, o.payment_status, o.total_amount,
+       o.grace_period_ends_at, o.created_at, o.target_minutes, o.started_at, o.started_by,
+       o.ready_at, o.ready_by, o.served_at, o.served_by, o.remake_of
+FROM orders o
+LEFT JOIN bills b ON b.id = o.bill_id
+WHERE o.tenant_id = $1
+  AND o.status <> 'cancelled'
+  AND (o.status <> 'delivered' OR (b.id IS NOT NULL AND b.status NOT IN ('confirmed', 'walkout')))
+ORDER BY o.created_at DESC
+`
+
+type ListTableOrdersForOpenBillsRow struct {
+	ID                pgtype.UUID        `json:"id"`
+	TenantID          pgtype.UUID        `json:"tenant_id"`
+	TableID           pgtype.UUID        `json:"table_id"`
+	TableNumber       string             `json:"table_number"`
+	Status            OrderStatus        `json:"status"`
+	PaymentStatus     PaymentStatus      `json:"payment_status"`
+	TotalAmount       pgtype.Numeric     `json:"total_amount"`
+	GracePeriodEndsAt pgtype.Timestamptz `json:"grace_period_ends_at"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	TargetMinutes     pgtype.Int4        `json:"target_minutes"`
+	StartedAt         pgtype.Timestamptz `json:"started_at"`
+	StartedBy         pgtype.UUID        `json:"started_by"`
+	ReadyAt           pgtype.Timestamptz `json:"ready_at"`
+	ReadyBy           pgtype.UUID        `json:"ready_by"`
+	ServedAt          pgtype.Timestamptz `json:"served_at"`
+	ServedBy          pgtype.UUID        `json:"served_by"`
+	RemakeOf          pgtype.UUID        `json:"remake_of"`
+}
+
+// For My-tables: active orders plus delivered orders on bills still open (not confirmed/walkout)
+func (q *Queries) ListTableOrdersForOpenBills(ctx context.Context, tenantID pgtype.UUID) ([]ListTableOrdersForOpenBillsRow, error) {
+	rows, err := q.db.Query(ctx, listTableOrdersForOpenBills, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTableOrdersForOpenBillsRow{}
+	for rows.Next() {
+		var i ListTableOrdersForOpenBillsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.TableID,
+			&i.TableNumber,
+			&i.Status,
+			&i.PaymentStatus,
+			&i.TotalAmount,
+			&i.GracePeriodEndsAt,
+			&i.CreatedAt,
+			&i.TargetMinutes,
+			&i.StartedAt,
+			&i.StartedBy,
+			&i.ReadyAt,
+			&i.ReadyBy,
+			&i.ServedAt,
+			&i.ServedBy,
+			&i.RemakeOf,
 		); err != nil {
 			return nil, err
 		}

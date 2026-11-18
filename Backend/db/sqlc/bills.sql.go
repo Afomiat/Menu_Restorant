@@ -54,6 +54,20 @@ func (q *Queries) BillSessionHasOrdered(ctx context.Context, arg BillSessionHasO
 	return exists, err
 }
 
+const countOnShiftCashiers = `-- name: CountOnShiftCashiers :one
+SELECT COUNT(*)::int FROM staff_shifts s
+JOIN users u ON u.id = s.user_id
+WHERE u.tenant_id = $1 AND u.role = 'cashier' AND u.is_active = true AND s.ended_at IS NULL
+`
+
+// How many cashiers currently have an open shift (to decide who gets bill:collected)
+func (q *Queries) CountOnShiftCashiers(ctx context.Context, tenantID pgtype.UUID) (int32, error) {
+	row := q.db.QueryRow(ctx, countOnShiftCashiers, tenantID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const countWaiterUnpaidBills = `-- name: CountWaiterUnpaidBills :one
 SELECT COUNT(*) FROM bills WHERE tenant_id = $1 AND waiter_id = $2 AND status IN ('open', 'bill_requested')
 `

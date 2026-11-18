@@ -165,6 +165,9 @@ func (m *mockOrderRepo) ListActiveByTenant(ctx context.Context, tenantID uuid.UU
 	}
 	return nil, m.err
 }
+func (m *mockOrderRepo) ListTableOrdersForOpenBills(ctx context.Context, tenantID uuid.UUID) ([]domain.Order, error) {
+	return m.ListActiveByTenant(ctx, tenantID)
+}
 func (m *mockOrderRepo) UpdateStatus(ctx context.Context, tenantID, orderID uuid.UUID, status domain.OrderStatus, actorID uuid.UUID) (*domain.Order, error) {
 	if m.err != nil {
 		return nil, m.err
@@ -235,5 +238,72 @@ func (m *mockTenantUsecase) ListActive(ctx context.Context) ([]domain.Tenant, er
 	if m.tenant != nil {
 		return []domain.Tenant{*m.tenant}, nil
 	}
+	return nil, m.err
+}
+
+type mockBillRepo struct {
+	bill          *domain.Bill
+	err           error
+	cashiersCount int
+}
+
+func (m *mockBillRepo) ActiveBillForTable(ctx context.Context, tenantID uuid.UUID, table *domain.RestaurantTable) (uuid.UUID, error) {
+	if m.bill != nil {
+		return m.bill.ID, nil
+	}
+	return uuid.Nil, m.err
+}
+func (m *mockBillRepo) AttachOrder(ctx context.Context, orderID, billID uuid.UUID) error {
+	return m.err
+}
+func (m *mockBillRepo) List(ctx context.Context, tenantID uuid.UUID, filter domain.BillFilter) ([]domain.Bill, error) {
+	if m.bill != nil {
+		return []domain.Bill{*m.bill}, nil
+	}
+	return nil, m.err
+}
+func (m *mockBillRepo) Get(ctx context.Context, tenantID, billID uuid.UUID) (*domain.Bill, error) {
+	return m.bill, m.err
+}
+func (m *mockBillRepo) AddPayment(ctx context.Context, tenantID, billID uuid.UUID, input domain.CollectInput, actorID uuid.UUID) error {
+	return m.err
+}
+func (m *mockBillRepo) SetStatus(ctx context.Context, tenantID, billID uuid.UUID, status domain.BillStatus, actorID uuid.UUID) error {
+	return m.err
+}
+func (m *mockBillRepo) SetWaiter(ctx context.Context, tenantID, billID uuid.UUID, waiterID *uuid.UUID) error {
+	return m.err
+}
+func (m *mockBillRepo) MoveToTable(ctx context.Context, tenantID, billID uuid.UUID, table *domain.RestaurantTable) error {
+	return m.err
+}
+func (m *mockBillRepo) Merge(ctx context.Context, tenantID, fromBillID, toBillID uuid.UUID, table *domain.RestaurantTable) error {
+	return m.err
+}
+func (m *mockBillRepo) CountWaiterUnpaid(ctx context.Context, tenantID, waiterID uuid.UUID) (int, error) {
+	return 0, m.err
+}
+func (m *mockBillRepo) CountOnShiftCashiers(ctx context.Context, tenantID uuid.UUID) (int, error) {
+	return m.cashiersCount, m.err
+}
+func (m *mockBillRepo) RequestedBillForTable(ctx context.Context, tenantID uuid.UUID, tableNumber string) (*domain.Bill, error) {
+	return m.bill, m.err
+}
+func (m *mockBillRepo) SessionOrderedOnBill(ctx context.Context, billID uuid.UUID, sessionToken string) (bool, error) {
+	return true, m.err
+}
+func (m *mockBillRepo) ListDue(ctx context.Context, now time.Time) ([]domain.BillDue, error) {
+	return nil, m.err
+}
+func (m *mockBillRepo) MarkReminded(ctx context.Context, due domain.BillDue) error {
+	return m.err
+}
+func (m *mockBillRepo) OpenShift(ctx context.Context, userID uuid.UUID) (*domain.Shift, error) {
+	return nil, m.err
+}
+func (m *mockBillRepo) StartShift(ctx context.Context, tenantID, userID uuid.UUID) (*domain.Shift, error) {
+	return nil, m.err
+}
+func (m *mockBillRepo) EndShift(ctx context.Context, userID uuid.UUID) (*domain.Shift, error) {
 	return nil, m.err
 }

@@ -77,13 +77,13 @@ type StaffCredentials struct {
 }
 
 var (
-	ErrInvalidLogin   = errors.New("wrong phone, email or password")
-	ErrStaffInactive  = errors.New("this account has been turned off; ask your manager")
-	ErrStaffNotFound  = errors.New("staff member not found")
-	ErrPhoneTaken     = errors.New("another staff member already uses this phone number")
-	ErrEmailTaken     = errors.New("another account already uses this email")
-	ErrLastManager    = errors.New("the restaurant needs at least one active manager")
-	ErrChangeOwnStaff = errors.New("you cannot change your own role or turn off your own account; ask another manager")
+	ErrInvalidLogin   = errors.New("Wrong phone, email or password")
+	ErrStaffInactive  = errors.New("This account has been turned off. Ask your manager")
+	ErrStaffNotFound  = errors.New("Staff member not found")
+	ErrPhoneTaken     = errors.New("Another staff member already uses this phone number")
+	ErrEmailTaken     = errors.New("Another account already uses this email")
+	ErrLastManager    = errors.New("The restaurant needs at least one active manager")
+	ErrChangeOwnStaff = errors.New("You cannot change your own role or turn off your own account; ask another manager")
 )
 
 // ValidationError explains which input is wrong; controllers return its message as a 400
@@ -116,6 +116,7 @@ type NewStaffInput struct {
 // UpdateStaffInput changes only the fields that are set
 type UpdateStaffInput struct {
 	FullName *string
+	Phone    *string
 	Role     *Role
 	IsActive *bool
 	Password *string
@@ -127,6 +128,7 @@ type StaffChanges struct {
 	Role         *Role
 	IsActive     *bool
 	PasswordHash *string
+	Phone        *string
 }
 
 type StaffRepository interface {

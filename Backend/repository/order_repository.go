@@ -125,6 +125,7 @@ func (r *orderRepository) GetByID(ctx context.Context, tenantID, orderID uuid.UU
 		ServedAt:             converter.PgToTimePtr(row.ServedAt),
 		ServedBy:             converter.PgToUUIDPtr(row.ServedBy),
 		RemakeOf:             converter.PgToUUIDPtr(row.RemakeOf),
+		BillID:               converter.PgToUUIDPtr(row.BillID),
 	}
 
 	items, err := r.loadOrderItems(ctx, order.ID)
@@ -179,6 +180,125 @@ func (r *orderRepository) ListActiveByTenant(ctx context.Context, tenantID uuid.
 	}
 
 	// Batch query all items for all active orders in a single round-trip
+	itemRows, err := r.pool.Query(ctx, `
+		SELECT id, order_id, menu_item_id, item_name, unit_price, quantity, notes
+		FROM order_items
+		WHERE order_id = ANY($1)
+	`, orderIDs)
+	if err != nil {
+		return orders, nil
+	}
+	defer itemRows.Close()
+
+	var itemIDs []pgtype.UUID
+	itemMap := make(map[uuid.UUID]*domain.OrderItem)
+
+	for itemRows.Next() {
+		var (
+			id, orderID, menuItemID pgtype.UUID
+			itemName                string
+			unitPrice               pgtype.Numeric
+			quantity                int32
+			notes                   pgtype.Text
+		)
+		if err := itemRows.Scan(&id, &orderID, &menuItemID, &itemName, &unitPrice, &quantity, &notes); err != nil {
+			continue
+		}
+		itemUUID := converter.PgToUUID(id)
+		itemIDs = append(itemIDs, id)
+		domItem := domain.OrderItem{
+			ID:         itemUUID,
+			OrderID:    converter.PgToUUID(orderID),
+			MenuItemID: converter.PgToUUID(menuItemID),
+			ItemName:   itemName,
+			UnitPrice:  converter.NumericToFloat(unitPrice),
+			Quantity:   quantity,
+			Notes:      converter.TextToString(notes),
+			Modifiers:  []domain.OrderItemModifier{},
+		}
+		if ord, ok := orderMap[domItem.OrderID]; ok {
+			ord.Items = append(ord.Items, domItem)
+			itemMap[itemUUID] = &ord.Items[len(ord.Items)-1]
+		}
+	}
+
+	if len(itemIDs) > 0 {
+		modRows, err := r.pool.Query(ctx, `
+			SELECT id, order_item_id, modifier_id, modifier_name, price_applied
+			FROM order_item_modifiers
+			WHERE order_item_id = ANY($1)
+		`, itemIDs)
+		if err == nil {
+			defer modRows.Close()
+			for modRows.Next() {
+				var (
+					id, orderItemID, modifierID pgtype.UUID
+					modifierName                string
+					priceApplied                pgtype.Numeric
+				)
+				if err := modRows.Scan(&id, &orderItemID, &modifierID, &modifierName, &priceApplied); err == nil {
+					domMod := domain.OrderItemModifier{
+						ID:           converter.PgToUUID(id),
+						OrderItemID:  converter.PgToUUID(orderItemID),
+						ModifierID:   converter.PgToUUID(modifierID),
+						ModifierName: modifierName,
+						PriceApplied: converter.NumericToFloat(priceApplied),
+					}
+					if itm, ok := itemMap[domMod.OrderItemID]; ok {
+						itm.Modifiers = append(itm.Modifiers, domMod)
+					}
+				}
+			}
+		}
+	}
+
+	return orders, nil
+}
+
+func (r *orderRepository) ListTableOrdersForOpenBills(ctx context.Context, tenantID uuid.UUID) ([]domain.Order, error) {
+	rows, err := r.q.ListTableOrdersForOpenBills(ctx, converter.UUIDToPg(tenantID))
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return []domain.Order{}, nil
+	}
+
+	orders := make([]domain.Order, len(rows))
+	orderIDs := make([]pgtype.UUID, len(rows))
+	orderMap := make(map[uuid.UUID]*domain.Order, len(rows))
+
+	for i, row := range rows {
+		tID := converter.PgToUUID(row.TableID)
+		var tableIDPtr *uuid.UUID
+		if tID != uuid.Nil {
+			tableIDPtr = &tID
+		}
+		id := converter.PgToUUID(row.ID)
+		orderIDs[i] = row.ID
+		orders[i] = domain.Order{
+			ID:                id,
+			TenantID:          converter.PgToUUID(row.TenantID),
+			TableID:           tableIDPtr,
+			TableNumber:       row.TableNumber,
+			Status:            domain.OrderStatus(row.Status),
+			TotalAmount:       converter.NumericToFloat(row.TotalAmount),
+			GracePeriodEndsAt: converter.PgToTime(row.GracePeriodEndsAt),
+			CreatedAt:         converter.PgToTime(row.CreatedAt),
+			Items:             []domain.OrderItem{},
+			TargetMinutes:     int(row.TargetMinutes.Int32),
+			StartedAt:         converter.PgToTimePtr(row.StartedAt),
+			StartedBy:         converter.PgToUUIDPtr(row.StartedBy),
+			ReadyAt:           converter.PgToTimePtr(row.ReadyAt),
+			ReadyBy:           converter.PgToUUIDPtr(row.ReadyBy),
+			ServedAt:          converter.PgToTimePtr(row.ServedAt),
+			ServedBy:          converter.PgToUUIDPtr(row.ServedBy),
+			RemakeOf:          converter.PgToUUIDPtr(row.RemakeOf),
+		}
+		orderMap[id] = &orders[i]
+	}
+
+	// Batch query all items for all orders in a single round-trip
 	itemRows, err := r.pool.Query(ctx, `
 		SELECT id, order_id, menu_item_id, item_name, unit_price, quantity, notes
 		FROM order_items

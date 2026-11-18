@@ -17,7 +17,7 @@ VALUES ($1, $2, $3, $4)
 RETURNING id, order_item_id, modifier_id, modifier_name, price_applied;
 
 -- name: GetOrderByID :one
-SELECT id, tenant_id, table_id, table_number, customer_session_token, status, payment_status, total_amount, grace_period_ends_at, created_at, target_minutes, started_at, started_by, ready_at, ready_by, served_at, served_by, remake_of
+SELECT id, tenant_id, table_id, table_number, customer_session_token, status, payment_status, total_amount, grace_period_ends_at, created_at, target_minutes, started_at, started_by, ready_at, ready_by, served_at, served_by, remake_of, bill_id
 FROM orders
 WHERE id = $1 AND tenant_id = $2
 LIMIT 1;
@@ -28,6 +28,18 @@ SELECT id, tenant_id, table_id, table_number, status, payment_status, total_amou
 FROM orders
 WHERE tenant_id = $1 AND status NOT IN ('delivered', 'cancelled')
 ORDER BY created_at DESC;
+
+-- name: ListTableOrdersForOpenBills :many
+-- For My-tables: active orders plus delivered orders on bills still open (not confirmed/walkout)
+SELECT o.id, o.tenant_id, o.table_id, o.table_number, o.status, o.payment_status, o.total_amount,
+       o.grace_period_ends_at, o.created_at, o.target_minutes, o.started_at, o.started_by,
+       o.ready_at, o.ready_by, o.served_at, o.served_by, o.remake_of
+FROM orders o
+LEFT JOIN bills b ON b.id = o.bill_id
+WHERE o.tenant_id = $1
+  AND o.status <> 'cancelled'
+  AND (o.status <> 'delivered' OR (b.id IS NOT NULL AND b.status NOT IN ('confirmed', 'walkout')))
+ORDER BY o.created_at DESC;
 
 -- name: UpdateOrderStatus :one
 -- Records who did each kitchen step and when. Moving an order back (undo) clears the later steps.
@@ -84,15 +96,17 @@ WHERE order_item_id = $1;
 -- name: BulkCancelTableOrders :exec
 UPDATE orders
 SET status = 'cancelled', updated_at = NOW()
-WHERE tenant_id = $1
-  AND table_number = $2
-  AND status NOT IN ('delivered', 'cancelled');
+WHERE orders.tenant_id = $1
+  AND orders.table_number = $2
+  AND orders.status NOT IN ('delivered', 'cancelled')
+  AND (orders.bill_id IS NULL OR orders.bill_id NOT IN (SELECT b.id FROM bills b WHERE b.status IN ('confirmed', 'walkout')));
 
 -- name: BulkCancelAllActiveOrders :exec
 UPDATE orders
 SET status = 'cancelled', updated_at = NOW()
-WHERE tenant_id = $1
-  AND status NOT IN ('delivered', 'cancelled');
+WHERE orders.tenant_id = $1
+  AND orders.status NOT IN ('delivered', 'cancelled')
+  AND (orders.bill_id IS NULL OR orders.bill_id NOT IN (SELECT b.id FROM bills b WHERE b.status IN ('confirmed', 'walkout')));
 
 -- name: ListVeryLateOrders :many
 -- Pro orders cooking for twice their target that no manager has been alerted about yet
