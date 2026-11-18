@@ -30,6 +30,7 @@ type CreateStaffRequest struct {
 // UpdateStaffRequest changes only the fields that are sent
 type UpdateStaffRequest struct {
 	FullName *string `json:"full_name" binding:"omitempty,max=100"`
+	Phone    *string `json:"phone" binding:"omitempty,max=32"`
 	Role     *string `json:"role"`
 	IsActive *bool   `json:"is_active"`
 	Password *string `json:"password" binding:"omitempty,max=128"`
@@ -119,7 +120,7 @@ func (ctrl *StaffController) UpdateStaff(c *gin.Context) {
 		return
 	}
 
-	input := domain.UpdateStaffInput{FullName: req.FullName, IsActive: req.IsActive, Password: req.Password}
+	input := domain.UpdateStaffInput{FullName: req.FullName, Phone: req.Phone, IsActive: req.IsActive, Password: req.Password}
 	if req.Role != nil {
 		role := domain.Role(*req.Role)
 		input.Role = &role

@@ -218,6 +218,11 @@ func (r *billRepository) CountWaiterUnpaid(ctx context.Context, tenantID, waiter
 	return int(n), err
 }
 
+func (r *billRepository) CountOnShiftCashiers(ctx context.Context, tenantID uuid.UUID) (int, error) {
+	n, err := r.q.CountOnShiftCashiers(ctx, converter.UUIDToPg(tenantID))
+	return int(n), err
+}
+
 func (r *billRepository) RequestedBillForTable(ctx context.Context, tenantID uuid.UUID, tableNumber string) (*domain.Bill, error) {
 	row, err := r.q.GetRequestedBillForTable(ctx, sqlc.GetRequestedBillForTableParams{
 		TenantID:    converter.UUIDToPg(tenantID),

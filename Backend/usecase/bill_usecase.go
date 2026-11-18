@@ -30,6 +30,8 @@ func NewBillUsecase(billRepo domain.BillRepository, tableRepo domain.TableReposi
 	return &billUsecase{billRepo: billRepo, tableRepo: tableRepo, staffRepo: staffRepo, activityRepo: activityRepo, notifier: notifier, now: time.Now}
 }
 
+	var cashiersOnly = domain.Audience{Roles: []domain.Role{domain.RoleCashier}}
+
 var cashiersAndManagers = domain.Audience{Roles: []domain.Role{domain.RoleCashier, domain.RoleManager}}
 
 func (u *billUsecase) AttachOrder(ctx context.Context, tenant *domain.Tenant, order *domain.Order) error {
@@ -131,7 +133,12 @@ func (u *billUsecase) Collect(ctx context.Context, actor domain.Actor, tenantID,
 	if err != nil {
 		return nil, err
 	}
-	u.notifier.NotifyStaff(tenantID, cashiersAndManagers, "bill:collected", billEvent(updated))
+	// B8: send bill:collected to cashiers on shift; fall back to managers when none on shift
+	collectTarget := cashiersAndManagers
+	if n, err := u.billRepo.CountOnShiftCashiers(ctx, tenantID); err == nil && n > 0 {
+		collectTarget = cashiersOnly
+	}
+	u.notifier.NotifyStaff(tenantID, collectTarget, "bill:collected", billEvent(updated))
 	return updated, nil
 }
 

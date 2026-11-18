@@ -134,7 +134,7 @@ func TestAPI_StaffManagement(t *testing.T) {
 	}
 	if w, res := api.do(http.MethodPost, "/api/v1/admin/staff", managerToken, map[string]string{
 		"full_name": "Short", "phone": "0922111333", "password": "123", "role": "chef",
-	}); w.Code != http.StatusBadRequest || res["error"] != "password must be at least 6 characters" {
+	}); w.Code != http.StatusBadRequest || res["error"] != "The password must be at least 6 characters" {
 		t.Fatalf("expected 400 with the reason, got %d %v", w.Code, res)
 	}
 
@@ -142,6 +142,13 @@ func TestAPI_StaffManagement(t *testing.T) {
 	w, res = api.do(http.MethodPatch, "/api/v1/admin/staff/"+id, managerToken, map[string]interface{}{"role": "cashier"})
 	if w.Code != http.StatusOK || res["data"].(map[string]interface{})["role"] != "cashier" {
 		t.Fatalf("expected the role change, got %d %v", w.Code, res)
+	}
+	w, res = api.do(http.MethodPatch, "/api/v1/admin/staff/"+id, managerToken, map[string]interface{}{"phone": "0911 000 099"})
+	if w.Code != http.StatusOK || res["data"].(map[string]interface{})["phone"] != "+251911000099" {
+		t.Fatalf("expected phone to update, got %d %v", w.Code, res)
+	}
+	if w, res := api.do(http.MethodPatch, "/api/v1/admin/staff/"+id, managerToken, map[string]interface{}{"phone": api.env.manager.Phone}); w.Code != http.StatusConflict || res["error"] != domain.ErrPhoneTaken.Error() {
+		t.Fatalf("expected 409 for duplicate phone, got %d %v", w.Code, res)
 	}
 	if w, res := api.do(http.MethodPatch, "/api/v1/admin/staff/"+api.env.manager.ID.String(), managerToken, map[string]interface{}{"is_active": false}); w.Code != http.StatusConflict || res["error"] != domain.ErrChangeOwnStaff.Error() {
 		t.Fatalf("expected 409 when turning off yourself, got %d %v", w.Code, res)

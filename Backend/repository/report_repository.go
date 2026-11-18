@@ -74,7 +74,7 @@ func (r *reportRepository) Kitchen(ctx context.Context, tenantID uuid.UUID, from
 
 func (r *reportRepository) OpenBills(ctx context.Context, tenantID uuid.UUID, from, to time.Time) ([]domain.OpenBill, error) {
 	rows, err := r.q.ReportOpenBills(ctx, sqlc.ReportOpenBillsParams{
-		TenantID: converter.UUIDToPg(tenantID), CreatedAt: converter.TimeToPg(from), CreatedAt_2: converter.TimeToPg(to),
+		TenantID: converter.UUIDToPg(tenantID), Until: converter.TimeToPg(to),
 	})
 	if err != nil {
 		return nil, err

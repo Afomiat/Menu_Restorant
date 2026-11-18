@@ -297,3 +297,85 @@ func TestOrder_UndoSuccessAndTimeout(t *testing.T) {
 		t.Fatal("expected error when 60s grace window expired, got nil")
 	}
 }
+
+func TestOrder_CancelOnPaidBillRefused(t *testing.T) {
+	tenantID := uuid.New()
+	orderID := uuid.New()
+	billID := uuid.New()
+	actor := domain.Actor{ID: uuid.New(), Role: domain.RoleManager}
+
+	orderRepo := &mockOrderRepo{
+		createdOrder: &domain.Order{
+			ID:          orderID,
+			TenantID:    tenantID,
+			TableNumber: "1",
+			BillID:      &billID,
+		},
+	}
+	billRepo := &mockBillRepo{
+		bill: &domain.Bill{
+			ID:     billID,
+			Status: domain.BillConfirmed,
+		},
+	}
+
+	orderUc := usecase.NewOrderUsecase(orderRepo, nil, &mockTableRepo{}, nil, "", billRepo)
+
+	_, err := orderUc.UpdateKitchenStatus(context.Background(), actor, tenantID, orderID, domain.StatusCancelled)
+	if !errors.Is(err, domain.ErrBillState) {
+		t.Fatalf("expected ErrBillState when cancelling order on confirmed bill, got: %v", err)
+	}
+
+	// Also test walkout bill
+	billRepo.bill.Status = domain.BillWalkout
+	_, err = orderUc.UpdateKitchenStatus(context.Background(), actor, tenantID, orderID, domain.StatusCancelled)
+	if !errors.Is(err, domain.ErrBillState) {
+		t.Fatalf("expected ErrBillState when cancelling order on walkout bill, got: %v", err)
+	}
+
+	// Open bill allows cancellation
+	billRepo.bill.Status = domain.BillOpen
+	updated, err := orderUc.UpdateKitchenStatus(context.Background(), actor, tenantID, orderID, domain.StatusCancelled)
+	if err != nil || updated.Status != domain.StatusCancelled {
+		t.Fatalf("expected cancellation to succeed on open bill, got: %v", err)
+	}
+}
+
+func TestOrder_SoldOutBlockedImmediately(t *testing.T) {
+	tenantID := uuid.New()
+	qrSecret := "test-secret-key-32-chars-abcdef"
+	tableNumber := "1"
+	tableID := uuid.New()
+	validToken := security.GenerateTableToken(tenantID.String(), tableNumber, qrSecret)
+
+	tenantRepo := &mockTenantRepo{tenant: &domain.Tenant{ID: tenantID, Plan: domain.PlanPlus}}
+	tableRepo := &mockTableRepo{
+		table: &domain.RestaurantTable{ID: tableID, TenantID: tenantID, TableNumber: tableNumber, IsActive: true},
+	}
+	itemID := uuid.New()
+	menuRepo := &mockMenuRepo{
+		item: &domain.MenuItem{ID: itemID, TenantID: tenantID, Name: "Burger", Price: 100.0, IsAvailable: true, IsSoldOut: false},
+	}
+	orderRepo := &mockOrderRepo{}
+
+	orderUc := usecase.NewOrderUsecase(orderRepo, tenantRepo, tableRepo, menuRepo, qrSecret)
+
+	input := domain.CreateOrderInput{
+		TenantID:    tenantID,
+		TableNumber: tableNumber,
+		TableToken:  validToken,
+		Items:       []domain.CreateOrderItemInput{{MenuItemID: itemID, Quantity: 1}},
+	}
+	order, err := orderUc.PlaceOrder(context.Background(), input)
+	if err != nil || order == nil {
+		t.Fatalf("expected order placed, got %v", err)
+	}
+
+	menuRepo.item.IsSoldOut = true
+	orderUc.ForgetMenuItem(itemID)
+
+	_, err = orderUc.PlaceOrder(context.Background(), input)
+	if err == nil {
+		t.Fatal("expected sold out error, got nil")
+	}
+}

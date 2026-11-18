@@ -119,9 +119,13 @@ func (ctrl *OrderController) PlaceOrder(c *gin.Context) {
 		}
 	}
 
-	// Broadcast real-time order to the restaurant's private kitchen tablet room
-	if ctrl.hub != nil {
-		ctrl.hub.BroadcastToTenant(tenant.ID, "order:created", order)
+	// Broadcast real-time order to chefs + managers + the table's waiter only (B5)
+	if ctrl.notifier != nil {
+		audience := domain.Audience{Roles: []domain.Role{domain.RoleChef, domain.RoleManager}}
+		if order.WaiterID != nil {
+			audience.UserIDs = []uuid.UUID{*order.WaiterID}
+		}
+		ctrl.notifier.NotifyStaff(tenant.ID, audience, "order:created", order)
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
@@ -281,6 +285,9 @@ func (ctrl *OrderController) UpdateOrderStatus(c *gin.Context) {
 	case errors.Is(err, domain.ErrStatusNotAllowed):
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return
+	case errors.Is(err, domain.ErrBillState):
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		return
 	case errors.Is(err, pgx.ErrNoRows):
 		c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
 		return
@@ -289,9 +296,22 @@ func (ctrl *OrderController) UpdateOrderStatus(c *gin.Context) {
 		return
 	}
 
-	// Broadcast status update event to all staff tablets in this restaurant
-	if ctrl.hub != nil {
-		ctrl.hub.BroadcastToTenant(tenantID, "order:status_updated", gin.H{
+	// Broadcast status update to kitchen + managers + the table's waiter only (B5)
+	if ctrl.notifier != nil {
+		statusAudience := domain.Audience{Roles: []domain.Role{domain.RoleChef, domain.RoleManager}}
+		if order.WaiterID != nil {
+			waiterID := *order.WaiterID
+			alreadyIn := false
+			for _, id := range statusAudience.UserIDs {
+				if id == waiterID {
+					alreadyIn = true
+				}
+			}
+			if !alreadyIn {
+				statusAudience.UserIDs = append(statusAudience.UserIDs, waiterID)
+			}
+		}
+		ctrl.notifier.NotifyStaff(tenantID, statusAudience, "order:status_updated", gin.H{
 			"order_id":     orderID,
 			"status":       orderStatus,
 			"table_number": order.TableNumber,

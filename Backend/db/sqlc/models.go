@@ -279,6 +279,7 @@ type ProblemDecision string
 const (
 	ProblemDecisionRemake         ProblemDecision = "remake"
 	ProblemDecisionRemoveFromBill ProblemDecision = "remove_from_bill"
+	ProblemDecisionNoChange       ProblemDecision = "no_change"
 )
 
 func (e *ProblemDecision) Scan(src interface{}) error {

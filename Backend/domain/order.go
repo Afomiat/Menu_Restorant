@@ -131,6 +131,7 @@ type OrderRepository interface {
 	Create(ctx context.Context, order *Order) error
 	GetByID(ctx context.Context, tenantID, orderID uuid.UUID) (*Order, error)
 	ListActiveByTenant(ctx context.Context, tenantID uuid.UUID) ([]Order, error)
+	ListTableOrdersForOpenBills(ctx context.Context, tenantID uuid.UUID) ([]Order, error)
 	// UpdateStatus moves an order and records who did the step and when
 	UpdateStatus(ctx context.Context, tenantID, orderID uuid.UUID, status OrderStatus, actorID uuid.UUID) (*Order, error)
 	ListVeryLate(ctx context.Context, now time.Time) ([]LateOrder, error)

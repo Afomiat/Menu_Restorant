@@ -197,8 +197,9 @@ UPDATE users
 SET full_name = COALESCE($1, full_name),
     role = COALESCE($2, role),
     is_active = COALESCE($3, is_active),
-    password_hash = COALESCE($4, password_hash)
-WHERE tenant_id = $5 AND id = $6
+    phone = COALESCE($4, phone),
+    password_hash = COALESCE($5, password_hash)
+WHERE tenant_id = $6 AND id = $7
 RETURNING id, tenant_id, email, password_hash, role, created_at, full_name, phone, is_active
 `
 
@@ -206,6 +207,7 @@ type UpdateStaffParams struct {
 	FullName     pgtype.Text  `json:"full_name"`
 	Role         NullUserRole `json:"role"`
 	IsActive     pgtype.Bool  `json:"is_active"`
+	Phone        pgtype.Text  `json:"phone"`
 	PasswordHash pgtype.Text  `json:"password_hash"`
 	TenantID     pgtype.UUID  `json:"tenant_id"`
 	ID           pgtype.UUID  `json:"id"`
@@ -216,6 +218,7 @@ func (q *Queries) UpdateStaff(ctx context.Context, arg UpdateStaffParams) (User,
 		arg.FullName,
 		arg.Role,
 		arg.IsActive,
+		arg.Phone,
 		arg.PasswordHash,
 		arg.TenantID,
 		arg.ID,

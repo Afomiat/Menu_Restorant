@@ -13,7 +13,7 @@ SELECT b.waiter_id, COALESCE(w.full_name, '')::text AS waiter_name,
        COALESCE(SUM((SELECT SUM(o.total_amount) FROM orders o WHERE o.bill_id = b.id AND o.status <> 'cancelled')), 0)::numeric AS sales,
        COALESCE(SUM((SELECT SUM(p.amount) FROM bill_payments p WHERE p.bill_id = b.id)), 0)::numeric AS collected,
        COALESCE(SUM(CASE WHEN b.status = 'confirmed' THEN (SELECT SUM(p.amount) FROM bill_payments p WHERE p.bill_id = b.id) END), 0)::numeric AS confirmed,
-       COALESCE(SUM(CASE WHEN b.status = 'collected' THEN (SELECT SUM(p.amount) FROM bill_payments p WHERE p.bill_id = b.id) END), 0)::numeric AS collected_not_confirmed,
+       COALESCE(SUM(CASE WHEN b.status <> 'confirmed' THEN (SELECT SUM(p.amount) FROM bill_payments p WHERE p.bill_id = b.id) END), 0)::numeric AS collected_not_confirmed,
        COUNT(*) FILTER (WHERE b.status = 'walkout')::int AS walkouts
 FROM bills b
 LEFT JOIN users w ON w.id = b.waiter_id
@@ -36,13 +36,14 @@ GROUP BY i.item_name
 ORDER BY i.item_name;
 
 -- name: ReportOpenBills :many
--- Bills opened between the times that are still not confirmed (end of day check)
+-- Bills created before the day ends that are still not confirmed (end of day check)
 SELECT b.id, b.table_number, b.status, COALESCE(w.full_name, '')::text AS waiter_name,
        COALESCE((SELECT SUM(o.total_amount) FROM orders o WHERE o.bill_id = b.id AND o.status <> 'cancelled'), 0)::numeric AS total_amount,
        COALESCE((SELECT SUM(p.amount) FROM bill_payments p WHERE p.bill_id = b.id), 0)::numeric AS amount_paid
 FROM bills b
 LEFT JOIN users w ON w.id = b.waiter_id
-WHERE b.tenant_id = $1 AND b.created_at >= $2 AND b.created_at < $3
+WHERE b.tenant_id = sqlc.arg('tenant_id')
+  AND b.created_at < sqlc.arg('until')::timestamptz
   AND b.status IN ('open', 'bill_requested', 'collected')
 ORDER BY b.created_at;
 
@@ -50,7 +51,7 @@ ORDER BY b.created_at;
 -- One waiter's money between the times
 SELECT COUNT(DISTINCT b.id)::int AS bills,
        COALESCE(SUM(p.amount), 0)::numeric AS collected,
-       COALESCE(SUM(p.amount) FILTER (WHERE b.status = 'collected'), 0)::numeric AS not_confirmed
+       COALESCE(SUM(p.amount) FILTER (WHERE b.status <> 'confirmed'), 0)::numeric AS not_confirmed
 FROM bill_payments p
 JOIN bills b ON b.id = p.bill_id
 WHERE p.tenant_id = $1 AND p.collected_by = $2 AND p.collected_at >= $3 AND p.collected_at < $4;

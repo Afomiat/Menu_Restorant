@@ -122,15 +122,15 @@ SELECT b.id, b.table_number, b.status, COALESCE(w.full_name, '')::text AS waiter
        COALESCE((SELECT SUM(p.amount) FROM bill_payments p WHERE p.bill_id = b.id), 0)::numeric AS amount_paid
 FROM bills b
 LEFT JOIN users w ON w.id = b.waiter_id
-WHERE b.tenant_id = $1 AND b.created_at >= $2 AND b.created_at < $3
+WHERE b.tenant_id = $1
+  AND b.created_at < $2::timestamptz
   AND b.status IN ('open', 'bill_requested', 'collected')
 ORDER BY b.created_at
 `
 
 type ReportOpenBillsParams struct {
-	TenantID    pgtype.UUID        `json:"tenant_id"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-	CreatedAt_2 pgtype.Timestamptz `json:"created_at_2"`
+	TenantID pgtype.UUID        `json:"tenant_id"`
+	Until    pgtype.Timestamptz `json:"until"`
 }
 
 type ReportOpenBillsRow struct {
@@ -142,9 +142,9 @@ type ReportOpenBillsRow struct {
 	AmountPaid  pgtype.Numeric `json:"amount_paid"`
 }
 
-// Bills opened between the times that are still not confirmed (end of day check)
+// Bills created before the day ends that are still not confirmed (end of day check)
 func (q *Queries) ReportOpenBills(ctx context.Context, arg ReportOpenBillsParams) ([]ReportOpenBillsRow, error) {
-	rows, err := q.db.Query(ctx, reportOpenBills, arg.TenantID, arg.CreatedAt, arg.CreatedAt_2)
+	rows, err := q.db.Query(ctx, reportOpenBills, arg.TenantID, arg.Until)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +214,7 @@ func (q *Queries) ReportSalesByMethod(ctx context.Context, arg ReportSalesByMeth
 const reportWaiterShift = `-- name: ReportWaiterShift :one
 SELECT COUNT(DISTINCT b.id)::int AS bills,
        COALESCE(SUM(p.amount), 0)::numeric AS collected,
-       COALESCE(SUM(p.amount) FILTER (WHERE b.status = 'collected'), 0)::numeric AS not_confirmed
+       COALESCE(SUM(p.amount) FILTER (WHERE b.status <> 'confirmed'), 0)::numeric AS not_confirmed
 FROM bill_payments p
 JOIN bills b ON b.id = p.bill_id
 WHERE p.tenant_id = $1 AND p.collected_by = $2 AND p.collected_at >= $3 AND p.collected_at < $4
@@ -252,7 +252,7 @@ SELECT b.waiter_id, COALESCE(w.full_name, '')::text AS waiter_name,
        COALESCE(SUM((SELECT SUM(o.total_amount) FROM orders o WHERE o.bill_id = b.id AND o.status <> 'cancelled')), 0)::numeric AS sales,
        COALESCE(SUM((SELECT SUM(p.amount) FROM bill_payments p WHERE p.bill_id = b.id)), 0)::numeric AS collected,
        COALESCE(SUM(CASE WHEN b.status = 'confirmed' THEN (SELECT SUM(p.amount) FROM bill_payments p WHERE p.bill_id = b.id) END), 0)::numeric AS confirmed,
-       COALESCE(SUM(CASE WHEN b.status = 'collected' THEN (SELECT SUM(p.amount) FROM bill_payments p WHERE p.bill_id = b.id) END), 0)::numeric AS collected_not_confirmed,
+       COALESCE(SUM(CASE WHEN b.status <> 'confirmed' THEN (SELECT SUM(p.amount) FROM bill_payments p WHERE p.bill_id = b.id) END), 0)::numeric AS collected_not_confirmed,
        COUNT(*) FILTER (WHERE b.status = 'walkout')::int AS walkouts
 FROM bills b
 LEFT JOIN users w ON w.id = b.waiter_id

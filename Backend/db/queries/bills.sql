@@ -103,8 +103,11 @@ UPDATE bills SET
     long_open_reminded_at = CASE WHEN sqlc.arg('long_open')::bool THEN NOW() ELSE long_open_reminded_at END
 WHERE id = sqlc.arg('id');
 
--- name: SetOrderBill :exec
-UPDATE orders SET bill_id = $2 WHERE id = $1;
+-- name: CountOnShiftCashiers :one
+-- How many cashiers currently have an open shift (to decide who gets bill:collected)
+SELECT COUNT(*)::int FROM staff_shifts s
+JOIN users u ON u.id = s.user_id
+WHERE u.tenant_id = $1 AND u.role = 'cashier' AND u.is_active = true AND s.ended_at IS NULL;
 
 -- name: GetOpenShift :one
 SELECT id, tenant_id, user_id, started_at, ended_at FROM staff_shifts WHERE user_id = $1 AND ended_at IS NULL LIMIT 1;
@@ -116,3 +119,6 @@ RETURNING id, tenant_id, user_id, started_at, ended_at;
 -- name: EndShift :one
 UPDATE staff_shifts SET ended_at = NOW() WHERE user_id = $1 AND ended_at IS NULL
 RETURNING id, tenant_id, user_id, started_at, ended_at;
+
+-- name: SetOrderBill :exec
+UPDATE orders SET bill_id = $2 WHERE id = $1;

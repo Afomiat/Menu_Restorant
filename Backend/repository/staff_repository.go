@@ -93,8 +93,8 @@ func (r *staffRepository) Update(ctx context.Context, tenantID, id uuid.UUID, ch
 	if changes.IsActive != nil {
 		params.IsActive = pgtype.Bool{Bool: *changes.IsActive, Valid: true}
 	}
-	if changes.PasswordHash != nil {
-		params.PasswordHash = pgtype.Text{String: *changes.PasswordHash, Valid: true}
+	if changes.Phone != nil {
+		params.Phone = pgtype.Text{String: *changes.Phone, Valid: true}
 	}
 
 	u, err := r.q.UpdateStaff(ctx, params)

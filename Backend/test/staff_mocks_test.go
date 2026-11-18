@@ -166,6 +166,14 @@ func (m *memStaffRepo) Update(ctx context.Context, tenantID, id uuid.UUID, chang
 	if changes.PasswordHash != nil {
 		s.PasswordHash = *changes.PasswordHash
 	}
+	if changes.Phone != nil {
+		for _, other := range m.staff {
+			if other.ID != id && other.TenantID == tenantID && other.Phone == *changes.Phone {
+				return nil, domain.ErrPhoneTaken
+			}
+		}
+		s.Phone = *changes.Phone
+	}
 	c := s.Staff
 	return &c, nil
 }

@@ -74,7 +74,7 @@ func main() {
 	staffUsecase := usecase.NewStaffUsecase(staffRepo, tenantRepo, activityRepo)
 	menuUsecase := usecase.NewMenuUsecase(tenantRepo, menuRepo)
 	tableUsecase := usecase.NewTableUsecase(tableRepo, staffRepo, activityRepo, cfg.QRSecretKey)
-	orderUsecase := usecase.NewOrderUsecase(orderRepo, tenantRepo, tableRepo, menuRepo, cfg.QRSecretKey)
+	orderUsecase := usecase.NewOrderUsecase(orderRepo, tenantRepo, tableRepo, menuRepo, cfg.QRSecretKey, billRepo)
 	uploadUsecase := usecase.NewUploadUsecase(tenantRepo, uploadRepo)
 	billUsecase := usecase.NewBillUsecase(billRepo, tableRepo, staffRepo, activityRepo, notifier)
 	problemUsecase := usecase.NewProblemUsecase(problemRepo, billRepo, orderRepo, activityRepo, notifier)
