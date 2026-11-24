@@ -373,6 +373,7 @@ const (
 	UserRoleWaiter     UserRole = "waiter"
 	UserRoleCashier    UserRole = "cashier"
 	UserRoleChef       UserRole = "chef"
+	UserRoleFinance    UserRole = "finance"
 )
 
 func (e *UserRole) Scan(src interface{}) error {

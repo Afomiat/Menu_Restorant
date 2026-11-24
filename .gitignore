@@ -35,3 +35,4 @@ scratch/
 # Build output
 Backend/bin/
 *.exe
+*.zip

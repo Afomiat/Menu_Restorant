@@ -64,7 +64,7 @@ export interface RestaurantMeta {
 export type PlanTier = 'basic' | 'plus' | 'pro';
 
 /** Staff roles; super_admin is the Azai team. */
-export type StaffRole = 'manager' | 'cashier' | 'waiter' | 'chef' | 'super_admin';
+export type StaffRole = 'manager' | 'cashier' | 'waiter' | 'chef' | 'finance' | 'super_admin';
 
 /** A staff account as the manager's Staff screen shows it. */
 export interface StaffMember {
@@ -313,20 +313,22 @@ export interface Decisions {
   walkouts: Walkout[];
 }
 
+export interface WaiterTotals {
+  waiter_id: string | null;
+  waiter_name: string;
+  bills: number;
+  sales: number;
+  collected: number;
+  confirmed: number;
+  collected_not_confirmed: number;
+  walkouts: number;
+}
+
 export interface DailyReport {
   date: string;
   sales_by_method: { method: PaymentMethod; payments: number; amount: number }[];
   sales_total: number;
-  waiters: {
-    waiter_id: string | null;
-    waiter_name: string;
-    bills: number;
-    sales: number;
-    collected: number;
-    confirmed: number;
-    collected_not_confirmed: number;
-    walkouts: number;
-  }[];
+  waiters: WaiterTotals[];
   walkouts: Walkout[];
   removed_dishes: Problem[];
   /** Dishes the manager sent back to the kitchen; sent by newer servers only. */
@@ -344,3 +346,28 @@ export interface ShiftReport {
   not_confirmed: number;
   confirmed: number;
 }
+
+export interface FinanceSummary {
+  from: string;
+  to: string;
+  sales_total: number;
+  collected: number;
+  confirmed: number;
+  collected_not_confirmed: number;
+  walkout_loss: number;
+  removed_loss: number;
+}
+
+export interface TrendPoint {
+  period: string;
+  revenue: number;
+  collected: number;
+  walkout_loss: number;
+}
+
+export interface DishRevenue {
+  item_name: string;
+  quantity_sold: number;
+  revenue: number;
+}
+

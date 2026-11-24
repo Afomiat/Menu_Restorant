@@ -3,7 +3,7 @@ import { canManage, canUseKitchen, normalizeRole, roleHome, roleLabel, STAFF_ROL
 
 describe('normalizeRole', () => {
   it('keeps the Pro roles', () => {
-    for (const role of ['manager', 'cashier', 'waiter', 'chef', 'super_admin']) {
+    for (const role of ['manager', 'cashier', 'waiter', 'chef', 'finance', 'super_admin']) {
       expect(normalizeRole(role)).toBe(role);
     }
   });
@@ -26,6 +26,7 @@ describe('role screens and permissions', () => {
     expect(roleHome('chef')).toBe('kitchen');
     expect(roleHome('waiter')).toBe('waiter');
     expect(roleHome('cashier')).toBe('cashier');
+    expect(roleHome('finance')).toBe('finance');
   });
 
   it('lets only managers manage and only managers and chefs use the kitchen', () => {
@@ -36,6 +37,6 @@ describe('role screens and permissions', () => {
   });
 
   it('labels every role', () => {
-    expect(STAFF_ROLES.map(roleLabel)).toEqual(['Manager', 'Cashier', 'Waiter', 'Chef']);
+    expect(STAFF_ROLES.map(roleLabel)).toEqual(['Manager', 'Cashier', 'Waiter', 'Chef', 'Finance']);
   });
 });

@@ -2,7 +2,7 @@ import type { StaffRole } from '../types';
 import { t } from '../i18n/en';
 
 /** Roles a manager can give a staff member, in display order. */
-export const STAFF_ROLES: readonly StaffRole[] = ['manager', 'cashier', 'waiter', 'chef'];
+export const STAFF_ROLES: readonly StaffRole[] = ['manager', 'cashier', 'waiter', 'chef', 'finance'];
 
 /**
  * Turns a role from a login into a known role. Logins from before the Pro roles say
@@ -26,7 +26,7 @@ export function canManage(role: StaffRole | null): boolean {
 }
 
 /** The screen a role sees after signing in. */
-export type RoleHome = 'menu' | 'kitchen' | 'waiter' | 'cashier';
+export type RoleHome = 'menu' | 'kitchen' | 'waiter' | 'cashier' | 'finance';
 
 export function roleHome(role: StaffRole | null): RoleHome {
   switch (role) {
@@ -36,6 +36,8 @@ export function roleHome(role: StaffRole | null): RoleHome {
       return 'waiter';
     case 'cashier':
       return 'cashier';
+    case 'finance':
+      return 'finance';
     default:
       return 'menu';
   }
@@ -44,4 +46,9 @@ export function roleHome(role: StaffRole | null): RoleHome {
 /** Roles that work the kitchen screen. */
 export function canUseKitchen(role: StaffRole | null): boolean {
   return canManage(role) || role === 'chef';
+}
+
+/** Roles that can view the finance dashboard. */
+export function canViewFinance(role: StaffRole | null): boolean {
+  return canManage(role) || role === 'finance';
 }

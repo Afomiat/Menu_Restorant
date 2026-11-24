@@ -10,6 +10,7 @@ export const en = {
     cashier: 'Cashier',
     waiter: 'Waiter',
     chef: 'Chef',
+    finance: 'Finance',
     super_admin: 'Azai team',
   },
 

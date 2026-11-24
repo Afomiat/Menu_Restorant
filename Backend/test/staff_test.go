@@ -79,7 +79,8 @@ func TestPhone_Normalize(t *testing.T) {
 func TestRole_NormalizeAndLabels(t *testing.T) {
 	cases := map[string]domain.Role{
 		"owner": domain.RoleManager, "kitchen": domain.RoleChef, "manager": domain.RoleManager,
-		"cashier": domain.RoleCashier, "waiter": domain.RoleWaiter, "chef": domain.RoleChef, "super_admin": domain.RoleSuperAdmin,
+		"cashier": domain.RoleCashier, "waiter": domain.RoleWaiter, "chef": domain.RoleChef,
+		"finance": domain.RoleFinance, "super_admin": domain.RoleSuperAdmin,
 	}
 	for raw, want := range cases {
 		if got := domain.NormalizeRole(raw); got != want {

@@ -123,8 +123,8 @@ func TestAPI_StaffManagement(t *testing.T) {
 	}
 
 	w, res = api.do(http.MethodGet, "/api/v1/admin/staff", managerToken, nil)
-	if w.Code != http.StatusOK || len(res["data"].([]interface{})) != 2 || len(res["roles"].([]interface{})) != 4 {
-		t.Fatalf("expected 2 staff and 4 roles, got %d %v", w.Code, res)
+	if w.Code != http.StatusOK || len(res["data"].([]interface{})) != 2 || len(res["roles"].([]interface{})) != len(domain.StaffRoles) {
+		t.Fatalf("expected 2 staff and %d roles, got %d %v", len(domain.StaffRoles), w.Code, res)
 	}
 
 	if w, res := api.do(http.MethodPost, "/api/v1/admin/staff", managerToken, map[string]string{

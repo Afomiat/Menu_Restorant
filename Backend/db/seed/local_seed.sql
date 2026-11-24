@@ -30,7 +30,8 @@ INSERT INTO users (tenant_id, full_name, phone, email, password_hash, role) VALU
   ('00000000-0000-0000-0000-00000000000d', 'Liya Mekonnen', '+251911200002', 'cashier@pro.azai.local', '$2a$10$h1FfJxEZkCmxiqHhuwDuZeeCOu7KHmGYSrgfCTVFrBj3x3VruwkQ6', 'cashier'),
   ('00000000-0000-0000-0000-00000000000d', 'Abebe Kebede', '+251911200003', 'waiter@pro.azai.local', '$2a$10$h1FfJxEZkCmxiqHhuwDuZeeCOu7KHmGYSrgfCTVFrBj3x3VruwkQ6', 'waiter'),
   ('00000000-0000-0000-0000-00000000000d', 'Tigist Worku', '+251911200004', 'chef@pro.azai.local', '$2a$10$h1FfJxEZkCmxiqHhuwDuZeeCOu7KHmGYSrgfCTVFrBj3x3VruwkQ6', 'chef'),
-  ('00000000-0000-0000-0000-00000000000d', 'Bereket Assefa', '+251911200005', 'waiter2@pro.azai.local', '$2a$10$h1FfJxEZkCmxiqHhuwDuZeeCOu7KHmGYSrgfCTVFrBj3x3VruwkQ6', 'waiter');
+  ('00000000-0000-0000-0000-00000000000d', 'Bereket Assefa', '+251911200005', 'waiter2@pro.azai.local', '$2a$10$h1FfJxEZkCmxiqHhuwDuZeeCOu7KHmGYSrgfCTVFrBj3x3VruwkQ6', 'waiter'),
+  ('00000000-0000-0000-0000-00000000000d', 'Kidus Yohannes', '+251911200006', 'finance@pro.azai.local', '$2a$10$h1FfJxEZkCmxiqHhuwDuZeeCOu7KHmGYSrgfCTVFrBj3x3VruwkQ6', 'finance');
 
 -- Tables 1 to 5 in every restaurant
 INSERT INTO restaurant_tables (tenant_id, table_number, qr_secret)

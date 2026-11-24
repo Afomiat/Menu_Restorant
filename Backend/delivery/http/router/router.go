@@ -26,6 +26,7 @@ type RouterDependencies struct {
 	BillUsecase    domain.BillUsecase
 	ProblemUsecase domain.ProblemUsecase
 	ReportUsecase  domain.ReportUsecase
+	FinanceUsecase domain.FinanceUsecase
 	PushRepo       domain.PushRepository
 	// Notifier sends targeted alerts (live screens, plus web push when it is on); defaults to the hub
 	Notifier domain.Notifier
@@ -101,6 +102,10 @@ func SetupRouter(deps RouterDependencies) *gin.Engine {
 	authCtrl := controller.NewAuthController(deps.StaffUsecase, deps.Config.JWTSecret)
 	staffCtrl := controller.NewStaffController(deps.StaffUsecase)
 	uploadCtrl := controller.NewUploadController(deps.UploadUsecase)
+	var financeCtrl *controller.FinanceController
+	if deps.FinanceUsecase != nil {
+		financeCtrl = controller.NewFinanceController(deps.FinanceUsecase)
+	}
 
 	// API v1 Group
 	apiV1 := r.Group("/api/v1")
@@ -158,7 +163,8 @@ func SetupRouter(deps RouterDependencies) *gin.Engine {
 		// STAFF / KITCHEN / ADMIN ROUTES (Protected by JWT Auth & RBAC)
 		// -------------------------------------------------------------
 		manager := middleware.RequireRole(domain.RoleManager)
-		allStaff := middleware.RequireRole(domain.RoleManager, domain.RoleCashier, domain.RoleWaiter, domain.RoleChef)
+		allStaff := middleware.RequireRole(domain.RoleManager, domain.RoleCashier, domain.RoleWaiter, domain.RoleChef, domain.RoleFinance)
+		financeOrManager := middleware.RequireRole(domain.RoleManager, domain.RoleFinance)
 
 		adminRoutes := apiV1.Group("/admin")
 		adminRoutes.Use(middleware.AuthMiddleware(deps.Config.JWTSecret), middleware.RequireActiveStaff(deps.StaffUsecase))
@@ -204,8 +210,22 @@ func SetupRouter(deps RouterDependencies) *gin.Engine {
 				proRoutes.GET("/decisions", manager, problemCtrl.Pending)
 
 				// Reports
-				proRoutes.GET("/reports/daily", manager, problemCtrl.DailyReport)
+				proRoutes.GET("/reports/daily", financeOrManager, problemCtrl.DailyReport)
 				proRoutes.GET("/reports/my-shift", middleware.RequireRole(domain.RoleWaiter, domain.RoleCashier), problemCtrl.MyShiftReport)
+
+				// Finance Dashboard (Pro plan, Finance or Manager)
+				if financeCtrl != nil {
+					financeGroup := proRoutes.Group("/finance")
+					financeGroup.Use(financeOrManager)
+					{
+						financeGroup.GET("/summary", financeCtrl.Summary)
+						financeGroup.GET("/trend", financeCtrl.Trend)
+						financeGroup.GET("/top-dishes", financeCtrl.TopDishes)
+						financeGroup.GET("/payment-methods", financeCtrl.PaymentMethods)
+						financeGroup.GET("/staff", financeCtrl.StaffPerformance)
+						financeGroup.GET("/summary.csv", financeCtrl.ExportCSV)
+					}
+				}
 
 				// Web push for locked phones
 				proRoutes.GET("/push/key", allStaff, problemCtrl.PushKey)

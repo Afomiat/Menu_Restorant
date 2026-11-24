@@ -29,7 +29,7 @@ import {
   clearCompletedOrders,
 } from '../services/orderService';
 import { getAdminToken, clearAdminToken, getStoredStaff, type StaffUser } from '../services/apiClient';
-import { canManage, canUseKitchen, normalizeRole } from '../utils/roles';
+import { canManage, canUseKitchen, canViewFinance, normalizeRole } from '../utils/roles';
 import { t } from '../i18n/en';
 import AdminStaffModal from './AdminStaffModal';
 import AdminRoleHome from './AdminRoleHome';
@@ -40,6 +40,7 @@ import BillsScreen from './BillsScreen';
 import DecisionsScreen from './DecisionsScreen';
 import { fetchDecisions } from '../services/problemService';
 import ReportsScreen from './ReportsScreen';
+import FinanceDashboard from './FinanceDashboard';
 import type { AdminView } from './AdminSidebar';
 import { useBell } from '../hooks/useBell';
 import { hasPlan } from '../utils/plan';
@@ -202,7 +203,16 @@ export default function AdminDashboardPage() {
   // Each role sees its own screen. The backend enforces the same rules on every request.
   const staffRole = adminToken ? normalizeRole(staffUser?.role) ?? 'manager' : null;
   const isManager = canManage(staffRole);
-  const viewToShow: AdminView = staffRole === 'chef' ? 'kitchen' : activeView;
+  const isFinance = canViewFinance(staffRole);
+  const isFinanceRole = staffRole === 'finance';
+  const viewToShow: AdminView =
+    staffRole === 'chef'
+      ? 'kitchen'
+      : isFinanceRole
+      ? activeView === 'reports'
+        ? 'reports'
+        : 'finance'
+      : activeView;
 
   // Pro screens: the kitchen board, the waiter's tables, bells and alerts
   const isPro = hasPlan(planFromBackend, 'pro');
@@ -911,8 +921,10 @@ export default function AdminDashboardPage() {
             confirmReminderMinutes={billTimings.confirm}
             onLoaded={updateDecisionsCount}
           />
-        ) : isManager && isPro && viewToShow === 'reports' ? (
+        ) : isFinance && isPro && viewToShow === 'reports' ? (
           <ReportsScreen currency={meta.currency || 'ETB'} />
+        ) : isFinance && isPro && viewToShow === 'finance' ? (
+          <FinanceDashboard currency={meta.currency || 'ETB'} />
         ) : isManager && isPro && viewToShow === 'bills' ? (
           <BillsScreen role={staffRole} currency={meta.currency || 'ETB'} refreshSignal={ordersChanged} onBillsLoaded={dropResolvedBillAlerts} />
         ) : staffRole === 'waiter' && isPro ? (
@@ -928,7 +940,7 @@ export default function AdminDashboardPage() {
             soldOutCount={soldOutCount}
             onBillsLoaded={dropResolvedBillAlerts}
           />
-        ) : staffRole === 'waiter' || staffRole === 'cashier' ? (
+        ) : staffRole === 'waiter' || staffRole === 'cashier' || staffRole === 'finance' ? (
           <AdminRoleHome role={staffRole} fullName={staffUser?.full_name} onLogout={handleLogout} />
         ) : viewToShow === 'kitchen' && isPro ? (
           <ProKitchenBoard

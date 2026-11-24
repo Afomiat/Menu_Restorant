@@ -61,6 +61,7 @@ func main() {
 	problemRepo := repository.NewProblemRepository(pool, queries)
 	pushRepo := repository.NewPushRepository(queries)
 	reportRepo := repository.NewReportRepository(queries)
+	financeRepo := repository.NewFinanceRepository(queries)
 
 	// Targeted alerts go to live screens, and with VAPID keys set, to locked phones as web push
 	var notifier domain.Notifier = hub
@@ -79,6 +80,7 @@ func main() {
 	billUsecase := usecase.NewBillUsecase(billRepo, tableRepo, staffRepo, activityRepo, notifier)
 	problemUsecase := usecase.NewProblemUsecase(problemRepo, billRepo, orderRepo, activityRepo, notifier)
 	reportUsecase := usecase.NewReportUsecase(reportRepo, problemRepo, billRepo)
+	financeUsecase := usecase.NewFinanceUsecase(financeRepo, reportRepo)
 
 	// Background checks (late orders, unpaid bills) run on the server, so alerts go out with no screen open
 	watchCtx, stopWatching := context.WithCancel(context.Background())
@@ -98,6 +100,7 @@ func main() {
 		BillUsecase:    billUsecase,
 		ProblemUsecase: problemUsecase,
 		ReportUsecase:  reportUsecase,
+		FinanceUsecase: financeUsecase,
 		PushRepo:       pushRepo,
 		Notifier:       notifier,
 		Hub:            hub,

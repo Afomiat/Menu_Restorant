@@ -1,12 +1,12 @@
-import { UtensilsCrossed, Sparkles, ChefHat, X, QrCode, LogOut, Settings, LayoutGrid, Rows3, Users, Receipt, AlertTriangle, BarChart3 } from 'lucide-react';
+import { UtensilsCrossed, Sparkles, ChefHat, X, QrCode, LogOut, Settings, LayoutGrid, Rows3, Users, Receipt, AlertTriangle, BarChart3, TrendingUp } from 'lucide-react';
 import type { RestaurantMeta, StaffRole } from '../types';
 import { PLAN_INFO, hasPlan } from '../utils/plan';
-import { canManage, canUseKitchen } from '../utils/roles';
+import { canManage, canUseKitchen, canViewFinance } from '../utils/roles';
 import { t } from '../i18n/en';
 
 type MenuDesign = NonNullable<RestaurantMeta['template']>;
 
-export type AdminView = 'menu' | 'kitchen' | 'bills' | 'alerts' | 'reports';
+export type AdminView = 'menu' | 'kitchen' | 'bills' | 'alerts' | 'reports' | 'finance';
 
 // The two customer menu designs a restaurant can switch between
 const MENU_DESIGNS: { id: MenuDesign; label: string; Icon: typeof LayoutGrid }[] = [
@@ -52,6 +52,7 @@ export default function AdminSidebar({
   role = 'manager',
 }: AdminSidebarProps) {
   const isManager = canManage(role);
+  const isFinance = canViewFinance(role);
   const showKitchen = canUseKitchen(role);
   const displayName = meta.name || 'Azai';
   // Same rule the customer menu uses: anything but 'modern' shows the classic design
@@ -194,37 +195,40 @@ export default function AdminSidebar({
             )}
 
             {isManager && onSelectView && meta?.plan && hasPlan(meta.plan, 'pro') && (
+              <button
+                type="button"
+                className={`admin-nav-item ${activeView === 'alerts' ? 'active' : ''}`}
+                onClick={() => {
+                  onSelectView('alerts');
+                  if (onCloseMobile) onCloseMobile();
+                }}
+              >
+                <AlertTriangle size={18} />
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {t.decisionsScreen.navLabel}
+                  {alertsCount > 0 && (
+                    <span
+                      data-testid="alerts-count"
+                      aria-label={`${alertsCount} waiting`}
+                      style={{
+                        backgroundColor: activeView === 'alerts' ? '#ffffff' : 'var(--admin-primary, #ff5a36)',
+                        color: activeView === 'alerts' ? 'var(--admin-primary, #ff5a36)' : '#ffffff',
+                        fontSize: '11px',
+                        fontWeight: 800,
+                        padding: '2px 8px',
+                        borderRadius: '999px',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                      }}
+                    >
+                      {alertsCount}
+                    </span>
+                  )}
+                </span>
+              </button>
+            )}
+
+            {isFinance && onSelectView && meta?.plan && hasPlan(meta.plan, 'pro') && (
               <>
-                <button
-                  type="button"
-                  className={`admin-nav-item ${activeView === 'alerts' ? 'active' : ''}`}
-                  onClick={() => {
-                    onSelectView('alerts');
-                    if (onCloseMobile) onCloseMobile();
-                  }}
-                >
-                  <AlertTriangle size={18} />
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {t.decisionsScreen.navLabel}
-                    {alertsCount > 0 && (
-                      <span
-                        data-testid="alerts-count"
-                        aria-label={`${alertsCount} waiting`}
-                        style={{
-                          backgroundColor: activeView === 'alerts' ? '#ffffff' : 'var(--admin-primary, #ff5a36)',
-                          color: activeView === 'alerts' ? 'var(--admin-primary, #ff5a36)' : '#ffffff',
-                          fontSize: '11px',
-                          fontWeight: 800,
-                          padding: '2px 8px',
-                          borderRadius: '999px',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                        }}
-                      >
-                        {alertsCount}
-                      </span>
-                    )}
-                  </span>
-                </button>
                 <button
                   type="button"
                   className={`admin-nav-item ${activeView === 'reports' ? 'active' : ''}`}
@@ -235,6 +239,17 @@ export default function AdminSidebar({
                 >
                   <BarChart3 size={18} />
                   <span>{t.reports.navLabel}</span>
+                </button>
+                <button
+                  type="button"
+                  className={`admin-nav-item ${activeView === 'finance' ? 'active' : ''}`}
+                  onClick={() => {
+                    onSelectView('finance');
+                    if (onCloseMobile) onCloseMobile();
+                  }}
+                >
+                  <TrendingUp size={18} />
+                  <span>Finance</span>
                 </button>
               </>
             )}

@@ -16,10 +16,11 @@ const (
 	RoleCashier    Role = "cashier"
 	RoleWaiter     Role = "waiter"
 	RoleChef       Role = "chef"
+	RoleFinance    Role = "finance"
 )
 
 // StaffRoles are the roles a manager can give a staff member, in display order
-var StaffRoles = []Role{RoleManager, RoleCashier, RoleWaiter, RoleChef}
+var StaffRoles = []Role{RoleManager, RoleCashier, RoleWaiter, RoleChef, RoleFinance}
 
 var roleLabels = map[Role]string{
 	RoleSuperAdmin: "Azai team",
@@ -27,6 +28,7 @@ var roleLabels = map[Role]string{
 	RoleCashier:    "Cashier",
 	RoleWaiter:     "Waiter",
 	RoleChef:       "Chef",
+	RoleFinance:    "Finance",
 }
 
 // NormalizeRole maps the role names used before the Pro roles (owner, kitchen) onto the

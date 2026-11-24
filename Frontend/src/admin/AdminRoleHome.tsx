@@ -21,7 +21,11 @@ export default function AdminRoleHome({ role, fullName = '', onLogout }: AdminRo
         {t.roleHome.signedInAs(roleLabel(role))}
       </p>
       <p style={{ margin: '0 0 24px', fontSize: '14px', color: '#475569' }}>
-        {role === 'cashier' ? t.roleHome.cashierComing : t.roleHome.waiterComing}
+        {role === 'cashier'
+          ? t.roleHome.cashierComing
+          : role === 'finance'
+          ? 'The Finance dashboard is part of the Pro plan. Ask your manager to upgrade.'
+          : t.roleHome.waiterComing}
       </p>
       <button type="button" className="admin-sec-pill-btn" onClick={onLogout}>
         <LogOut size={14} /> {t.roleHome.signOut}

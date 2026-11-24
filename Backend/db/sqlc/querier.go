@@ -41,6 +41,10 @@ type Querier interface {
 	DeleteMenuItem(ctx context.Context, arg DeleteMenuItemParams) error
 	DeletePushSubscription(ctx context.Context, endpoint string) error
 	EndShift(ctx context.Context, userID pgtype.UUID) (StaffShift, error)
+	FinanceSummary(ctx context.Context, arg FinanceSummaryParams) (FinanceSummaryRow, error)
+	FinanceTopDishes(ctx context.Context, arg FinanceTopDishesParams) ([]FinanceTopDishesRow, error)
+	FinanceTrendDaily(ctx context.Context, arg FinanceTrendDailyParams) ([]FinanceTrendDailyRow, error)
+	FinanceTrendWeekly(ctx context.Context, arg FinanceTrendWeeklyParams) ([]FinanceTrendWeeklyRow, error)
 	GetActiveBillForTable(ctx context.Context, arg GetActiveBillForTableParams) (pgtype.UUID, error)
 	GetCategoryByID(ctx context.Context, arg GetCategoryByIDParams) (Category, error)
 	GetMenuItemByID(ctx context.Context, arg GetMenuItemByIDParams) (MenuItem, error)
