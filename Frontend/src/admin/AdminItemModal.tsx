@@ -4,6 +4,7 @@ import type { MenuItem, Category } from '../types';
 import { uploadImageToCloudinary } from '../services/uploadService';
 import { t as text } from '../i18n/en';
 import { parsePrepMinutes } from '../utils/kitchenTimer';
+import { DISH_PLACEHOLDER } from '../utils/images';
 
 interface AdminItemModalProps {
   isOpen: boolean;
@@ -160,7 +161,7 @@ export default function AdminItemModal({
       price: numericPrice,
       description: formData.description?.trim() || '',
       fullDescription: formData.fullDescription?.trim() || undefined,
-      imageUrl: formData.imageUrl?.trim() || '/images/default_food.png',
+      imageUrl: formData.imageUrl?.trim() || '',
       tags: formData.tags || [],
       available: formData.available !== false,
       prepMinutes: parsePrepMinutes(formData.prepMinutes),
@@ -300,7 +301,7 @@ export default function AdminItemModal({
                       src={formData.imageUrl}
                       alt="Dish preview"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/images/default_food.png';
+                        (e.target as HTMLImageElement).src = DISH_PLACEHOLDER;
                       }}
                     />
                   </div>
@@ -437,7 +438,7 @@ export default function AdminItemModal({
                         alt="Preview"
                         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src = '/images/default_food.png';
+                          (e.target as HTMLImageElement).src = DISH_PLACEHOLDER;
                         }}
                       />
                     ) : (

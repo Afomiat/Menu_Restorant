@@ -8,6 +8,8 @@ import ShiftBar from './ShiftBar';
 import DishProblemButton from './DishProblemButton';
 import PushButton from './PushButton';
 import SoldOutButton from './SoldOutButton';
+import { BusyButton, SkeletonBlocks } from './Loading';
+import { formatPrice } from '../utils/currency';
 import { t } from '../i18n/en';
 import { billsSignature, isServed, tableState, type TableState } from '../utils/orderBoards';
 
@@ -97,14 +99,30 @@ export default function WaiterTablesScreen({
     }
   };
 
+  // Tables that need the waiter come first: food waiting, then a customer asking for the bill
+  const all = tables || [];
+  const billFor = (tableNumber: string) =>
+    bills.find((b) => b.table_number === tableNumber && (b.status === 'open' || b.status === 'bill_requested' || b.status === 'collected'));
+  const urgency = (entry: TableOrders) => {
+    const bill = billFor(entry.table.table_number);
+    if (tableState(entry.orders) === 'ready') return 0;
+    if (bill?.status === 'bill_requested') return 1;
+    if (entry.orders.some((o) => !isServed(o.status))) return 2;
+    return bill ? 3 : 4;
+  };
+  const sorted = [...all].sort((a, b) => urgency(a) - urgency(b));
+  const readyCount = all.filter((e) => tableState(e.orders) === 'ready').length;
+  const askedCount = all.filter((e) => billFor(e.table.table_number)?.status === 'bill_requested').length;
+  const owed = all.reduce((sum, e) => sum + (billFor(e.table.table_number)?.amount_owed || 0), 0);
+
   return (
     <section className="admin-kitchen-page-view" aria-label={t.waiter.title}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+      <div className="rpt-header">
         <div>
           <h1 className="admin-top-title" style={{ margin: 0 }}>{t.waiter.title}</h1>
-          {fullName && <p style={{ margin: '2px 0 0', color: '#64748b', fontSize: '13px' }}>{fullName}</p>}
+          {fullName && <p className="rpt-subtitle">{fullName}</p>}
         </div>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <div className="wt-actions">
           {onOpenSoldOut && <SoldOutButton count={soldOutCount} onClick={onOpenSoldOut} />}
           {!bell.enabled && (
             <button type="button" className="admin-save-pill-btn" onClick={() => bell.enable()}>
@@ -121,31 +139,45 @@ export default function WaiterTablesScreen({
       <PushButton />
 
       {readyAlerts.map((alert) => (
-        <div
-          key={alert.orderId}
-          role="alert"
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: '#16a34a', color: '#fff', borderRadius: '12px', padding: '12px 16px', marginBottom: '10px', fontWeight: 700 }}
-        >
+        <div key={alert.orderId} role="alert" className="wt-ready-banner">
           <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <BellRing size={18} /> {t.waiter.readyBanner(alert.tableNumber)}
           </span>
-          <button type="button" onClick={() => onDismissAlert(alert.orderId)} aria-label={t.kitchen.dismiss} style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}>
+          <button type="button" onClick={() => onDismissAlert(alert.orderId)} aria-label={t.kitchen.dismiss} className="wt-banner-close">
             <X size={18} />
           </button>
         </div>
       ))}
 
-      {error && <p role="status" style={{ color: '#dc2626', fontSize: '13px' }}>{error}</p>}
+      {error && <p role="status" style={{ color: '#dc2626', fontSize: '14px', margin: 0 }}>{error}</p>}
 
-      {tables && tables.length === 0 && <p style={{ color: '#64748b' }}>{t.waiter.empty}</p>}
+      {/* Until the first answer: the page's outline */}
+      {!tables && !error && <SkeletonBlocks kpis={3} sections={[{ kind: 'cards', count: 3 }]} label={t.waiter.title} />}
+
+      {tables && tables.length === 0 && <p className="rpt-empty">{t.waiter.empty}</p>}
+
+      {tables && tables.length > 0 && (
+        <div className="rpt-kpis" role="region" aria-label={t.waiter.summary}>
+          <div className={`rpt-kpi ${readyCount > 0 ? 'rpt-kpi-good' : ''}`}>
+            <span className="rpt-kpi-label">{t.waiter.foodReady}</span>
+            <strong className="rpt-kpi-value">{readyCount}</strong>
+          </div>
+          <div className={`rpt-kpi ${askedCount > 0 ? 'rpt-kpi-warn' : ''}`}>
+            <span className="rpt-kpi-label">{t.waiter.billsAsked}</span>
+            <strong className="rpt-kpi-value">{askedCount}</strong>
+          </div>
+          <div className="rpt-kpi">
+            <span className="rpt-kpi-label">{t.waiter.owed}</span>
+            <strong className="rpt-kpi-value">{formatPrice(owed, currency || 'ETB')}</strong>
+          </div>
+        </div>
+      )}
 
       <div className="admin-kitchen-tickets-grid">
-        {(tables || []).map(({ table, orders }) => {
+        {sorted.map(({ table, orders }) => {
           const state = STATE_STYLE[tableState(orders)];
           // The table's bill still in the waiter's hands (taking orders, or collected and not confirmed)
-          const bill = bills.find(
-            (b) => b.table_number === table.table_number && (b.status === 'open' || b.status === 'bill_requested' || b.status === 'collected')
-          );
+          const bill = billFor(table.table_number);
           // The bill's state next to the kitchen state, so "Bill asked" is seen without scrolling
           const billChip = !bill
             ? null
@@ -155,66 +187,75 @@ export default function WaiterTablesScreen({
                 ? t.waiter.partPaid
                 : null;
           return (
-            <div key={table.id} className="admin-kitchen-table-card" data-testid={`waiter-table-${table.table_number}`}>
-              <div className="admin-kitchen-card-header">
-                <strong style={{ fontSize: '17px' }}>{t.kitchen.table(table.table_number)}</strong>
+            <div key={table.id} className="bill-card wt-table" data-testid={`waiter-table-${table.table_number}`}>
+              <div className="bill-card-head">
+                <strong className="bill-card-title">{t.kitchen.table(table.table_number)}</strong>
                 <span style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 800, color: state.color, background: state.bg, padding: '3px 10px', borderRadius: '999px' }}>
+                  <span className="bill-status" style={{ color: state.color, background: state.bg }}>
                     {state.label}
                   </span>
                   {billChip && (
-                    <span data-testid="table-bill-chip" style={{ fontSize: '12px', fontWeight: 800, color: '#b45309', background: '#ffedd5', padding: '3px 10px', borderRadius: '999px' }}>
+                    <span data-testid="table-bill-chip" className="bill-status bill-status-bill_requested">
                       {billChip}
                     </span>
                   )}
                 </span>
               </div>
-              <div style={{ display: 'grid', gap: '10px', padding: '12px 16px' }}>
-                {orders.map((order, i) => {
-                  const served = isServed(order.status);
-                  // A problem is reported once the food has reached the table (or is ready to go)
-                  const canReport = served || order.status === 'ready';
-                  return (
-                  <div key={order.id} data-served={served || undefined} style={{ borderTop: i > 0 ? '1px solid #e2e8f0' : 'none', paddingTop: i > 0 ? '10px' : 0, opacity: served ? 0.75 : 1 }}>
-                    <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px', display: 'flex', justifyContent: 'space-between' }}>
-                      <span>{t.waiter.order(i + 1)}</span>
-                      {served && <span style={{ color: '#15803d', fontWeight: 700 }}>{t.waiter.servedDone}</span>}
-                    </div>
-                    <ul style={{ listStyle: 'none', margin: 0, padding: 0, fontSize: '14px' }}>
-                      {(order.items || []).map((it) => (
-                        <li key={it.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
-                          <span>
-                            <strong>{it.quantity}×</strong> {it.item_name}
-                          </span>
-                          {canReport && <DishProblemButton orderId={order.id} itemId={it.id} dishName={it.item_name} />}
-                        </li>
-                      ))}
-                    </ul>
-                    {order.status === 'ready' && (
-                      <button
-                        type="button"
-                        className="admin-save-pill-btn"
-                        style={{ marginTop: '8px' }}
-                        disabled={busyOrder === order.id}
-                        onClick={() => serve(order)}
-                      >
-                        <CheckCircle2 size={14} /> {t.waiter.served}
-                      </button>
-                    )}
-                  </div>
-                  );
-                })}
-                {bill && (
-                  <BillCard
-                    bill={bill}
-                    role="waiter"
-                    currency={currency}
-                    onChanged={load}
-                    showTable={false}
-                    tableSuggestions={(tables || []).map((tb) => tb.table.table_number)}
-                  />
-                )}
-              </div>
+              {orders.length > 0 && (
+                <ul className="wt-orders">
+                  {orders.map((order, i) => {
+                    const served = isServed(order.status);
+                    // A problem is reported once the food has reached the table (or is ready to go)
+                    const canReport = served || order.status === 'ready';
+                    return (
+                      <li key={order.id} data-served={served || undefined} className={`wt-order ${served ? 'wt-order-served' : ''}`}>
+                        <div className="wt-order-head">
+                          <span>{t.waiter.order(i + 1)}</span>
+                          {served ? (
+                            <span className="wt-served">{t.waiter.servedDone}</span>
+                          ) : (
+                            <span className={`wt-order-state wt-order-${order.status}`}>
+                              {order.status === 'ready' ? t.waiter.foodReady : order.status === 'preparing' ? t.waiter.cooking : t.waiter.ordered}
+                            </span>
+                          )}
+                        </div>
+                        <ul className="wt-dishes">
+                          {(order.items || []).map((it) => (
+                            <li key={it.id}>
+                              <span>
+                                <strong>{it.quantity}×</strong> {it.item_name}
+                              </span>
+                              {canReport && <DishProblemButton orderId={order.id} itemId={it.id} dishName={it.item_name} />}
+                            </li>
+                          ))}
+                        </ul>
+                        {order.status === 'ready' && (
+                          <BusyButton
+                            className="admin-save-pill-btn"
+                            style={{ justifySelf: 'start' }}
+                            busy={busyOrder === order.id}
+                            icon={<CheckCircle2 size={14} />}
+                            onClick={() => serve(order)}
+                          >
+                            {t.waiter.served}
+                          </BusyButton>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              {bill && (
+                <BillCard
+                  bill={bill}
+                  role="waiter"
+                  currency={currency}
+                  onChanged={load}
+                  showTable={false}
+                  inset
+                  tableSuggestions={all.map((tb) => tb.table.table_number)}
+                />
+              )}
             </div>
           );
         })}

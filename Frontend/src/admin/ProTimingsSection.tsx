@@ -33,12 +33,14 @@ function validate(values: Record<string, string>): string | null {
 }
 
 interface ProTimingsSectionProps {
+  /** Page mode: sits in its own card, so no divider line and a card-style heading */
+  plain?: boolean;
   /** Called with the timings the server stored, so other screens can use the new values */
   onSaved?: (settings: TenantSettings) => void;
 }
 
 /** Pro managers: prep and reminder times, saved together with the rest of the Settings window. */
-const ProTimingsSection = forwardRef<ProTimingsHandle, ProTimingsSectionProps>(function ProTimingsSection({ onSaved }, ref) {
+const ProTimingsSection = forwardRef<ProTimingsHandle, ProTimingsSectionProps>(function ProTimingsSection({ onSaved, plain = false }, ref) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -84,8 +86,11 @@ const ProTimingsSection = forwardRef<ProTimingsHandle, ProTimingsSectionProps>(f
   );
 
   return (
-    <section aria-label={t.settings.proTitle} style={{ borderTop: '1px solid var(--admin-border)', paddingTop: '16px', display: 'grid', gap: '10px' }}>
-      <h4 style={{ margin: 0, fontSize: '14px' }}>{t.settings.proTitle}</h4>
+    <section
+      aria-label={t.settings.proTitle}
+      style={plain ? { display: 'grid', gap: '12px' } : { borderTop: '1px solid var(--admin-border)', paddingTop: '16px', display: 'grid', gap: '10px' }}
+    >
+      {plain ? <h2 className="rpt-panel-title">{t.settings.proTitle}</h2> : <h4 style={{ margin: 0, fontSize: '14px' }}>{t.settings.proTitle}</h4>}
       {loading ? (
         <Loader2 size={16} className="admin-spin" />
       ) : (

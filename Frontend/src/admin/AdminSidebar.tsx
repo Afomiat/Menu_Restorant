@@ -6,7 +6,8 @@ import { t } from '../i18n/en';
 
 type MenuDesign = NonNullable<RestaurantMeta['template']>;
 
-export type AdminView = 'menu' | 'kitchen' | 'bills' | 'alerts' | 'reports' | 'finance';
+export type { AdminView } from '../utils/adminViews';
+import type { AdminView } from '../utils/adminViews';
 
 // The two customer menu designs a restaurant can switch between
 const MENU_DESIGNS: { id: MenuDesign; label: string; Icon: typeof LayoutGrid }[] = [
@@ -257,7 +258,7 @@ export default function AdminSidebar({
             {isManager && onOpenStaff && (
               <button
                 type="button"
-                className="admin-nav-item"
+                className={`admin-nav-item ${activeView === 'staff' ? 'active' : ''}`}
                 onClick={() => {
                   onOpenStaff();
                   if (onCloseMobile) onCloseMobile();
@@ -287,7 +288,7 @@ export default function AdminSidebar({
             {isManager && (
             <button
               type="button"
-              className="admin-nav-item"
+              className={`admin-nav-item ${activeView === 'tables' ? 'active' : ''}`}
               onClick={() => {
                 if (onOpenTables) onOpenTables();
                 if (onCloseMobile) onCloseMobile();
@@ -301,7 +302,7 @@ export default function AdminSidebar({
             {isManager && onOpenSettings && (
               <button
                 type="button"
-                className="admin-nav-item"
+                className={`admin-nav-item ${activeView === 'settings' ? 'active' : ''}`}
                 onClick={() => {
                   onOpenSettings();
                   if (onCloseMobile) onCloseMobile();

@@ -190,3 +190,22 @@ describe('AdminStaffModal', () => {
     expect(updateStaff).not.toHaveBeenCalled();
   });
 });
+
+describe('Staff page', () => {
+  it('sums up the team by role, with turned-off accounts', async () => {
+    fetchStaff.mockResolvedValue([
+      member('01', 'Hana Alemu', 'manager'),
+      member('02', 'Abebe Kebede', 'waiter'),
+      member('03', 'Bereket Assefa', 'waiter'),
+      member('04', 'Tigist Worku', 'chef'),
+      member('05', 'Selam Girma', 'waiter', false),
+    ]);
+    render(<AdminStaffModal asPage isOpen onClose={vi.fn()} plan="pro" currentUserId="01" />);
+
+    expect(await screen.findByText('5 staff · 1 manager · 2 waiters · 1 chef · 1 turned off')).toBeTruthy();
+    // Each person gets an initials badge
+    expect(screen.getByTestId('staff-row-02').textContent).toContain('AK');
+    expect(screen.getByRole('region', { name: 'Team' })).toBeTruthy();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});

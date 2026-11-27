@@ -3,6 +3,7 @@ import type { MenuItem } from '../../types';
 import { formatNumber } from '../../utils/currency';
 import { useFeatureGate } from '../../hooks/useFeatureGate';
 import { sizedImageUrl } from '../../utils/imageUrl';
+import { DISH_PLACEHOLDER } from '../../utils/images';
 
 interface ModernFoodGridProps {
   items: MenuItem[];
@@ -71,7 +72,7 @@ export default function ModernFoodGrid({
                 loading="lazy"
                 style={isSoldOut ? { filter: 'grayscale(50%)' } : undefined}
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = '/images/default_food.png';
+                  (e.target as HTMLImageElement).src = DISH_PLACEHOLDER;
                 }}
               />
               {isSoldOut ? (

@@ -3,6 +3,7 @@ import { MoreHorizontal, Edit2, Trash2, CheckCircle2, XCircle, Clock } from 'luc
 import type { MenuItem } from '../types';
 import { formatCurrency } from '../utils/currency';
 import { t as text } from '../i18n/en';
+import { DISH_PLACEHOLDER } from '../utils/images';
 
 interface AdminDishCardProps {
   item: MenuItem;
@@ -73,12 +74,12 @@ export default function AdminDishCard({
       <div className="admin-dish-card-header">
         <div className="admin-dish-img-wrap">
           <img
-            src={item.imageUrl || '/images/cat_food.jpg'}
+            src={item.imageUrl || DISH_PLACEHOLDER}
             alt={item.name}
             className="admin-dish-img"
             loading="lazy"
             onError={(e) => {
-              (e.target as HTMLImageElement).src = '/images/cat_food.jpg';
+              (e.target as HTMLImageElement).src = DISH_PLACEHOLDER;
             }}
           />
           {!isAvailable && (

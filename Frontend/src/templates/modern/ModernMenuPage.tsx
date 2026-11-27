@@ -22,6 +22,7 @@ import SearchBar from '../../components/common/SearchBar';
 import OfflineBanner from '../../components/common/OfflineBanner';
 
 import './modern.css';
+import { isPlaceholderImage } from '../../utils/images';
 
 interface ModernMenuPageProps {
   meta: RestaurantMeta;
@@ -194,8 +195,8 @@ export default function ModernMenuPage({
   // Dynamic Hero Banner variables for each restaurant
   const heroImageSrc =
     meta.heroImageUrl ||
-    items.find((it) => it.imageUrl)?.imageUrl ||
-    '/images/burger_classic.jpg';
+    items.find((it) => !isPlaceholderImage(it.imageUrl))?.imageUrl ||
+    null;
 
   const heroMainTitle = meta.heroTitle?.split('&')[0]?.trim() || 'Hungry?';
   const heroSubtitleText = meta.heroTitle?.includes('&')
@@ -310,7 +311,8 @@ export default function ModernMenuPage({
       <main className="modern-container" style={{ flex: '1 0 auto' }}>
         {/* 2. Hero Showcase Banner with Diagonal Half-Right Blurred Food Image */}
         <section className="modern-hero-banner" aria-label="Restaurant Highlight">
-          {/* Diagonal Half-Right Food Image Showcase */}
+          {/* Diagonal Half-Right Food Image Showcase (left out when the restaurant has no photo yet) */}
+          {heroImageSrc && (
           <div className="modern-hero-diagonal-bg" aria-hidden="true">
             <div
               className="modern-hero-image-blur-layer"
@@ -323,11 +325,13 @@ export default function ModernMenuPage({
               // First thing on screen: load it right away instead of waiting for the lazy loader
               fetchPriority="high"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = '/images/burger_classic.jpg';
+                // A broken banner photo is hidden rather than replaced by a placeholder
+                (e.target as HTMLImageElement).closest('.modern-hero-diagonal-bg')?.setAttribute('hidden', '');
               }}
             />
             <div className="modern-hero-diagonal-overlay" />
           </div>
+          )}
 
           <div className="modern-hero-content">
             <h1 className="modern-hero-title">

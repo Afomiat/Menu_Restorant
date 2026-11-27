@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { Bill, BillStatus } from '../types';
 
 const svc = {
@@ -86,7 +86,8 @@ describe('BillCard for a waiter', () => {
     const card = screen.getByTestId('bill-b1');
     expect(card.textContent).toContain('Bill asked');
     expect(card.textContent).toContain('Owed');
-    expect(card.textContent).toContain('Abebe · Cash');
+    expect(card.textContent).toContain('Cash');
+    expect(card.textContent).toContain('Abebe');
     expect(screen.queryByText('Ask for bill')).toBeNull();
     expect(screen.queryByText('Confirm money received')).toBeNull();
   });
@@ -196,12 +197,58 @@ describe('BillsScreen', () => {
     ]);
     render(<BillsScreen role="cashier" refreshSignal={0} showShift />);
 
-    expect(await screen.findByText('Collected, waiting for you to confirm (1)')).toBeTruthy();
-    expect(screen.getByText('Open bills (2)')).toBeTruthy();
-    expect(screen.getByText('Confirmed today (1)')).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Collected, waiting for you to confirm 1' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Open bills 2' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Confirmed today 1' })).toBeTruthy();
     const ids = Array.from(document.querySelectorAll('[data-testid^="bill-"]')).map((el) => el.getAttribute('data-testid'));
     expect(ids).toEqual(['bill-coll1', 'bill-open1', 'bill-ask1', 'bill-done1']);
     expect(screen.getByTestId('shift-status')).toBeTruthy();
+  });
+
+  it('sums up the money to confirm, what open bills owe and what was confirmed today', async () => {
+    svc.fetchBills.mockResolvedValue([
+      bill('c1', 'collected', { amount_paid: 420, amount_owed: 0 }),
+      bill('c2', 'collected', { amount_paid: 860, amount_owed: 0 }),
+      bill('o1', 'open', { amount_owed: 300 }),
+      bill('d1', 'confirmed', { amount_paid: 540, amount_owed: 0 }),
+      bill('w1', 'walkout', { amount_owed: 1090 }),
+    ]);
+    render(<BillsScreen role="cashier" refreshSignal={0} currency="ETB" />);
+
+    const summary = await screen.findByRole('region', { name: 'Today at a glance' });
+    expect(summary.textContent).toContain('To confirm1,280 ETB2 bills');
+    expect(summary.textContent).toContain('Open bills11 bill · 300 ETB owed');
+    // A walkout is not money confirmed
+    expect(summary.textContent).toContain('Confirmed today540 ETB1 bill');
+    // Closed bills are compact rows, the walkout marked as such
+    expect(screen.getByTestId('bill-w1').textContent).toContain('Walkout');
+  });
+
+  it('shows the page outline, not an empty page, until the bills arrive', async () => {
+    let resolve: (bills: Bill[]) => void = () => {};
+    svc.fetchBills.mockReturnValue(new Promise<Bill[]>((r) => (resolve = r)));
+    render(<BillsScreen role="cashier" refreshSignal={0} />);
+
+    expect(screen.getByRole('status', { name: 'Bills' })).toBeTruthy();
+    expect(screen.queryByText('Nothing here.')).toBeNull();
+
+    await act(async () => resolve([bill('c1', 'collected', { amount_paid: 420, amount_owed: 0 })]));
+    expect(screen.queryByRole('status', { name: 'Bills' })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Collected, waiting for you to confirm 1' })).toBeTruthy();
+  });
+
+  it('spins only the pressed button while the money is confirmed', async () => {
+    let resolve: (b: Bill) => void = () => {};
+    svc.confirmBill.mockReturnValue(new Promise<Bill>((r) => (resolve = r)));
+    render(<BillCard bill={bill('c1', 'collected', { amount_paid: 420, amount_owed: 0 })} role="cashier" onChanged={vi.fn()} />);
+
+    fireEvent.click(screen.getByText('Confirm money received'));
+    const button = screen.getByText('Confirm money received').closest('button') as HTMLButtonElement;
+    expect(button.getAttribute('aria-busy')).toBe('true');
+    expect(button.disabled).toBe(true);
+
+    await act(async () => resolve(bill('c1', 'confirmed')));
+    expect(button.getAttribute('aria-busy')).toBeNull();
   });
 
   it('reloads after confirming', async () => {

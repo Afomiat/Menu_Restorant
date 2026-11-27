@@ -4,6 +4,8 @@ import { collectBill, confirmBill, fetchColleagues, handoverBill, moveBill, requ
 import { markWalkout } from '../services/problemService';
 import { formatPrice } from '../utils/currency';
 import { t } from '../i18n/en';
+import { BusyButton } from './Loading';
+import { MoreHorizontal } from 'lucide-react';
 
 interface BillCardProps {
   bill: Bill;
@@ -15,6 +17,11 @@ interface BillCardProps {
   showTable?: boolean;
   /** Tables offered when moving or joining the bill; any other name can still be typed. */
   tableSuggestions?: string[];
+  /**
+   * Inside a waiter's table card: a lighter look, and the less common actions (move, hand over,
+   * walkout) behind "More" so the phone shows one short row of buttons.
+   */
+  inset?: boolean;
 }
 
 type Panel = 'none' | 'collect' | 'move' | 'handover' | 'walkout';
@@ -22,7 +29,8 @@ type Panel = 'none' | 'collect' | 'move' | 'handover' | 'walkout';
 const METHODS: PaymentMethod[] = ['cash', 'telebirr', 'cbe_birr_bank'];
 
 /** One bill with what was paid and what is owed, and the actions the signed-in role may take. */
-export default function BillCard({ bill, role, currency = 'ETB', onChanged, showTable = true, tableSuggestions = [] }: BillCardProps) {
+export default function BillCard({ bill, role, currency = 'ETB', onChanged, showTable = true, tableSuggestions = [], inset = false }: BillCardProps) {
+  const [showMore, setShowMore] = useState(false);
   const [panel, setPanel] = useState<Panel>('none');
   const [amount, setAmount] = useState(String(bill.amount_owed));
   const [method, setMethod] = useState<PaymentMethod>('cash');
@@ -30,7 +38,9 @@ export default function BillCard({ bill, role, currency = 'ETB', onChanged, show
   const [table, setTable] = useState('');
   const [colleagues, setColleagues] = useState<Colleague[]>([]);
   const [handoverTo, setHandoverTo] = useState('');
-  const [busy, setBusy] = useState(false);
+  // Which action is running ('ask', 'confirm', 'save', 'walkout'), so only its button spins
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const busy = busyAction !== null;
   const [error, setError] = useState<string | null>(null);
 
   const serves = role === 'waiter' || role === 'manager' || role === 'super_admin';
@@ -39,8 +49,8 @@ export default function BillCard({ bill, role, currency = 'ETB', onChanged, show
   const money = (v: number) => formatPrice(v, currency);
   const moveOptions = tableSuggestions.filter((name) => name !== bill.table_number);
 
-  const run = async (action: () => Promise<Bill>) => {
-    setBusy(true);
+  const run = async (action: () => Promise<Bill>, key = 'save') => {
+    setBusyAction(key);
     setError(null);
     try {
       const updated = await action();
@@ -49,7 +59,7 @@ export default function BillCard({ bill, role, currency = 'ETB', onChanged, show
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed');
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   };
 
@@ -64,34 +74,43 @@ export default function BillCard({ bill, role, currency = 'ETB', onChanged, show
     }
   };
 
+  // The less common actions: always shown on a full bill card, behind "More" inside a table card
+  const hasMore = serves && (takesOrders || bill.status === 'collected');
+  const moreOpen = !inset || showMore || panel === 'move' || panel === 'handover' || panel === 'walkout';
+
   return (
-    <div data-testid={`bill-${bill.id}`} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px', background: '#fff', display: 'grid', gap: '8px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
-        {showTable ? <strong>{t.kitchen.table(bill.table_number)}</strong> : <strong>{t.bills.heading}</strong>}
-        <span style={{ fontSize: '12px', fontWeight: 800, color: bill.status === 'bill_requested' ? '#b45309' : '#475569' }}>
-          {t.bills.status[bill.status]}
-        </span>
+    <div data-testid={`bill-${bill.id}`} className={`bill-card ${inset ? 'bill-card-inset' : ''}`}>
+      <div className="bill-card-head">
+        <strong className="bill-card-title">{showTable ? t.kitchen.table(bill.table_number) : t.bills.heading}</strong>
+        <span className={`bill-status bill-status-${bill.status}`}>{t.bills.status[bill.status]}</span>
       </div>
-      <div style={{ fontSize: '13px', color: '#64748b' }}>{t.bills.waiter(bill.waiter_name)}</div>
-      <div style={{ display: 'flex', gap: '4px 16px', fontSize: '14px', flexWrap: 'wrap', whiteSpace: 'nowrap' }}>
+      <div className="bill-card-waiter">{t.bills.waiter(bill.waiter_name)}</div>
+      <div className="bill-amounts">
         <span>
-          {t.bills.total}: <strong>{money(bill.total_amount)}</strong>
+          <span className="bill-amount-label">{t.bills.total}</span>
+          <strong>{money(bill.total_amount)}</strong>
         </span>
         <span>
-          {t.bills.paid}: {money(bill.amount_paid)}
+          <span className="bill-amount-label">{t.bills.paid}</span>
+          <strong>{money(bill.amount_paid)}</strong>
         </span>
         {bill.amount_owed > 0 && (
-          <span style={{ color: '#b45309' }}>
-            {t.bills.owed}: <strong>{money(bill.amount_owed)}</strong>
+          <span className="bill-amount-owed">
+            <span className="bill-amount-label">{t.bills.owed}</span>
+            <strong>{money(bill.amount_owed)}</strong>
           </span>
         )}
       </div>
       {bill.payments.length > 0 && (
-        <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '12px', color: '#475569' }}>
+        <ul className="bill-payments">
           {bill.payments.map((p) => (
             <li key={p.id}>
-              {money(p.amount)} · {t.bills.collectedBy(p.collected_by_name, t.bills.methods[p.method])}
-              {p.reference && ` · ${p.reference}`}
+              <span className={`bill-method bill-method-${p.method}`}>{t.bills.methods[p.method]}</span>
+              <strong>{money(p.amount)}</strong>
+              <span className="bill-payment-by">
+                {p.collected_by_name}
+                {p.reference && ` · ${p.reference}`}
+              </span>
             </li>
           ))}
         </ul>
@@ -99,34 +118,39 @@ export default function BillCard({ bill, role, currency = 'ETB', onChanged, show
 
       <div className="admin-bill-actions" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
         {serves && bill.status === 'open' && (
-          <button type="button" className="admin-sec-pill-btn" disabled={busy} onClick={() => run(() => requestBill(bill.id))}>
+          <BusyButton className="admin-sec-pill-btn" busy={busyAction === 'ask'} disabled={busy} onClick={() => run(() => requestBill(bill.id), 'ask')}>
             {t.bills.askBill}
-          </button>
+          </BusyButton>
         )}
         {serves && takesOrders && bill.amount_owed > 0 && (
           <button type="button" className="admin-save-pill-btn" disabled={busy} onClick={() => openPanel('collect')}>
             {t.bills.collect}
           </button>
         )}
-        {serves && takesOrders && (
+        {hasMore && inset && !moreOpen && (
+          <button type="button" className="admin-sec-pill-btn" aria-expanded={false} onClick={() => setShowMore(true)}>
+            <MoreHorizontal size={14} /> {t.bills.more}
+          </button>
+        )}
+        {moreOpen && serves && takesOrders && (
           <button type="button" className="admin-sec-pill-btn" disabled={busy} onClick={() => openPanel('move')}>
             {t.bills.move}
           </button>
         )}
-        {serves && (takesOrders || bill.status === 'collected') && (
+        {moreOpen && serves && (takesOrders || bill.status === 'collected') && (
           <button type="button" className="admin-sec-pill-btn" disabled={busy} onClick={() => openPanel('handover')}>
             {t.bills.handover}
           </button>
         )}
-        {serves && takesOrders && bill.amount_owed > 0 && (
+        {moreOpen && serves && takesOrders && bill.amount_owed > 0 && (
           <button type="button" className="admin-sec-pill-btn" style={{ color: '#b91c1c' }} disabled={busy} onClick={() => openPanel('walkout')}>
             {t.walkouts.mark}
           </button>
         )}
         {confirms && bill.status === 'collected' && (
-          <button type="button" className="admin-save-pill-btn" disabled={busy} onClick={() => run(() => confirmBill(bill.id))}>
+          <BusyButton className="admin-save-pill-btn" busy={busyAction === 'confirm'} disabled={busy} onClick={() => run(() => confirmBill(bill.id), 'confirm')}>
             {t.bills.confirm}
-          </button>
+          </BusyButton>
         )}
       </div>
 
@@ -159,33 +183,33 @@ export default function BillCard({ bill, role, currency = 'ETB', onChanged, show
                 {t.bills.reference}
                 <input className="admin-input-control" maxLength={64} value={reference} onChange={(e) => setReference(e.target.value)} />
               </label>
-              <span style={{ fontSize: '11px', color: '#64748b' }}>{t.bills.referenceHint}</span>
+              <span style={{ fontSize: '13px', color: '#64748b' }}>{t.bills.referenceHint}</span>
             </div>
           )}
-          <button type="submit" className="admin-save-pill-btn" disabled={busy}>
+          <BusyButton type="submit" className="admin-save-pill-btn" busy={busyAction === 'save'} disabled={busy}>
             {t.bills.save}
-          </button>
+          </BusyButton>
         </form>
       )}
 
       {panel === 'walkout' && (
         <div role="group" aria-label={t.walkouts.mark} style={{ display: 'grid', gap: '6px' }}>
-          <span style={{ fontSize: '13px' }}>{t.walkouts.confirmMark(bill.table_number, money(bill.amount_owed))}</span>
+          <span style={{ fontSize: '14px' }}>{t.walkouts.confirmMark(bill.table_number, money(bill.amount_owed))}</span>
           <div style={{ display: 'flex', gap: '6px' }}>
-            <button
-              type="button"
+            <BusyButton
               className="admin-save-pill-btn"
               style={{ backgroundColor: '#b91c1c' }}
+              busy={busyAction === 'walkout'}
               disabled={busy}
               onClick={() =>
                 run(async () => {
                   await markWalkout(bill.id);
                   return { ...bill, status: 'walkout' };
-                })
+                }, 'walkout')
               }
             >
               {t.walkouts.mark}
-            </button>
+            </BusyButton>
             <button type="button" className="admin-sec-pill-btn" onClick={() => setPanel('none')}>
               {t.bills.cancel}
             </button>
@@ -217,9 +241,9 @@ export default function BillCard({ bill, role, currency = 'ETB', onChanged, show
               ))}
             </datalist>
           )}
-          <button type="submit" className="admin-save-pill-btn" disabled={busy || !table.trim()}>
+          <BusyButton type="submit" className="admin-save-pill-btn" busy={busyAction === 'save'} disabled={busy || !table.trim()}>
             {t.bills.save}
-          </button>
+          </BusyButton>
         </form>
       )}
 
@@ -240,9 +264,9 @@ export default function BillCard({ bill, role, currency = 'ETB', onChanged, show
               </option>
             ))}
           </select>
-          <button type="submit" className="admin-save-pill-btn" disabled={busy || !handoverTo}>
+          <BusyButton type="submit" className="admin-save-pill-btn" busy={busyAction === 'save'} disabled={busy || !handoverTo}>
             {t.bills.save}
-          </button>
+          </BusyButton>
         </form>
       )}
 

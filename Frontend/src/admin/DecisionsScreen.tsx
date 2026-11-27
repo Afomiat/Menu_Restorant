@@ -6,7 +6,9 @@ import { formatPrice } from '../utils/currency';
 import { groupTickets } from '../utils/orderBoards';
 import { timerState } from '../utils/kitchenTimer';
 import { useNow } from '../hooks/useNow';
+import { CheckCircle2 } from 'lucide-react';
 import PushButton from './PushButton';
+import { BusyButton, SkeletonBlocks } from './Loading';
 import { t } from '../i18n/en';
 
 interface DecisionsScreenProps {
@@ -89,80 +91,137 @@ export default function DecisionsScreen({
 
   return (
     <section className="admin-kitchen-page-view" aria-label={t.decisionsScreen.title}>
-      <h1 className="admin-top-title" style={{ margin: '0 0 12px' }}>{t.decisionsScreen.title}</h1>
+      <div className="rpt-header">
+        <div>
+          <h1 className="admin-top-title" style={{ margin: 0 }}>{t.decisionsScreen.title}</h1>
+          <p className="rpt-subtitle">{t.decisionsScreen.subtitle}</p>
+        </div>
+      </div>
       <PushButton />
-      {error && <p role="status" style={{ color: '#dc2626', fontSize: '13px' }}>{error}</p>}
-      {nothing && <p style={{ color: '#64748b' }}>{t.decisionsScreen.none}</p>}
+      {error && <p role="status" style={{ color: '#dc2626', fontSize: '14px', margin: 0 }}>{error}</p>}
 
-      {data && data.problems.length > 0 && (
-        <section aria-label={t.decisionsScreen.problems}>
-          <h2 style={sectionTitle}>{t.decisionsScreen.problems}</h2>
-          <div className="admin-kitchen-tickets-grid" style={{ marginBottom: '20px' }}>
-            {data.problems.map((p) => (
-              <ProblemCard key={p.id} problem={p} onDecided={load} />
-            ))}
+      {/* Until the first answer: the page's outline */}
+      {!data && !error && <SkeletonBlocks kpis={4} sections={[{ kind: 'cards', count: 2 }, { kind: 'rows', count: 3 }]} label={t.decisionsScreen.title} />}
+
+      {data && (
+        <>
+          <div className="rpt-kpis" role="region" aria-label={t.decisionsScreen.summary}>
+            <Counter label={t.decisionsScreen.problems} count={data.problems.length} tone="warn" />
+            <Counter label={t.decisionsScreen.walkouts} count={data.walkouts.length} tone="bad" />
+            <Counter label={t.decisionsScreen.late} count={late.length} tone="bad" />
+            <Counter label={t.decisionsScreen.unpaid} count={unpaid.length} tone="warn" />
           </div>
-        </section>
-      )}
 
-      {data && data.walkouts.length > 0 && (
-        <section aria-label={t.decisionsScreen.walkouts}>
-          <h2 style={sectionTitle}>{t.decisionsScreen.walkouts}</h2>
-          <div className="admin-kitchen-tickets-grid" style={{ marginBottom: '20px' }}>
-            {data.walkouts.map((w) => (
-              <WalkoutCard key={w.bill_id} walkout={w} currency={currency} onDecided={load} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {late.length > 0 && (
-        <section aria-label={t.decisionsScreen.late}>
-          <h2 style={sectionTitle}>{t.decisionsScreen.late}</h2>
-          <div className="admin-kitchen-tickets-grid" style={{ marginBottom: '20px' }}>
-            {late.map((tk) => (
-              <div key={tk.orderId} data-testid={`late-${tk.orderId}`} style={{ ...cardStyle, borderColor: '#fca5a5' }}>
-                <strong style={{ color: '#b91c1c' }}>
-                  {t.decisionsScreen.lateLine(tk.tableNumber, Math.floor((now - (tk.startedAt || now)) / MIN), tk.targetMinutes)}
-                </strong>
-                <span style={{ fontSize: '13px' }}>{tk.items.map((row) => `${row.quantity}× ${row.item.name}`).join(', ')}</span>
+          {nothing && (
+            <div className="rpt-panel alr-clear">
+              <CheckCircle2 size={28} />
+              <div>
+                <strong>{t.decisionsScreen.none}</strong>
+                <p className="rpt-muted" style={{ margin: '4px 0 0' }}>{t.decisionsScreen.noneHint}</p>
               </div>
-            ))}
-          </div>
-        </section>
-      )}
+            </div>
+          )}
 
-      {unpaid.length > 0 && (
-        <section aria-label={t.decisionsScreen.unpaid}>
-          <h2 style={sectionTitle}>{t.decisionsScreen.unpaid}</h2>
-          <div className="admin-kitchen-tickets-grid">
-            {unpaid.map((b) => (
-              <div key={b.id} data-testid={`unpaid-${b.id}`} style={{ ...cardStyle, borderColor: '#fdba74' }}>
-                <strong style={{ color: '#b45309' }}>
-                  {b.status === 'collected'
-                    ? t.decisionsScreen.collectedAgo(b.table_number, minutesSince(b.collected_at, now))
-                    : t.decisionsScreen.askedAgo(b.table_number, minutesSince(b.requested_at, now))}
-                </strong>
-                <span style={{ fontSize: '13px' }}>
-                  {t.decisionsScreen.waiterOwes(b.waiter_name, formatPrice(b.status === 'collected' ? b.amount_paid : b.amount_owed, currency))}
-                </span>
+          {data.problems.length > 0 && (
+            <section aria-label={t.decisionsScreen.problems} className="bill-section">
+              <h2 className="bill-section-title">
+                {t.decisionsScreen.problems} <span className="rpt-count">{data.problems.length}</span>
+              </h2>
+              <div className="admin-kitchen-tickets-grid">
+                {data.problems.map((p) => (
+                  <ProblemCard key={p.id} problem={p} onDecided={load} />
+                ))}
               </div>
-            ))}
-          </div>
-        </section>
+            </section>
+          )}
+
+          {data.walkouts.length > 0 && (
+            <section aria-label={t.decisionsScreen.walkouts} className="bill-section">
+              <h2 className="bill-section-title">
+                {t.decisionsScreen.walkouts} <span className="rpt-count">{data.walkouts.length}</span>
+              </h2>
+              <div className="admin-kitchen-tickets-grid">
+                {data.walkouts.map((w) => (
+                  <WalkoutCard key={w.bill_id} walkout={w} currency={currency} onDecided={load} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {late.length > 0 && (
+            <section aria-label={t.decisionsScreen.late} className="bill-section">
+              <h2 className="bill-section-title">
+                {t.decisionsScreen.late} <span className="rpt-count">{late.length}</span>
+              </h2>
+              <ul className="rpt-rows rpt-loss-list">
+                {late.map((tk) => (
+                  <li key={tk.orderId} data-testid={`late-${tk.orderId}`} className="rpt-row rpt-loss">
+                    <span className="rpt-row-main rpt-stack">
+                      <strong>{t.decisionsScreen.lateLine(tk.tableNumber, Math.floor((now - (tk.startedAt || now)) / MIN), tk.targetMinutes)}</strong>
+                      <span className="rpt-muted">{tk.items.map((row) => `${row.quantity}× ${row.item.name}`).join(', ')}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {unpaid.length > 0 && (
+            <section aria-label={t.decisionsScreen.unpaid} className="bill-section">
+              <h2 className="bill-section-title">
+                {t.decisionsScreen.unpaid} <span className="rpt-count">{unpaid.length}</span>
+              </h2>
+              <ul className="rpt-rows rpt-loss-list">
+                {unpaid.map((b) => (
+                  <li key={b.id} data-testid={`unpaid-${b.id}`} className="rpt-row rpt-loss rpt-loss-warn">
+                    <span className="rpt-row-main rpt-stack">
+                      <strong>
+                        {b.status === 'collected'
+                          ? t.decisionsScreen.collectedAgo(b.table_number, minutesSince(b.collected_at, now))
+                          : t.decisionsScreen.askedAgo(b.table_number, minutesSince(b.requested_at, now))}
+                      </strong>
+                      <span className="rpt-muted">{b.waiter_name ? t.decisionsScreen.waiterName(b.waiter_name) : t.reports.noWaiter}</span>
+                    </span>
+                    <strong>{formatPrice(b.status === 'collected' ? b.amount_paid : b.amount_owed, currency)}</strong>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </>
       )}
     </section>
   );
 }
 
-const sectionTitle = { fontSize: '15px', margin: '0 0 8px' } as const;
-const cardStyle = { border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px', background: '#fff', display: 'grid', gap: '8px' } as const;
+function Counter({ label, count, tone }: { label: string; count: number; tone: 'warn' | 'bad' }) {
+  return (
+    <div className={`rpt-kpi ${count > 0 ? `rpt-kpi-${tone}` : ''}`}>
+      <span className="rpt-kpi-label">{label}</span>
+      <strong className="rpt-kpi-value">{count}</strong>
+    </div>
+  );
+}
 
 /** "18:03", or "—" when that step has not happened. */
 function clock(iso?: string | null): string {
   if (!iso) return '—';
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+/** A row of pill-shaped choices; still radio buttons underneath, for keyboards and screen readers. */
+function Choices<T extends string>({ name, label, options, value, onChange }: { name: string; label: string; options: { value: T; label: string }[]; value: T | null | ''; onChange: (v: T) => void }) {
+  return (
+    <div role="radiogroup" aria-label={label} className="alr-choices">
+      {options.map((o) => (
+        <label key={o.value} className={`alr-choice ${value === o.value ? 'alr-choice-on' : ''}`}>
+          <input type="radio" name={name} checked={value === o.value} onChange={() => onChange(o.value)} />
+          {o.label}
+        </label>
+      ))}
+    </div>
+  );
 }
 
 function ProblemCard({ problem, onDecided }: { problem: Problem; onDecided: () => void }) {
@@ -177,7 +236,7 @@ function ProblemCard({ problem, onDecided }: { problem: Problem; onDecided: () =
     <form
       data-testid={`problem-${problem.id}`}
       aria-label={`${problem.item_name}, ${t.kitchen.table(problem.table_number)}`}
-      style={cardStyle}
+      className="bill-card"
       onSubmit={async (e) => {
         e.preventDefault();
         if (!decision || !fault) {
@@ -198,44 +257,42 @@ function ProblemCard({ problem, onDecided }: { problem: Problem; onDecided: () =
         }
       }}
     >
-      <strong>
-        {t.kitchen.table(problem.table_number)}: {problem.quantity}× {problem.item_name}
-      </strong>
-      <span style={{ color: '#b45309', fontWeight: 700, fontSize: '13px' }}>
-        {t.problems.reasons[problem.reason]}
-        {problem.note && ` · ${problem.note}`}
-      </span>
-      <span style={{ fontSize: '12px', color: '#64748b' }}>{t.problems.people(problem.ready_by_name, problem.served_by_name, problem.reported_by_name)}</span>
-      <span style={{ fontSize: '12px', color: '#64748b' }} data-testid="problem-times">
-        {t.decisionsScreen.times(clock(problem.reported_at), clock(problem.started_at), clock(problem.ready_at), clock(problem.served_at))}
-      </span>
-      <div role="radiogroup" aria-label={t.decisionsScreen.decide} style={{ display: 'flex', gap: '12px', fontSize: '13px', flexWrap: 'wrap' }}>
-        {(['remake', 'remove_from_bill'] as ProblemDecision[]).map((d) => (
-          <label key={d} style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-            <input type="radio" name={`decision-${problem.id}`} checked={decision === d} onChange={() => setDecision(d)} />
-            {t.problems.decisions[d]}
-          </label>
-        ))}
+      <div className="bill-card-head">
+        <strong className="bill-card-title">
+          {t.kitchen.table(problem.table_number)}: {problem.quantity}× {problem.item_name}
+        </strong>
+        <span className="bill-status bill-status-bill_requested">{t.problems.reasons[problem.reason]}</span>
       </div>
-      <label className="admin-input-label">
-        {t.problems.fault}
-        <select className="admin-input-control" value={fault} onChange={(e) => setFault(e.target.value as Fault)}>
-          <option value="" disabled>
-            {t.decisionsScreen.chooseFault}
-          </option>
-          {(['kitchen', 'waiter', 'none'] as Fault[]).map((f) => (
-            <option key={f} value={f}>
-              {t.problems.faults[f]}
-            </option>
-          ))}
-        </select>
-      </label>
-      <button type="submit" className="admin-save-pill-btn" disabled={busy || !ready} style={{ opacity: ready ? 1 : 0.45, cursor: ready ? 'pointer' : 'not-allowed' }}>
+      {problem.note && <p className="alr-note">“{problem.note}”</p>}
+      <div className="alr-facts">
+        <span>{t.problems.people(problem.ready_by_name, problem.served_by_name, problem.reported_by_name)}</span>
+        <span data-testid="problem-times">
+          {t.decisionsScreen.times(clock(problem.reported_at), clock(problem.started_at), clock(problem.ready_at), clock(problem.served_at))}
+        </span>
+      </div>
+      <Choices
+        name={`decision-${problem.id}`}
+        label={t.decisionsScreen.decide}
+        options={(['remake', 'remove_from_bill'] as ProblemDecision[]).map((d) => ({ value: d, label: t.problems.decisions[d] }))}
+        value={decision}
+        onChange={setDecision}
+      />
+      <div className="alr-fault">
+        <span className="alr-fault-label">{t.problems.fault}</span>
+        <Choices
+          name={`fault-${problem.id}`}
+          label={t.problems.fault}
+          options={(['kitchen', 'waiter', 'none'] as Fault[]).map((f) => ({ value: f, label: t.problems.faults[f] }))}
+          value={fault}
+          onChange={setFault}
+        />
+      </div>
+      <BusyButton type="submit" className="admin-save-pill-btn" busy={busy} disabled={!ready} style={{ justifySelf: 'start', opacity: ready ? 1 : 0.45 }}>
         {t.decisionsScreen.decide}
-      </button>
-      {!ready && <span style={{ fontSize: '12px', color: '#64748b' }}>{t.decisionsScreen.chooseBoth}</span>}
+      </BusyButton>
+      {!ready && <span className="rpt-muted">{t.decisionsScreen.chooseBoth}</span>}
       {error && (
-        <span role="alert" style={{ color: '#dc2626', fontSize: '12px' }}>
+        <span role="alert" style={{ color: '#dc2626', fontSize: '14px' }}>
           {error}
         </span>
       )}
@@ -245,11 +302,11 @@ function ProblemCard({ problem, onDecided }: { problem: Problem; onDecided: () =
 
 function WalkoutCard({ walkout, currency, onDecided }: { walkout: Walkout; currency: string; onDecided: () => void }) {
   const [note, setNote] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<WalkoutDecision | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const decide = async (decision: WalkoutDecision) => {
-    setBusy(true);
+    setBusy(decision);
     setError(null);
     try {
       await decideWalkout(walkout.bill_id, decision, note);
@@ -257,28 +314,26 @@ function WalkoutCard({ walkout, currency, onDecided }: { walkout: Walkout; curre
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed');
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
   return (
-    <div data-testid={`walkout-${walkout.bill_id}`} style={cardStyle}>
-      <strong>{t.walkouts.summary(walkout.table_number, formatPrice(walkout.amount, currency), walkout.waiter_name)}</strong>
-      {walkout.walkout_at && (
-        <span style={{ fontSize: '12px', color: '#64748b' }}>
-          {t.walkouts.markedAt(clock(walkout.walkout_at), walkout.marked_by_name)}
-        </span>
-      )}
+    <div data-testid={`walkout-${walkout.bill_id}`} className="bill-card">
+      <div className="bill-card-head">
+        <strong className="bill-card-title">{t.walkouts.summary(walkout.table_number, formatPrice(walkout.amount, currency), walkout.waiter_name)}</strong>
+      </div>
+      {walkout.walkout_at && <div className="alr-facts">{t.walkouts.markedAt(clock(walkout.walkout_at), walkout.marked_by_name)}</div>}
       <input className="admin-input-control" aria-label={t.walkouts.note} placeholder={t.walkouts.note} maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} />
-      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
         {(['waiter_pays', 'restaurant_loss'] as WalkoutDecision[]).map((d) => (
-          <button key={d} type="button" className="admin-sec-pill-btn" disabled={busy} onClick={() => decide(d)}>
+          <BusyButton key={d} className="admin-sec-pill-btn" busy={busy === d} disabled={busy !== null} onClick={() => decide(d)}>
             {t.walkouts.decisions[d]}
-          </button>
+          </BusyButton>
         ))}
       </div>
       {error && (
-        <span role="alert" style={{ color: '#dc2626', fontSize: '12px' }}>
+        <span role="alert" style={{ color: '#dc2626', fontSize: '14px' }}>
           {error}
         </span>
       )}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Download, Loader2, AlertCircle } from 'lucide-react';
+import { Download } from 'lucide-react';
 import type { DishRevenue, FinanceSummary, PaymentMethod, TrendPoint, WaiterTotals } from '../types';
 import {
   fetchFinanceSummary,
@@ -10,6 +10,7 @@ import {
   downloadFinanceCSV,
 } from '../services/financeService';
 import { todayInEthiopia } from '../utils/kitchenTimer';
+import { BusyButton, SkeletonBlocks } from './Loading';
 import FinanceDateRangePicker, { type DateRange } from './FinanceDateRangePicker';
 import FinanceSummaryCards from './FinanceSummaryCards';
 import FinanceTrendChart from './FinanceTrendChart';
@@ -21,6 +22,21 @@ interface FinanceDashboardProps {
   currency?: string;
 }
 
+type MethodTotal = { method: PaymentMethod; payments: number; amount: number };
+
+/** The page's parts for one date range; a part is null when its request failed. */
+interface Loaded {
+  key: string;
+  summary: FinanceSummary | null;
+  dishes: DishRevenue[] | null;
+  methods: MethodTotal[] | null;
+  waiters: WaiterTotals[] | null;
+}
+
+function valueOrNull<T>(result: PromiseSettledResult<T>): T | null {
+  return result.status === 'fulfilled' ? result.value : null;
+}
+
 export default function FinanceDashboard({ currency = 'ETB' }: FinanceDashboardProps) {
   const today = todayInEthiopia();
   const firstOfMonth = `${today.slice(0, 7)}-01`;
@@ -28,55 +44,66 @@ export default function FinanceDashboard({ currency = 'ETB' }: FinanceDashboardP
   const [range, setRange] = useState<DateRange>({ from: firstOfMonth, to: today });
   const [groupBy, setGroupBy] = useState<'day' | 'week'>('day');
 
-  const [summary, setSummary] = useState<FinanceSummary | null>(null);
-  const [trend, setTrend] = useState<TrendPoint[]>([]);
-  const [dishes, setDishes] = useState<DishRevenue[]>([]);
-  const [methods, setMethods] = useState<{ method: PaymentMethod; payments: number; amount: number }[]>([]);
-  const [waiters, setWaiters] = useState<WaiterTotals[]>([]);
+  const [loaded, setLoaded] = useState<Loaded | null>(null);
+  const [trend, setTrend] = useState<{ key: string; points: TrendPoint[] | null } | null>(null);
 
-  const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
 
+  const rangeKey = `${range.from}|${range.to}`;
+  const trendKey = `${rangeKey}|${groupBy}`;
+
+  // Each part loads on its own: one failing request (say, top dishes) leaves the rest of the page working
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-
-    Promise.all([
+    let current = true;
+    const key = `${range.from}|${range.to}`;
+    Promise.allSettled([
       fetchFinanceSummary(range.from, range.to),
-      fetchFinanceTrend(range.from, range.to, groupBy),
       fetchTopDishes(range.from, range.to, 10),
       fetchPaymentMethods(range.from, range.to),
       fetchStaffPerformance(range.from, range.to),
-    ])
-      .then(([sumData, trendData, dishesData, methodsData, waitersData]) => {
-        if (cancelled) return;
-        setSummary(sumData);
-        setTrend(trendData);
-        setDishes(dishesData);
-        setMethods(methodsData);
-        setWaiters(waitersData);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setError(err instanceof Error ? err.message : 'Failed to load finance data');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+    ]).then(([summary, dishes, methods, waiters]) => {
+      // A slow answer for dates no longer picked must not replace the newer one
+      if (!current) return;
+      setLoaded({
+        key,
+        summary: valueOrNull(summary),
+        dishes: valueOrNull(dishes),
+        methods: valueOrNull(methods),
+        waiters: valueOrNull(waiters),
       });
-
+    });
     return () => {
-      cancelled = true;
+      current = false;
+    };
+  }, [range]);
+
+  // Daily / weekly only changes the chart, so only the chart reloads
+  useEffect(() => {
+    let current = true;
+    const key = `${range.from}|${range.to}|${groupBy}`;
+    fetchFinanceTrend(range.from, range.to, groupBy)
+      .then((points) => {
+        if (current) setTrend({ key, points });
+      })
+      .catch(() => {
+        if (current) setTrend({ key, points: null });
+      });
+    return () => {
+      current = false;
     };
   }, [range, groupBy]);
 
+  const loading = !loaded || loaded.key !== rangeKey;
+  const trendLoading = !trend || trend.key !== trendKey;
+
   const handleExportCSV = async () => {
     setDownloading(true);
+    setExportError(null);
     try {
       await downloadFinanceCSV(range.from, range.to);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Failed to export CSV');
+      setExportError(err instanceof Error ? err.message : 'Could not export the CSV');
     } finally {
       setDownloading(false);
     }
@@ -84,100 +111,60 @@ export default function FinanceDashboard({ currency = 'ETB' }: FinanceDashboardP
 
   return (
     <section className="admin-kitchen-page-view" aria-label="Finance Dashboard">
-      {/* Header with Title, Date Range Picker & CSV Export */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '16px',
-          marginBottom: '20px',
-        }}
-      >
+      <div className="rpt-header">
         <div>
           <h1 className="admin-top-title" style={{ margin: 0 }}>Finance Dashboard</h1>
-          <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#64748b' }}>
-            Comprehensive revenue analytics, payment channels and staff performance
-          </p>
+          <p className="rpt-subtitle">Revenue, payment channels and staff performance</p>
         </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+        <div className="fin-controls">
           <FinanceDateRangePicker range={range} onChange={setRange} />
-
-          <button
-            type="button"
-            className="admin-sec-pill-btn"
-            onClick={handleExportCSV}
-            disabled={downloading}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '12px',
-              padding: '6px 14px',
-              height: '34px',
-            }}
-          >
-            {downloading ? <Loader2 size={14} className="admin-spin" /> : <Download size={14} />}
+          <BusyButton className="admin-sec-pill-btn fin-export" busy={downloading} icon={<Download size={16} />} onClick={handleExportCSV}>
             Export CSV
-          </button>
+          </BusyButton>
         </div>
       </div>
 
-      {error && (
-        <div
-          role="alert"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            backgroundColor: '#fef2f2',
-            color: '#dc2626',
-            border: '1px solid #fecaca',
-            borderRadius: '12px',
-            padding: '12px 16px',
-            fontSize: '13px',
-            marginBottom: '16px',
-          }}
-        >
-          <AlertCircle size={16} />
-          {error}
-        </div>
+      {exportError && (
+        <p role="alert" className="fin-error">
+          {exportError}
+        </p>
       )}
 
       {loading ? (
-        <div style={{ padding: '60px 0', textAlign: 'center', color: '#94a3b8' }}>
-          <Loader2 size={32} className="admin-spin" style={{ margin: '0 auto 12px' }} />
-          <div>Loading finance dashboard data...</div>
-        </div>
+        <SkeletonBlocks
+          kpis={4}
+          sections={[{ kind: 'panel', lines: 6 }, { kind: 'panel', lines: 4 }, { kind: 'rows', count: 4 }]}
+          label="Loading the finance dashboard"
+        />
+      ) : !loaded.summary && !loaded.dishes && !loaded.methods && !loaded.waiters ? (
+        <p role="alert" className="fin-error">
+          Couldn&apos;t load the finance figures. Check the connection and pick the dates again.
+        </p>
       ) : (
-        <div style={{ display: 'grid', gap: '24px' }}>
-          {/* 1. KPI Summary Cards */}
-          {summary && <FinanceSummaryCards summary={summary} currency={currency} />}
+        <>
+          <FinanceSummaryCards summary={loaded.summary} currency={currency} />
 
-          {/* 2. Revenue Trend Bar Chart */}
           <FinanceTrendChart
-            data={trend}
+            data={trend?.points ?? []}
+            loading={trendLoading}
+            failed={!trendLoading && trend?.points === null}
             groupBy={groupBy}
             onGroupByChange={setGroupBy}
             currency={currency}
           />
 
-          {/* 3. Row: Payment Channels & Top Dishes */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+          <div className="rpt-two">
             <FinancePaymentPie
-              methods={methods}
-              walkoutLoss={summary?.walkout_loss || 0}
-              removedLoss={summary?.removed_loss || 0}
+              methods={loaded.methods}
+              walkoutLoss={loaded.summary?.walkout_loss || 0}
+              removedLoss={loaded.summary?.removed_loss || 0}
               currency={currency}
             />
-            <FinanceTopDishes dishes={dishes} currency={currency} />
+            <FinanceTopDishes dishes={loaded.dishes} currency={currency} />
           </div>
 
-          {/* 4. Staff Performance Table */}
-          <FinanceStaffTable waiters={waiters} currency={currency} />
-        </div>
+          <FinanceStaffTable waiters={loaded.waiters} currency={currency} />
+        </>
       )}
     </section>
   );

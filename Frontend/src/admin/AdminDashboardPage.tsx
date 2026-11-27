@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef, type CSSProperties } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { Plus, AlertCircle, Sparkles, ChefHat, ExternalLink, UtensilsCrossed, ChevronLeft, ChevronRight, Menu as MenuIcon } from 'lucide-react';
 import useRestaurantMenu from '../hooks/useRestaurantMenu';
 import { PlanProvider } from '../context/PlanContext';
@@ -41,7 +41,7 @@ import DecisionsScreen from './DecisionsScreen';
 import { fetchDecisions } from '../services/problemService';
 import ReportsScreen from './ReportsScreen';
 import FinanceDashboard from './FinanceDashboard';
-import type { AdminView } from './AdminSidebar';
+import { isAdminView, type AdminView } from '../utils/adminViews';
 import { useBell } from '../hooks/useBell';
 import { hasPlan } from '../utils/plan';
 
@@ -73,7 +73,7 @@ import { useKitchenWebSocket } from '../hooks/useKitchenWebSocket';
 import type { MenuItem, Category, RestaurantMeta, RestaurantMenu, CartItem, OrderStatus, PlanTier, Bill, Decisions } from '../types';
 import { PLAN_INFO } from '../utils/plan';
 import { matchesSearchQuery } from '../utils/search';
-import SkeletonLoader from '../components/common/SkeletonLoader';
+import { DashboardSkeleton } from './Loading';
 import NotFoundPage from '../pages/NotFoundPage';
 import AdminSidebar from './AdminSidebar';
 import AdminDishCard from './AdminDishCard';
@@ -103,8 +103,22 @@ export default function AdminDashboardPage() {
   // It is NOT overridable from the UI — the backend RequirePlan middleware is the real gate.
   const planFromBackend: PlanTier = initialMeta?.plan || 'basic';
 
-  // Active top-level view: 'menu' (Dashboard/Dishes) or 'kitchen' (Live KDS Orders)
-  const [activeView, setActiveView] = useState<AdminView>('menu');
+  // The open page lives in the address (?view=bills), so a reload or a shared link opens the same page.
+  // Roles still decide what may be shown: an address naming a page a role cannot see falls back below.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const viewParam = searchParams.get('view');
+  const activeView: AdminView = isAdminView(viewParam) ? viewParam : 'menu';
+  const setActiveView = useCallback(
+    (view: AdminView) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (view === 'menu') next.delete('view');
+        else next.set('view', view);
+        return next;
+      });
+    },
+    [setSearchParams]
+  );
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Local editable state
@@ -112,6 +126,8 @@ export default function AdminDashboardPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
   const [kitchenOrders, setKitchenOrders] = useState<CartItem[]>([]);
+  // False until the first list of kitchen orders arrives, so the kitchen never flashes "No open orders"
+  const [kitchenLoaded, setKitchenLoaded] = useState(false);
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -171,8 +187,6 @@ export default function AdminDashboardPage() {
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isSoldOutModalOpen, setIsSoldOutModalOpen] = useState(false);
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [isTablesModalOpen, setIsTablesModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<MenuItem | null>(null);
   const [categoryToEdit, setCategoryToEdit] = useState<Category | null>(null);
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
@@ -198,7 +212,6 @@ export default function AdminDashboardPage() {
 
   const [adminToken, setAdminToken] = useState<string | null>(getAdminToken());
   const [staffUser, setStaffUser] = useState<StaffUser | null>(getStoredStaff());
-  const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
 
   // Each role sees its own screen. The backend enforces the same rules on every request.
   const staffRole = adminToken ? normalizeRole(staffUser?.role) ?? 'manager' : null;
@@ -369,16 +382,18 @@ export default function AdminDashboardPage() {
       return;
     }
 
-    fetchAdminActiveOrders().then((backendOrders) => {
-      if (backendOrders && backendOrders.length > 0) {
-        const liveItems = backendOrders.flatMap((bo) => mapBackendOrderToCartItems(bo, items));
-        setKitchenOrders(liveItems);
-        saveRestaurantOrders(slug, liveItems);
-      } else {
-        setKitchenOrders([]);
-        saveRestaurantOrders(slug, []);
-      }
-    });
+    fetchAdminActiveOrders()
+      .then((backendOrders) => {
+        if (backendOrders && backendOrders.length > 0) {
+          const liveItems = backendOrders.flatMap((bo) => mapBackendOrderToCartItems(bo, items));
+          setKitchenOrders(liveItems);
+          saveRestaurantOrders(slug, liveItems);
+        } else {
+          setKitchenOrders([]);
+          saveRestaurantOrders(slug, []);
+        }
+      })
+      .finally(() => setKitchenLoaded(true));
   }, [slug, items, adminToken, canSeeKitchen]);
 
   const handleLogout = () => {
@@ -597,7 +612,7 @@ export default function AdminDashboardPage() {
   }
 
   if (loading || !meta) {
-    return <SkeletonLoader />;
+    return <DashboardSkeleton />;
   }
 
   const activeCurrency = meta.currency || 'ETB';
@@ -803,9 +818,12 @@ export default function AdminDashboardPage() {
 
   const soldOutCount = items.filter((it) => it.available === false).length;
 
-  const activeOrdersCount = kitchenOrders.filter(
-    (o) => o.status !== 'complete' && o.status !== 'cancelled'
-  ).length;
+  // Open orders (tickets), not dish lines: an order of Tibs and Buna counts once, like on the kitchen board
+  const activeOrdersCount = new Set(
+    kitchenOrders
+      .filter((o) => o.status !== 'complete' && o.status !== 'cancelled' && o.status !== 'delivered')
+      .map((o, i) => o.orderId || `row-${i}`)
+  ).size;
 
   return (
     <PlanProvider plan={planFromBackend}>
@@ -818,9 +836,9 @@ export default function AdminDashboardPage() {
         activeView={viewToShow}
         onSelectView={(view) => setActiveView(view)}
         activeOrdersCount={activeOrdersCount}
-        onOpenTables={() => setIsTablesModalOpen(true)}
-        onOpenSettings={() => setIsSettingsModalOpen(true)}
-        onOpenStaff={() => setIsStaffModalOpen(true)}
+        onOpenTables={() => setActiveView('tables')}
+        onOpenSettings={() => setActiveView('settings')}
+        onOpenStaff={() => setActiveView('staff')}
         onLogout={handleLogout}
         onChangeDesign={handleChangeDesign}
         isMobileOpen={isMobileSidebarOpen}
@@ -911,6 +929,38 @@ export default function AdminDashboardPage() {
             onLogout={handleLogout}
             onBillsLoaded={dropResolvedBillAlerts}
           />
+        ) : isManager && viewToShow === 'staff' ? (
+          <AdminStaffModal
+            asPage
+            isOpen
+            onClose={() => setActiveView('menu')}
+            plan={planFromBackend}
+            currentUserId={staffUser?.id}
+            onToast={showToast}
+          />
+        ) : isManager && viewToShow === 'tables' ? (
+          <AdminTablesModal
+            asPage
+            isOpen
+            onClose={() => setActiveView('menu')}
+            restaurantSlug={slug}
+            plan={planFromBackend}
+            restaurantName={meta?.name}
+          />
+        ) : isManager && viewToShow === 'settings' ? (
+          <AdminSettingsModal
+            asPage
+            isOpen
+            meta={meta}
+            onClose={() => setActiveView('menu')}
+            onSave={handleSaveSettings}
+            onResetToDefault={handleResetToDefault}
+            showProTimings={isPro && isManager}
+            onTimingsSaved={(settings) => {
+              setDefaultPrepMinutes(settings.default_prep_minutes);
+              setBillTimings({ escalation: settings.bill_escalation_minutes, confirm: settings.confirm_reminder_minutes });
+            }}
+          />
         ) : isManager && isPro && viewToShow === 'alerts' ? (
           <DecisionsScreen
             currency={meta.currency || 'ETB'}
@@ -944,6 +994,7 @@ export default function AdminDashboardPage() {
           <AdminRoleHome role={staffRole} fullName={staffUser?.full_name} onLogout={handleLogout} />
         ) : viewToShow === 'kitchen' && isPro ? (
           <ProKitchenBoard
+            loading={!kitchenLoaded}
             orders={kitchenOrders}
             role={staffRole}
             bell={bell}
@@ -1316,38 +1367,6 @@ export default function AdminDashboardPage() {
         confirmLabel="Delete Category"
         onConfirm={confirmDeleteCategory}
         onClose={() => setCategoryToDelete(null)}
-      />
-
-      {/* Restaurant Meta & Currency Settings Modal */}
-      <AdminSettingsModal
-        isOpen={isSettingsModalOpen}
-        meta={meta}
-        onClose={() => setIsSettingsModalOpen(false)}
-        onSave={handleSaveSettings}
-        onResetToDefault={handleResetToDefault}
-        showProTimings={isPro && isManager}
-        onTimingsSaved={(settings) => {
-          setDefaultPrepMinutes(settings.default_prep_minutes);
-          setBillTimings({ escalation: settings.bill_escalation_minutes, confirm: settings.confirm_reminder_minutes });
-        }}
-      />
-
-      {/* Dining Tables & QR Code Generator Modal */}
-      <AdminTablesModal
-        isOpen={isTablesModalOpen}
-        onClose={() => setIsTablesModalOpen(false)}
-        restaurantSlug={slug}
-        plan={planFromBackend}
-        restaurantName={meta?.name}
-      />
-
-      {/* Staff accounts (managers, Pro plan) */}
-      <AdminStaffModal
-        isOpen={isStaffModalOpen && isManager}
-        onClose={() => setIsStaffModalOpen(false)}
-        plan={planFromBackend}
-        currentUserId={staffUser?.id}
-        onToast={showToast}
       />
 
       {/* Floating Toast Notification */}

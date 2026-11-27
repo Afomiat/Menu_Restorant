@@ -171,6 +171,35 @@ describe('ProKitchenBoard order inside a table', () => {
   });
 });
 
+describe('ProKitchenBoard counters', () => {
+  it('counts new, cooking, late and ready tickets', () => {
+    renderBoard([
+      row('n', 'Buna', 'not_started'),
+      row('c', 'Shiro', 'preparing', { startedAt: NOW - 3 * MIN }),
+      row('l', 'Tibs', 'preparing', { startedAt: NOW - 12 * MIN }),
+      row('r', 'Firfir', 'ready'),
+    ]);
+
+    const counts = screen.getByRole('region', { name: 'Kitchen at a glance' }).textContent;
+    expect(counts).toContain('New1');
+    expect(counts).toContain('Cooking2');
+    expect(counts).toContain('Late1');
+    expect(counts).toContain('Ready for the waiter1');
+  });
+});
+
+describe('ProKitchenBoard while loading', () => {
+  it('shows the outline, then does not ring for orders that were already there', () => {
+    const bell = makeBell();
+    const { rerender } = render(<ProKitchenBoard loading orders={[]} role="chef" bell={bell} onOrderStatusChange={vi.fn()} now={NOW} />);
+    expect(screen.getByRole('status', { name: 'Kitchen' })).toBeTruthy();
+    expect(screen.queryByText(/No open orders/)).toBeNull();
+
+    rerender(<ProKitchenBoard orders={[row('a', 'Tibs', 'not_started')]} role="chef" bell={bell} onOrderStatusChange={vi.fn()} now={NOW} />);
+    expect(bell.ring).not.toHaveBeenCalled();
+  });
+});
+
 describe('ProKitchenBoard sold out', () => {
   it('lets the chef open the sold-out list', () => {
     const onOpenSoldOut = vi.fn();

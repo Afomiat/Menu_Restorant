@@ -18,6 +18,7 @@ import {
 } from '../services/orderService';
 import { formatPrice } from '../utils/currency';
 import { groupLabel } from '../utils/table';
+import { DISH_PLACEHOLDER } from '../utils/images';
 
 interface AdminKitchenDrawerProps {
   slug: string;
@@ -51,7 +52,7 @@ export default function AdminKitchenDrawer({
           id: existingItem?.id || (order as any)?.itemId || `unknown-${index}`,
           name: existingItem?.name || (order as any)?.name || 'Dish Item',
           price: typeof existingItem?.price === 'number' ? existingItem.price : (order as any)?.price || 0,
-          imageUrl: existingItem?.imageUrl || '/images/cat_food.jpg',
+          imageUrl: existingItem?.imageUrl || DISH_PLACEHOLDER,
           description: existingItem?.description || '',
           tags: existingItem?.tags || [],
           available: existingItem?.available !== false,
@@ -411,7 +412,7 @@ export default function AdminKitchenDrawer({
                         itemObj?.variants?.find((v) => v?.name === order.variant)?.priceAdjustment || 0;
                       const itemBasePrice = typeof itemObj?.price === 'number' ? itemObj.price : 0;
                       const itemTotal = (itemBasePrice + variantAdj) * (order.quantity || 1);
-                      const itemImg = itemObj?.imageUrl || '/images/cat_food.jpg';
+                      const itemImg = itemObj?.imageUrl || DISH_PLACEHOLDER;
                       const itemName = itemObj?.name || 'Dish Item';
 
                       return (
@@ -451,7 +452,7 @@ export default function AdminKitchenDrawer({
                                 flexShrink: 0,
                               }}
                               onError={(e) => {
-                                (e.target as HTMLImageElement).src = '/images/cat_food.jpg';
+                                (e.target as HTMLImageElement).src = DISH_PLACEHOLDER;
                               }}
                             />
                             <div style={{ minWidth: 0 }}>

@@ -115,9 +115,9 @@ function signedInAs(role: string, full_name = 'Test Person') {
   localStorage.setItem('azai_staff_user', JSON.stringify({ id: 'u1', email: '', full_name, role, tenant_id: 't1' }));
 }
 
-function renderDashboard() {
+function renderDashboard(path = '/bistro/admin') {
   return render(
-    <MemoryRouter initialEntries={['/bistro/admin']}>
+    <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/:restaurantName/admin" element={<AdminDashboardPage />} />
       </Routes>
@@ -184,6 +184,17 @@ describe('AdminDashboardPage screens by role', () => {
     expect(screen.queryByLabelText('Add new dish')).toBeNull();
   });
 
+  it('counts an order of two dishes once on the Kitchen Orders badge', async () => {
+    signedInAs('chef');
+    kitchenOrders = [
+      { ...order('Tibs', 'not_started'), orderId: 'one-order' },
+      { ...order('Buna', 'not_started'), orderId: 'one-order' },
+    ];
+    renderDashboard();
+
+    await waitFor(() => expect(navItems()).toEqual(['Kitchen Orders1', 'Sign Out']));
+  });
+
   it('treats a login from before the Pro roles (kitchen) as a chef', async () => {
     currentPlan = 'plus';
     signedInAs('kitchen');
@@ -217,8 +228,25 @@ describe('AdminDashboardPage screens by role', () => {
 
     fireEvent.click(screen.getByText('Staff', { selector: '.admin-nav-item span span' }));
 
-    expect(await screen.findByRole('dialog', { name: 'Staff' })).toBeTruthy();
+    // Staff is its own page now, not a dialog over the dashboard
+    expect(await screen.findByRole('region', { name: 'Staff' })).toBeTruthy();
+    expect(screen.queryByRole('dialog', { name: 'Staff' })).toBeNull();
+    expect(screen.getByText('Staff', { selector: '.admin-nav-item span span' }).closest('button')?.className).toContain('active');
     expect(fetchStaff).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens Tables & QR Codes and Restaurant Settings as pages', async () => {
+    signedInAs('manager');
+    renderDashboard();
+
+    fireEvent.click(screen.getByText('Tables & QR Codes'));
+    expect(await screen.findByRole('region', { name: 'Tables & QR Codes' })).toBeTruthy();
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    fireEvent.click(screen.getByText('Restaurant Settings', { selector: '.admin-nav-item span' }));
+    expect(await screen.findByRole('region', { name: 'Restaurant Settings' })).toBeTruthy();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull();
   });
 
   it('opens the sidebar from the phone header, so a manager reaches every screen', () => {
@@ -334,7 +362,7 @@ describe('AdminDashboardPage bills (Pro)', () => {
     signedInAs('cashier', 'Liya');
     renderDashboard();
 
-    expect(await screen.findByText('Collected, waiting for you to confirm (0)')).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Collected, waiting for you to confirm 0' })).toBeTruthy();
     expect(screen.getByTestId('shift-status')).toBeTruthy();
     expect(fetchAdminActiveOrders).not.toHaveBeenCalled();
   });
@@ -353,8 +381,23 @@ describe('AdminDashboardPage bills (Pro)', () => {
 
     fireEvent.click(screen.getByText('Bills', { selector: '.admin-nav-item span' }));
 
-    expect(await screen.findByText('Open bills (0)')).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Open bills 0' })).toBeTruthy();
     expect(fetchBills).toHaveBeenCalled();
+  });
+
+  it('opens the page named in the address, so a reload stays on the same page', async () => {
+    signedInAs('manager');
+    renderDashboard('/bistro/admin?view=bills');
+
+    expect(await screen.findByRole('heading', { name: 'Open bills 0' })).toBeTruthy();
+    expect(screen.getByText('Bills', { selector: '.admin-nav-item span' }).closest('button')?.className).toContain('active');
+  });
+
+  it('ignores an unknown page in the address and shows the dishes', () => {
+    signedInAs('manager');
+    renderDashboard('/bistro/admin?view=nonsense');
+
+    expect(screen.getByText('Dashboard', { selector: '.admin-nav-item span' }).closest('button')?.className).toContain('active');
   });
 
   it('shows bill alerts as banners until dismissed', async () => {

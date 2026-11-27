@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import type { MenuItem } from '../../types';
 import { formatPrice } from '../../utils/currency';
 import { sizedImageUrl } from '../../utils/imageUrl';
+import { DISH_PLACEHOLDER } from '../../utils/images';
 
 interface ClassicTimelineProps {
   items: MenuItem[];
@@ -398,7 +399,7 @@ function MobileCard({ item, idx, currency = 'ETB', onItemSelect }: { item: MenuI
             alt={item.name}
             loading={idx === 0 ? 'eager' : 'lazy'}
             onError={(e) => {
-              (e.target as HTMLImageElement).src = '/images/default_food.png';
+              (e.target as HTMLImageElement).src = DISH_PLACEHOLDER;
             }}
             style={{
               width: '100%', height: '100%',
@@ -759,7 +760,7 @@ function DesktopCard({ item, idx, currency = 'ETB', onItemSelect }: { item: Menu
           alt={item.name}
           loading={idx === 0 ? 'eager' : 'lazy'}
           onError={(e) => {
-            (e.target as HTMLImageElement).src = '/images/default_food.png';
+            (e.target as HTMLImageElement).src = DISH_PLACEHOLDER;
           }}
           style={{
             width: '100%', height: '100%',

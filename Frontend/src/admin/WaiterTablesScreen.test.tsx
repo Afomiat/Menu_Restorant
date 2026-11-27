@@ -75,10 +75,14 @@ describe('WaiterTablesScreen', () => {
     ]);
     renderScreen();
 
-    expect(within(await screen.findByTestId('waiter-table-5')).getByText('Food ready')).toBeTruthy();
-    expect(within(screen.getByTestId('waiter-table-6')).getByText('Cooking')).toBeTruthy();
-    expect(within(screen.getByTestId('waiter-table-7')).getByText('Ordered')).toBeTruthy();
-    expect(within(screen.getByTestId('waiter-table-8')).getByText('No open orders')).toBeTruthy();
+    // The table's own state sits in its header; each order also shows where it is
+    const head = (n: string) => within(screen.getByTestId(`waiter-table-${n}`).querySelector('.bill-card-head') as HTMLElement);
+    await screen.findByTestId('waiter-table-5');
+    expect(head('5').getByText('Food ready')).toBeTruthy();
+    expect(head('6').getByText('Cooking')).toBeTruthy();
+    expect(head('7').getByText('Ordered')).toBeTruthy();
+    expect(head('8').getByText('No open orders')).toBeTruthy();
+    expect(within(screen.getByTestId('waiter-table-5')).getAllByText('Cooking')).toHaveLength(1);
     expect(screen.getByText('Abebe Kebede')).toBeTruthy();
   });
 
@@ -207,7 +211,7 @@ describe('WaiterTablesScreen table header', () => {
 
     const card = await screen.findByTestId('waiter-table-5');
     await waitFor(() => expect(within(card).getByTestId('table-bill-chip').textContent).toBe('Bill asked'));
-    expect(within(card).getByText('Food ready')).toBeTruthy();
+    expect(within(card.querySelector('.bill-card-head') as HTMLElement).getByText('Food ready')).toBeTruthy();
     expect(within(screen.getByTestId('waiter-table-6')).queryByTestId('table-bill-chip')).toBeNull();
   });
 
@@ -218,5 +222,48 @@ describe('WaiterTablesScreen table header', () => {
 
     const card = await screen.findByTestId('waiter-table-5');
     await waitFor(() => expect(within(card).getByTestId('table-bill-chip').textContent).toBe('Part paid'));
+  });
+});
+
+describe('WaiterTablesScreen layout', () => {
+  const bill = (status: string, table: string, extra: Record<string, unknown> = {}) => ({
+    id: `bill-${table}`, tenant_id: 't', table_id: null, table_number: table, waiter_id: 'w1', waiter_name: 'Abebe', status,
+    total_amount: 500, amount_paid: 0, amount_owed: 500, requested_at: null, collected_at: null, confirmed_at: null,
+    created_at: '', closed_at: null, payments: [], ...extra,
+  });
+
+  it('shows the page outline until the tables arrive', () => {
+    fetchMyTables.mockReturnValue(new Promise(() => {}));
+    renderScreen();
+    expect(screen.getByRole('status', { name: 'My tables' })).toBeTruthy();
+    expect(screen.queryByText('No tables are assigned to you yet. Ask your manager.')).toBeNull();
+  });
+
+  it('puts tables with food ready first, then bills asked, and counts them', async () => {
+    fetchMyTables.mockResolvedValue([table('1', []), table('2', [order('a', 'preparing')]), table('3', [order('b', 'ready')]), table('4', [])]);
+    fetchBills.mockResolvedValue([bill('bill_requested', '4', { amount_owed: 300 }), bill('open', '2', { amount_owed: 450 })]);
+    renderScreen({ currency: 'ETB' });
+
+    await waitFor(() => {
+      const order = Array.from(document.querySelectorAll('[data-testid^="waiter-table-"]')).map((el) => el.getAttribute('data-testid'));
+      expect(order).toEqual(['waiter-table-3', 'waiter-table-4', 'waiter-table-2', 'waiter-table-1']);
+    });
+    const summary = screen.getByRole('region', { name: 'My tables at a glance' });
+    expect(summary.textContent).toContain('Food ready1');
+    expect(summary.textContent).toContain('Bills asked1');
+    expect(summary.textContent).toContain('Still owed750 ETB');
+  });
+
+  it('keeps the less common bill actions behind More', async () => {
+    fetchMyTables.mockResolvedValue([table('2', [order('a', 'preparing')])]);
+    fetchBills.mockResolvedValue([bill('open', '2')]);
+    renderScreen();
+
+    const card = await screen.findByTestId('waiter-table-2');
+    await waitFor(() => expect(within(card).getByText('Collect')).toBeTruthy());
+    expect(within(card).queryByText('Move or join table')).toBeNull();
+    fireEvent.click(within(card).getByText('More'));
+    expect(within(card).getByText('Move or join table')).toBeTruthy();
+    expect(within(card).getByText('Left without paying')).toBeTruthy();
   });
 });

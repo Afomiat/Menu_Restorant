@@ -27,6 +27,7 @@ import { hasPlan } from '../utils/plan';
 import AdminConfirmModal from './AdminConfirmModal';
 import SearchBar from '../components/common/SearchBar';
 import { groupLabel, tableLabel } from '../utils/table';
+import { DISH_PLACEHOLDER } from '../utils/images';
 
 interface AdminKitchenViewProps {
   slug: string;
@@ -77,7 +78,7 @@ export default function AdminKitchenView({
           id: existingItem?.id || (order as any)?.itemId || `unknown-${index}`,
           name: existingItem?.name || (order as any)?.name || 'Dish Item',
           price: typeof existingItem?.price === 'number' ? existingItem.price : (order as any)?.price || 0,
-          imageUrl: existingItem?.imageUrl || '/images/default_food.png',
+          imageUrl: existingItem?.imageUrl || DISH_PLACEHOLDER,
           description: existingItem?.description || '',
           tags: existingItem?.tags || [],
           available: existingItem?.available !== false,
@@ -732,7 +733,7 @@ const confirmClearHistory = () => {
                       itemObj?.variants?.find((v) => v?.name === order.variant)?.priceAdjustment || 0;
                     const itemBasePrice = typeof itemObj?.price === 'number' ? itemObj.price : 0;
                     const itemTotal = (itemBasePrice + variantAdj) * (order.quantity || 1);
-                    const itemImg = itemObj?.imageUrl || '/images/cat_food.jpg';
+                    const itemImg = itemObj?.imageUrl || DISH_PLACEHOLDER;
                     const itemName = itemObj?.name || 'Dish Item';
 
                     return (
@@ -749,7 +750,7 @@ const confirmClearHistory = () => {
                             alt={itemName}
                             className="admin-kitchen-dish-thumb"
                             onError={(e) => {
-                              (e.target as HTMLImageElement).src = '/images/cat_food.jpg';
+                              (e.target as HTMLImageElement).src = DISH_PLACEHOLDER;
                             }}
                           />
 

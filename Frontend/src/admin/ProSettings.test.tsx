@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { Category, MenuItem, RestaurantMeta, StaffMember } from '../types';
 
 // --- Services used by the manager's Pro settings ---
@@ -71,6 +71,16 @@ describe('Tables: assigning a waiter (Pro)', () => {
     await waitFor(() => expect(assignTableWaiter).toHaveBeenCalledWith('tb5', null));
   });
 
+  it('lists the tables in one panel and the chosen table, waiter and QR in the other', async () => {
+    render(<AdminTablesModal asPage isOpen onClose={vi.fn()} restaurantSlug="demo-pro" plan="pro" />);
+
+    const list = screen.getByRole('region', { name: 'Tables' });
+    const first = await within(list).findByRole('button', { name: /Table 5/ });
+    expect(first.getAttribute('aria-current')).toBe('true');
+    expect(await screen.findByLabelText('Waiter')).toBeTruthy();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it('shows the reason when assigning fails', async () => {
     assignTableWaiter.mockRejectedValueOnce(new Error('choose an active waiter of this restaurant'));
     render(<AdminTablesModal isOpen onClose={vi.fn()} restaurantSlug="demo-pro" plan="pro" />);
@@ -98,7 +108,8 @@ describe('Tables: assigning a waiter (Pro)', () => {
     await waitFor(() => expect(select.value).toBe('w1'));
     fireEvent.change(select, { target: { value: '' } });
 
-    expect((await screen.findByRole('status')).textContent).toContain('Saved');
+    // "Saving…" shows while the change is sent, then "Saved"
+    await waitFor(() => expect(screen.getByRole('status').textContent).toContain('Saved'));
     expect(screen.getByText('Table 5').closest('button')?.textContent).toBe('Table 5 · no waiter');
   });
 
@@ -160,6 +171,17 @@ describe('Pro timings', () => {
     render(<AdminSettingsModal isOpen meta={meta} onClose={onClose} onSave={onSave} onResetToDefault={vi.fn()} showProTimings />);
     return { onSave, onClose };
   };
+
+  it('groups the settings into sections on the page', async () => {
+    fetchAdminTenantProfile.mockResolvedValue({ settings });
+    render(<AdminSettingsModal asPage isOpen meta={meta} onClose={vi.fn()} onSave={vi.fn()} onResetToDefault={vi.fn()} showProTimings />);
+
+    expect(screen.getByRole('region', { name: 'Restaurant' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Location & hours' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Logo, banner & colour' })).toBeTruthy();
+    expect(await screen.findByLabelText('Default prep time')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Save Settings' })).toBeTruthy();
+  });
 
   it('saves changed timings with the one Save Settings button', async () => {
     fetchAdminTenantProfile.mockResolvedValue({ settings });

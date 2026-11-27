@@ -10,6 +10,7 @@ import {
   fetchLiveOrderStatus,
 } from '../services/orderService';
 import { customerRequestBill } from '../services/billService';
+import { DISH_PLACEHOLDER } from '../utils/images';
 
 function mapBackendStatusToFrontend(backendStatus?: string): OrderStatus {
   if (!backendStatus || backendStatus === 'pending_grace' || backendStatus === 'received' || backendStatus === 'not_started') {
@@ -393,7 +394,7 @@ export default function useMenuCart({
                 id: it?.menu_item_id || res.order.id,
                 name: it?.item_name || 'Dish Item',
                 price: it?.unit_price || 0,
-                imageUrl: '/images/default_food.png',
+                imageUrl: DISH_PLACEHOLDER,
                 description: '',
                 tags: [],
                 available: true,

@@ -13,6 +13,7 @@ import type {
 import { CANONICAL_MODERN_CATEGORIES, CANONICAL_MODERN_ITEMS } from '../data/modernMenuDefaults';
 import { apiClient, ApiError } from './apiClient';
 import { normalizePlan } from '../utils/plan';
+import { dishImage, savedDishImage } from '../utils/images';
 
 export class MenuServiceError extends Error {
   code: 'not-found' | 'network' | 'invalid-data';
@@ -72,7 +73,7 @@ function mapBackendToRestaurantMenu(data: BackendFullMenuResponse['data']): Rest
     name: item.name,
     description: item.description,
     price: item.price,
-    imageUrl: item.image_url || '/images/default_food.png',
+    imageUrl: dishImage(item.image_url),
     tags: Array.isArray(item.tags)
       ? item.tags.map((t: string) => String(t).toLowerCase().trim())
       : typeof item.tags === 'string' && (item.tags as string).trim()
@@ -159,7 +160,7 @@ function sanitizeMenuData(raw: any): RestaurantMenu {
       description: String(item?.description || ''),
       fullDescription: item?.fullDescription ? String(item.fullDescription) : undefined,
       price: typeof item?.price === 'number' ? item.price : parseFloat(String(item?.price)) || 0,
-      imageUrl: String(item?.imageUrl || '/images/default_food.png'),
+      imageUrl: dishImage(item?.imageUrl),
       tags: Array.isArray(item?.tags) ? item.tags : [],
       allergens: Array.isArray(item?.allergens) ? item.allergens : [],
       available: item?.available !== false,
@@ -407,7 +408,7 @@ export async function createAdminItem(item: {
     name: item.name,
     description: item.description || '',
     price: item.price,
-    image_url: item.imageUrl || '',
+    image_url: savedDishImage(item.imageUrl),
     tags: item.tags || [],
     prep_minutes: item.prepMinutes ?? null,
   });
@@ -432,7 +433,7 @@ export async function updateAdminItem(
     name: item.name,
     description: item.description || '',
     price: item.price,
-    image_url: item.imageUrl || '',
+    image_url: savedDishImage(item.imageUrl),
     tags: item.tags || [],
     is_available: item.isAvailable !== false,
     prep_minutes: item.prepMinutes ?? null,

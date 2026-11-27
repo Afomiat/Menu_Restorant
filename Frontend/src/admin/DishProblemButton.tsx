@@ -3,6 +3,7 @@ import { AlertTriangle } from 'lucide-react';
 import type { ProblemReason } from '../types';
 import { reportProblem } from '../services/problemService';
 import { t } from '../i18n/en';
+import { BusyButton } from './Loading';
 
 const REASONS: ProblemReason[] = ['cold', 'wrong_dish', 'undercooked', 'too_slow', 'foreign_object', 'other'];
 
@@ -22,7 +23,7 @@ export default function DishProblemButton({ orderId, itemId, dishName }: DishPro
   const [sent, setSent] = useState(false);
 
   if (sent) {
-    return <span style={{ fontSize: '12px', color: '#15803d', fontWeight: 700 }}>{t.problems.sent}</span>;
+    return <span style={{ fontSize: '13px', color: '#15803d', fontWeight: 700 }}>{t.problems.sent}</span>;
   }
 
   if (!open) {
@@ -30,9 +31,9 @@ export default function DishProblemButton({ orderId, itemId, dishName }: DishPro
       <button
         type="button"
         onClick={() => setOpen(true)}
-        style={{ background: 'none', border: 'none', color: '#b45309', cursor: 'pointer', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: 0 }}
+        style={{ background: 'none', border: 'none', color: '#b45309', cursor: 'pointer', fontSize: '13px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', padding: 0 }}
       >
-        <AlertTriangle size={12} /> {t.problems.report}
+        <AlertTriangle size={14} /> {t.problems.report}
       </button>
     );
   }
@@ -55,7 +56,7 @@ export default function DishProblemButton({ orderId, itemId, dishName }: DishPro
         }
       }}
     >
-      <strong style={{ fontSize: '13px' }}>{t.problems.reportTitle(dishName)}</strong>
+      <strong style={{ fontSize: '14px' }}>{t.problems.reportTitle(dishName)}</strong>
       <select className="admin-input-control" aria-label={t.problems.report} value={reason} onChange={(e) => setReason(e.target.value as ProblemReason)}>
         {REASONS.map((r) => (
           <option key={r} value={r}>
@@ -65,15 +66,15 @@ export default function DishProblemButton({ orderId, itemId, dishName }: DishPro
       </select>
       <input className="admin-input-control" aria-label={t.problems.note} placeholder={t.problems.note} maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} />
       <div style={{ display: 'flex', gap: '6px' }}>
-        <button type="submit" className="admin-save-pill-btn" disabled={busy}>
+        <BusyButton type="submit" className="admin-save-pill-btn" busy={busy}>
           {t.problems.send}
-        </button>
+        </BusyButton>
         <button type="button" className="admin-sec-pill-btn" onClick={() => setOpen(false)}>
           {t.bills.cancel}
         </button>
       </div>
       {error && (
-        <span role="alert" style={{ color: '#dc2626', fontSize: '12px' }}>
+        <span role="alert" style={{ color: '#dc2626', fontSize: '13px' }}>
           {error}
         </span>
       )}

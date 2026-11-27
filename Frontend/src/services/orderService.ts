@@ -1,5 +1,6 @@
 import type { CartItem, OrderStatus, BackendOrder, BackendTable, PlanTier, TableOrders } from '../types';
 import { apiClient } from './apiClient';
+import { DISH_PLACEHOLDER } from '../utils/images';
 
 const ORDER_EVENT_PREFIX = 'azai_orders_updated_';
 const LEGACY_ORDER_EVENT_PREFIX = 'aura_orders_updated_';
@@ -145,7 +146,7 @@ export function mapBackendOrderToCartItems(order: BackendOrder, menuItems: any[]
           id: order.id,
           name: `Order #${order.id.slice(-4)}`,
           price: order.total_amount || 0,
-          imageUrl: '/images/default_food.png',
+          imageUrl: DISH_PLACEHOLDER,
           description: '',
           tags: [],
           available: true,
@@ -170,7 +171,7 @@ export function mapBackendOrderToCartItems(order: BackendOrder, menuItems: any[]
         id: it.menu_item_id,
         name: it.item_name,
         price: it.unit_price,
-        imageUrl: '/images/default_food.png',
+        imageUrl: DISH_PLACEHOLDER,
         description: '',
         tags: [],
         available: true,

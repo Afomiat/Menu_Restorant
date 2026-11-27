@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { Bill, CartItem, DailyReport, MenuItem, Problem, Walkout } from '../types';
 
 const svc = {
@@ -106,14 +106,36 @@ describe('DecisionsScreen', () => {
 
     const card = await screen.findByTestId('problem-p1');
     expect(card.textContent).toContain('Table 5: 1× Tibs');
-    expect(card.textContent).toContain('Undercooked · pink inside');
+    expect(card.textContent).toContain('Undercooked');
+    expect(card.textContent).toContain('“pink inside”');
     expect(card.textContent).toContain('Readied by Tigist · served by Abebe · reported by Abebe');
 
     fireEvent.click(within(card).getByLabelText('Remove from bill'));
-    fireEvent.change(within(card).getByLabelText('Who was at fault'), { target: { value: 'kitchen' } });
+    fireEvent.click(within(within(card).getByRole('radiogroup', { name: 'Who was at fault' })).getByLabelText('Kitchen'));
     fireEvent.submit(card);
 
     await waitFor(() => expect(svc.decideProblem).toHaveBeenCalledWith('p1', 'remove_from_bill', 'kitchen'));
+    expect(await screen.findByText('Nothing waiting for you.')).toBeTruthy();
+  });
+
+  it('shows the page outline while loading, then a counter for each kind of alert', async () => {
+    let resolve: (d: { problems: Problem[]; walkouts: Walkout[] }) => void = () => {};
+    svc.fetchDecisions.mockReturnValue(new Promise((r) => (resolve = r)));
+    render(<DecisionsScreen refreshSignal={0} />);
+    expect(screen.getByRole('status', { name: 'Alerts' })).toBeTruthy();
+
+    await act(async () => resolve({ problems: [problem('p1'), problem('p2')], walkouts: [walkout('b7')] }));
+    const counters = screen.getByRole('region', { name: 'Waiting for you' });
+    expect(counters.textContent).toContain('Problems with dishes2');
+    expect(counters.textContent).toContain('Walkouts1');
+    expect(counters.textContent).toContain('Late dishes0');
+    expect(screen.queryByRole('status', { name: 'Alerts' })).toBeNull();
+  });
+
+  it('says all is clear when nothing waits', async () => {
+    svc.fetchDecisions.mockResolvedValue({ problems: [], walkouts: [] });
+    render(<DecisionsScreen refreshSignal={0} />);
+
     expect(await screen.findByText('Nothing waiting for you.')).toBeTruthy();
   });
 
@@ -138,7 +160,7 @@ describe('DecisionsScreen', () => {
 
     const card = await screen.findByTestId('problem-p1');
     fireEvent.click(within(card).getByLabelText('Remove from bill'));
-    fireEvent.change(within(card).getByLabelText('Who was at fault'), { target: { value: 'none' } });
+    fireEvent.click(within(within(card).getByRole('radiogroup', { name: 'Who was at fault' })).getByLabelText('No one'));
     fireEvent.submit(card);
     expect((await screen.findByRole('alert')).textContent).toBe(
       'This bill is already paid or closed, so the dish cannot be taken off it. Choose Remake instead.'
@@ -152,12 +174,11 @@ describe('DecisionsScreen', () => {
     const card = await screen.findByTestId('problem-p1');
     const decide = within(card).getByRole('button', { name: 'Decide' }) as HTMLButtonElement;
     expect(within(card).getAllByRole('radio').some((r) => (r as HTMLInputElement).checked)).toBe(false);
-    expect((within(card).getByLabelText('Who was at fault') as HTMLSelectElement).value).toBe('');
     expect(decide.disabled).toBe(true);
 
     fireEvent.click(within(card).getByLabelText('Remake'));
     expect(decide.disabled).toBe(true);
-    fireEvent.change(within(card).getByLabelText('Who was at fault'), { target: { value: 'waiter' } });
+    fireEvent.click(within(within(card).getByRole('radiogroup', { name: 'Who was at fault' })).getByLabelText('Waiter'));
     expect(decide.disabled).toBe(false);
     expect(svc.decideProblem).not.toHaveBeenCalled();
   });
@@ -219,27 +240,61 @@ describe('ReportsScreen', () => {
     open_bills: [{ bill_id: 'b9', table_number: '3', status: 'bill_requested', waiter_name: 'Abebe', total_amount: 300, amount_paid: 100 }],
   };
 
-  it('shows every part of the day', async () => {
+  it('shows the day at a glance in four totals', async () => {
+    svc.fetchDailyReport.mockResolvedValue(report);
+    render(<ReportsScreen currency="ETB" />);
+
+    const summary = await screen.findByRole('region', { name: 'Summary' });
+    const text = summary.textContent || '';
+    expect(text).toContain('Collected1,470 ETB4 payments');
+    expect(text).toContain('Confirmed by cashier1,200 ETB82% of collected');
+    expect(text).toContain('Not confirmed yet270 ETB');
+    // Walkout 600 + removed dish 450
+    expect(text).toContain('Lost1,050 ETB1 walkout · 1 removed');
+  });
+
+  it('shows payments, waiters, losses, kitchen times and open bills', async () => {
     svc.fetchDailyReport.mockResolvedValue(report);
     render(<ReportsScreen currency="ETB" />);
 
     const sales = await screen.findByRole('region', { name: 'Sales by payment method' });
-    expect(sales.textContent).toContain('Cash');
-    expect(sales.textContent).toContain('Total collected');
-    expect(screen.getByRole('region', { name: 'Waiters' }).textContent).toContain('Abebe');
+    expect(sales.textContent).toContain('Cash3 payments1,200 ETB82%');
+    expect(sales.textContent).toContain('Total collected1,470 ETB');
+
+    const waiters = screen.getByRole('region', { name: 'Waiters' });
+    expect(waiters.textContent).toContain('Abebe4 bills · 1,530 ETB sold');
+    expect(waiters.textContent).toContain('1 walkout');
+    expect(waiters.textContent).toContain('1,200 ETB of 1,470 ETB confirmed');
+    expect(waiters.textContent).toContain('270 ETB not confirmed');
+
     const losses = screen.getByRole('region', { name: 'Losses' });
-    expect(losses.textContent).toContain('Table 7 left without paying');
+    expect(losses.textContent).toContain('Table 7 left without paying · waiter Bereket');
+    expect(losses.textContent).toContain('−600 ETB');
     expect(losses.textContent).toContain('Table 5: 1× Tibs');
-    expect(losses.textContent).toContain('Kitchen');
-    expect(screen.getByRole('region', { name: 'Kitchen times' }).textContent).toContain('18:30');
-    expect(screen.getByRole('region', { name: 'Kitchen times' }).textContent).toContain('15:00');
-    // Headings on every table, and the day's total loss: walkout 600 + removed dish 450
-    expect(sales.querySelector('thead')?.textContent).toBe('Paid byPaymentsAmount');
-    expect(losses.querySelectorAll('thead')).toHaveLength(2);
+    expect(losses.textContent).toContain('Undercooked · At fault: Kitchen');
     expect(screen.getByTestId('losses-total').textContent).toContain('1,050');
     // Remakes only appear when the server sends them
     expect(screen.queryByText('Dishes cooked again')).toBeNull();
-    expect(screen.getByRole('region', { name: 'Bills still open' }).textContent).toContain('Bill asked');
+
+    const kitchen = screen.getByRole('region', { name: 'Kitchen times' });
+    expect(kitchen.textContent).toContain('18:30 avg · target 15:00');
+    expect(kitchen.textContent).toContain('2 late');
+
+    const open = screen.getByRole('region', { name: 'Bills still open' });
+    expect(open.textContent).toContain('Table 3Bill askedAbebe');
+    expect(open.textContent).toContain('200 ETBowed');
+  });
+
+  it('shows a collected bill as money to confirm, not as owed', async () => {
+    svc.fetchDailyReport.mockResolvedValue({
+      ...report,
+      open_bills: [{ bill_id: 'b4', table_number: '4', status: 'collected', waiter_name: 'Bereket', total_amount: 420, amount_paid: 420 }],
+    });
+    render(<ReportsScreen currency="ETB" />);
+
+    const open = await screen.findByRole('region', { name: 'Bills still open' });
+    expect(open.textContent).toContain('420 ETBto confirm');
+    expect(open.textContent).not.toContain('owed');
   });
 
   it('lists dishes cooked again when the server sends them', async () => {
@@ -249,16 +304,30 @@ describe('ReportsScreen', () => {
     const losses = await screen.findByRole('region', { name: 'Losses' });
     expect(losses.textContent).toContain('Dishes cooked again');
     expect(losses.textContent).toContain('Table 5: 1× Shiro');
-    expect(losses.textContent).toContain('ColdWaiter');
+    expect(losses.textContent).toContain('Cold · At fault: Waiter');
   });
 
-  it('labels each value for the phone card layout', async () => {
-    svc.fetchDailyReport.mockResolvedValue(report);
+  it('puts the slowest dishes first, against their prep time', async () => {
+    svc.fetchDailyReport.mockResolvedValue({
+      ...report,
+      kitchen: [
+        { item_name: 'Buna', orders: 5, avg_minutes: 3, target_minutes: 5, late: 0 },
+        { item_name: 'Tibs', orders: 3, avg_minutes: 18.5, target_minutes: 15, late: 2 },
+      ],
+    });
     render(<ReportsScreen currency="ETB" />);
 
-    const waiters = await screen.findByRole('region', { name: 'Waiters' });
-    const labels = Array.from(waiters.querySelectorAll('tbody td')).map((td) => td.getAttribute('data-label'));
-    expect(labels).toEqual(['Waiter', 'Bills', 'Sales', 'Collected', 'Confirmed', 'Not confirmed', 'Walkouts']);
+    await screen.findByRole('region', { name: 'Kitchen times' });
+    const order = Array.from(document.querySelectorAll('[data-testid^="kitchen-"]')).map((el) => el.getAttribute('data-testid'));
+    expect(order).toEqual(['kitchen-Tibs', 'kitchen-Buna']);
+  });
+
+  it('shows the page outline while a day loads', async () => {
+    svc.fetchDailyReport.mockReturnValue(new Promise(() => {}));
+    render(<ReportsScreen currency="ETB" />);
+
+    expect(screen.getByRole('status', { name: 'Reports' })).toBeTruthy();
+    expect(screen.queryByRole('region', { name: 'Summary' })).toBeNull();
   });
 
   it('loads another day when the date changes', async () => {
@@ -270,5 +339,8 @@ describe('ReportsScreen', () => {
 
     await waitFor(() => expect(svc.fetchDailyReport).toHaveBeenLastCalledWith('2026-11-01'));
     expect((await screen.findAllByText('Nothing for this day.')).length).toBeGreaterThan(0);
+    expect(screen.getByText('No losses this day.')).toBeTruthy();
+    // Away from today, one tap goes back to it
+    expect(screen.getByRole('button', { name: 'Today' })).toBeTruthy();
   });
 });

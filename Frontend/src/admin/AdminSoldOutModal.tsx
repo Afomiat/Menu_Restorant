@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { X, Search, CheckSquare, Square, AlertCircle, Save } from 'lucide-react';
 import type { MenuItem } from '../types';
 import { formatCurrency } from '../utils/currency';
+import { DISH_PLACEHOLDER } from '../utils/images';
 
 interface AdminSoldOutModalProps {
   isOpen: boolean;
@@ -182,7 +183,7 @@ export default function AdminSoldOutModal({
                       }}
                     >
                       <img
-                        src={item.imageUrl || '/images/cat_food.jpg'}
+                        src={item.imageUrl || DISH_PLACEHOLDER}
                         alt={item.name}
                         style={{
                           width: '100%',
@@ -191,7 +192,7 @@ export default function AdminSoldOutModal({
                           filter: isSoldOut ? 'grayscale(80%)' : 'none',
                         }}
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src = '/images/cat_food.jpg';
+                          (e.target as HTMLImageElement).src = DISH_PLACEHOLDER;
                         }}
                       />
                     </div>

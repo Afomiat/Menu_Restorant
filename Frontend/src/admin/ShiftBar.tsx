@@ -4,6 +4,7 @@ import { endShift, fetchMyShift, startShift } from '../services/billService';
 import { fetchMyShiftReport } from '../services/problemService';
 import { formatPrice } from '../utils/currency';
 import { t } from '../i18n/en';
+import { BusyButton } from './Loading';
 
 /**
  * Start and end a shift; ending is refused while a waiter still holds unpaid bills.
@@ -62,13 +63,13 @@ export default function ShiftBar({
         {shift ? t.shift.onShift(since) : t.shift.offShift}
       </span>
       {shift ? (
-        <button type="button" className="admin-sec-pill-btn" disabled={busy} onClick={() => run(endShift, () => null)}>
+        <BusyButton className="admin-sec-pill-btn" busy={busy} onClick={() => run(endShift, () => null)}>
           {t.shift.end}
-        </button>
+        </BusyButton>
       ) : (
-        <button type="button" className="admin-save-pill-btn" disabled={busy} onClick={() => run(startShift, (s) => s)}>
+        <BusyButton className="admin-save-pill-btn" busy={busy} onClick={() => run(startShift, (s) => s)}>
           {t.shift.start}
-        </button>
+        </BusyButton>
       )}
       {shift && totals && (
         <span style={{ fontSize: '13px', color: '#0f172a' }} data-testid="shift-totals">

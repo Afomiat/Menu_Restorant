@@ -1,4 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { type ReactNode, useState, useEffect, useRef } from 'react';
+import AdminPageShell from './AdminPageShell';
+import { BusyButton } from './Loading';
+import { t } from '../i18n/en';
 import { X, Settings, RefreshCw, DollarSign, Store, MapPin, Palette, Image as ImageIcon, UploadCloud, Loader2, Trash2, Clock } from 'lucide-react';
 import type { RestaurantMeta, TenantSettings } from '../types';
 import AdminConfirmModal from './AdminConfirmModal';
@@ -14,6 +17,8 @@ interface AdminSettingsModalProps {
   /** Pro restaurants also set prep and reminder times here. */
   showProTimings?: boolean;
   onTimingsSaved?: (settings: TenantSettings) => void;
+  /** Shown as its own dashboard page instead of a dialog: no Cancel, and it stays open after saving. */
+  asPage?: boolean;
 }
 
 const COMMON_CURRENCIES = [
@@ -34,6 +39,7 @@ export default function AdminSettingsModal({
   showProTimings = false,
   onTimingsSaved,
   onResetToDefault,
+  asPage = false,
 }: AdminSettingsModalProps) {
   const timingsRef = useRef<ProTimingsHandle>(null);
   const [isSavingTimings, setIsSavingTimings] = useState(false);
@@ -176,35 +182,47 @@ export default function AdminSettingsModal({
     };
 
     onSave(updatedMeta);
-    onClose();
+    if (!asPage) onClose();
   };
 
-  return (
-    <div className="admin-modal-overlay" onClick={onClose}>
-      <div
-        className="admin-modal-dialog"
-        style={{ maxWidth: '520px' }}
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-      >
-        <div className="admin-modal-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Settings size={20} color="var(--admin-primary)" />
-            <h3 className="admin-modal-title">Restaurant & Currency Settings</h3>
+  const frame = (content: ReactNode) =>
+    asPage ? (
+      <AdminPageShell title={t.settings.pageTitle} subtitle={t.settings.pageSubtitle} maxWidth={760} bare>
+        {content}
+      </AdminPageShell>
+    ) : (
+      <div className="admin-modal-overlay" onClick={onClose}>
+        <div
+          className="admin-modal-dialog"
+          style={{ maxWidth: '520px' }}
+          onClick={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="admin-modal-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Settings size={20} color="var(--admin-primary)" />
+              <h3 className="admin-modal-title">Restaurant & Currency Settings</h3>
+            </div>
+            <button
+              type="button"
+              className="admin-modal-close-btn"
+              onClick={onClose}
+              aria-label="Close modal"
+            >
+              <X size={18} />
+            </button>
           </div>
-          <button
-            type="button"
-            className="admin-modal-close-btn"
-            onClick={onClose}
-            aria-label="Close modal"
-          >
-            <X size={18} />
-          </button>
+          {content}
         </div>
+      </div>
+    );
 
+  return frame(
+    <>
         <form onSubmit={handleSubmit}>
-          <div className="admin-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className={asPage ? 'set-body' : 'admin-modal-body'} style={asPage ? undefined : { display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <SettingsGroup page={asPage} title={t.settings.groupRestaurant}>
             {/* Restaurant Name */}
             <div>
               <label className="admin-input-label">
@@ -277,13 +295,15 @@ export default function AdminSettingsModal({
                   />
                 )}
               </div>
-              <p style={{ fontSize: '11.5px', color: 'var(--admin-text-muted)', margin: '5px 0 0 2px' }}>
+              <p style={{ fontSize: '13px', color: 'var(--admin-text-muted)', margin: '5px 0 0 2px' }}>
                 {isLiveMenu
                   ? 'Restaurant name and currency are managed by the platform administrator.'
                   : 'Selected currency will apply everywhere across dishes, cart drawer, and live customer menus.'}
               </p>
             </div>
 
+            </SettingsGroup>
+            <SettingsGroup page={asPage} title={t.settings.groupPlace}>
             {/* Delivery Address / Location */}
             <div>
               <label className="admin-input-label">
@@ -295,7 +315,7 @@ export default function AdminSettingsModal({
                 className="admin-input-control"
                 value={deliveryAddress}
                 onChange={(e) => setDeliveryAddress(e.target.value)}
-                placeholder="e.g. 11/2 Diriyah, Riyadh"
+                placeholder="e.g. Bole Road, near Edna Mall, Addis Ababa"
               />
             </div>
 
@@ -314,6 +334,8 @@ export default function AdminSettingsModal({
               />
             </div>
 
+            </SettingsGroup>
+            <SettingsGroup page={asPage} title={t.settings.groupBrand}>
             {/* Restaurant Logo */}
             <div>
               <label className="admin-input-label">
@@ -341,7 +363,7 @@ export default function AdminSettingsModal({
                   className="admin-sec-pill-btn"
                   disabled={isUploadingLogo}
                   onClick={() => logoFileInputRef.current?.click()}
-                  style={{ height: '38px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  style={{ height: '38px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px', flex: '0 0 auto' }}
                 >
                   {isUploadingLogo ? (
                     <>
@@ -366,7 +388,7 @@ export default function AdminSettingsModal({
                       (e.target as HTMLImageElement).style.display = 'none';
                     }}
                   />
-                  <span style={{ fontSize: '11.5px', color: 'var(--admin-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                  <span style={{ fontSize: '13px', color: 'var(--admin-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                     {logoUrl}
                   </span>
                   <button
@@ -380,7 +402,7 @@ export default function AdminSettingsModal({
                 </div>
               )}
               {logoUploadError && (
-                <p style={{ fontSize: '11.5px', color: 'var(--admin-danger)', margin: '4px 0 0 2px' }}>
+                <p style={{ fontSize: '13px', color: 'var(--admin-danger)', margin: '4px 0 0 2px' }}>
                   {logoUploadError}
                 </p>
               )}
@@ -400,7 +422,7 @@ export default function AdminSettingsModal({
                   style={{ flex: 1 }}
                   value={heroImageUrl}
                   onChange={(e) => setHeroImageUrl(e.target.value)}
-                  placeholder="e.g. /images/burger_classic.jpg or image URL"
+                  placeholder="Image link, or use Upload"
                 />
                 <input
                   ref={heroFileInputRef}
@@ -414,7 +436,7 @@ export default function AdminSettingsModal({
                   className="admin-sec-pill-btn"
                   disabled={isUploadingHero}
                   onClick={() => heroFileInputRef.current?.click()}
-                  style={{ height: '38px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  style={{ height: '38px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px', flex: '0 0 auto' }}
                 >
                   {isUploadingHero ? (
                     <>
@@ -440,7 +462,7 @@ export default function AdminSettingsModal({
                       (e.target as HTMLImageElement).style.display = 'none';
                     }}
                   />
-                  <span style={{ fontSize: '11.5px', color: 'var(--admin-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                  <span style={{ fontSize: '13px', color: 'var(--admin-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                     {heroImageUrl}
                   </span>
                   <button
@@ -455,12 +477,12 @@ export default function AdminSettingsModal({
               )}
 
               {heroUploadError && (
-                <p style={{ fontSize: '11.5px', color: 'var(--admin-danger)', margin: '4px 0 0 2px' }}>
+                <p style={{ fontSize: '13px', color: 'var(--admin-danger)', margin: '4px 0 0 2px' }}>
                   {heroUploadError}
                 </p>
               )}
 
-              <p style={{ fontSize: '11.5px', color: 'var(--admin-text-muted)', margin: '5px 0 0 2px' }}>
+              <p style={{ fontSize: '13px', color: 'var(--admin-text-muted)', margin: '5px 0 0 2px' }}>
                 Displayed with a diagonal cut and blurred atmospheric backdrop on the customer menu hero banner.
               </p>
             </div>
@@ -495,6 +517,7 @@ export default function AdminSettingsModal({
               </div>
             </div>
 
+            </SettingsGroup>
             {/* Reset Data Section (local demo menus only) */}
             {!isLiveMenu && (
             <div
@@ -514,7 +537,7 @@ export default function AdminSettingsModal({
                 <div style={{ fontSize: '13px', fontWeight: 700, color: '#9f1239' }}>
                   Reset Menu to JSON File
                 </div>
-                <div style={{ fontSize: '11.5px', color: '#be123c', marginTop: '2px' }}>
+                <div style={{ fontSize: '13px', color: '#be123c', marginTop: '2px' }}>
                   Discards local changes and reloads original data from disk.
                 </div>
               </div>
@@ -529,31 +552,28 @@ export default function AdminSettingsModal({
               </button>
             </div>
             )}
-            {showProTimings && <ProTimingsSection ref={timingsRef} onSaved={onTimingsSaved} />}
+            {showProTimings && (
+              <SettingsGroup page={asPage}>
+                <ProTimingsSection ref={timingsRef} onSaved={onTimingsSaved} plain={asPage} />
+              </SettingsGroup>
+            )}
           </div>
 
-          <div className="admin-modal-footer">
-            <button
-              type="button"
-              className="admin-modal-btn admin-modal-btn-cancel"
-              onClick={onClose}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="admin-modal-btn admin-modal-btn-save"
-              disabled={isUploading || isSavingTimings}
-              style={{
-                opacity: isUploading || isSavingTimings ? 0.7 : 1,
-                cursor: isUploading || isSavingTimings ? 'not-allowed' : 'pointer',
-              }}
-            >
+          <div className={asPage ? 'set-footer' : 'admin-modal-footer'}>
+            {!asPage && (
+              <button
+                type="button"
+                className="admin-sec-pill-btn"
+                onClick={onClose}
+              >
+                Cancel
+              </button>
+            )}
+            <BusyButton type="submit" className="admin-save-pill-btn" busy={isUploading || isSavingTimings}>
               {isUploading ? 'Uploading...' : isSavingTimings ? 'Saving...' : 'Save Settings'}
-            </button>
+            </BusyButton>
           </div>
         </form>
-      </div>
 
       {/* Factory Reset Confirmation Modal */}
       <AdminConfirmModal
@@ -568,6 +588,17 @@ export default function AdminSettingsModal({
         }}
         onClose={() => setIsResetConfirmOpen(false)}
       />
-    </div>
+    </>
+  );
+}
+
+/** On the page, each group of settings is its own card with a heading; in the dialog, a plain run of fields. */
+function SettingsGroup({ page, title, children }: { page: boolean; title?: string; children: ReactNode }) {
+  if (!page) return <>{children}</>;
+  return (
+    <section className="rpt-panel set-group" aria-label={title}>
+      {title && <h2 className="rpt-panel-title">{title}</h2>}
+      {children}
+    </section>
   );
 }
